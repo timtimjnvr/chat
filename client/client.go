@@ -1,11 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"client/data"
 	"flag"
 	"fmt"
-	"io"
+	"github.com/pkg/errors"
 	"log"
 	"net"
 	"os"
@@ -13,17 +12,16 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
-
-	"github.com/pkg/errors"
 )
 
 const (
-	ip                = "ip"
-	port              = "port"
-	transportProtocol = "tcp"
-	messageArg        = "messageArgument"
-	addrArg           = "portArgument"
-	portArg           = "portArgument"
+	transportProtocol      = "tcp"
+	localhost              = "localhost"
+	localhostDottedDecimal = "127.0.0.1"
+
+	messageArg = "messageArgument"
+	addrArg    = "portArgument"
+	portArg    = "addrArgument"
 
 	maxSimultaneousConnections = 1000
 	messageMaxSize             = 10000
@@ -44,17 +42,18 @@ func main() {
 		sigc     = make(chan os.Signal, 1)
 		shutdown = make(chan struct{})
 
-		portAccept    = *portPtr
-		addressAccept = *addrPtr
-
-		chatList       data.Chat
-		stdin          = make(chan string, maxMessagesStdin)
-		newConnections = make(chan net.Conn, maxSimultaneousConnections)
+		portAccept        = *portPtr
+		addressAccept     = *addrPtr
+		readerStdin       = os.Stdin
+		chatList          data.Chat
+		stdin             = make(chan string, maxMessagesStdin)
+		newConnections    = make(chan net.Conn, maxSimultaneousConnections)
+		connectionToClose = make(chan int, maxSimultaneousConnections)
 	)
 
 	defer func() {
-		wgReadStdin.Wait()
 		wgListen.Wait()
+		wgReadStdin.Wait()
 		log.Println("[INFO] program shutdown")
 	}()
 
@@ -68,7 +67,7 @@ func main() {
 	go ListenAndServe(&wgListen, newConnections, shutdown, transportProtocol, addressAccept, portAccept)
 
 	wgReadStdin.Add(1)
-	go readStdin(&wgReadStdin, os.Stdin, stdin, shutdown)
+	go readStdin(&wgReadStdin, readerStdin, stdin, shutdown)
 
 	for {
 		select {
@@ -83,39 +82,20 @@ func main() {
 			currentChat = chat
 			go handleConnection(chat, shutdown)
 
+		case <-connectionToClose:
+			// TODO
+
 		case line := <-stdin:
 			cmd, err := parseCommand(line)
 			if err != nil {
 				log.Println("[ERROR] ", err)
 			}
-			switch cmd.typology {
-			case connectCommandType:
-				var (
-					pt   int
-					conn net.Conn
-				)
 
-				pt, _ = strconv.Atoi(cmd.args[portArg])
+			err = execute(cmd, currentChat, &chatList, newConnections, connectionToClose)
 
-				conn, err = openConnection(transportProtocol, "", pt)
-				if err != nil {
-					log.Println("[ERROR] ", err)
-				}
-				newConnections <- conn
-
-			case msgCommandType:
-				content := cmd.args[messageArg]
-				err = sendMessage(currentChat, content)
-				if err != nil {
-					log.Println("[ERROR] ", err)
-				}
-
-			case closeCommandType:
-				// TODO
-			case switchDiscussionCommandType:
-				//TODO
+			if err != nil {
+				log.Println("[ERROR] ", err)
 			}
-
 		}
 	}
 }
@@ -124,6 +104,7 @@ func ListenAndServe(wg *sync.WaitGroup, newConnections chan net.Conn, shutdown c
 	var (
 		wgConnection = sync.WaitGroup{}
 		wgClosure    = sync.WaitGroup{}
+		conn         net.Conn
 	)
 
 	defer func() {
@@ -144,7 +125,7 @@ func ListenAndServe(wg *sync.WaitGroup, newConnections chan net.Conn, shutdown c
 	for {
 		log.Println(fmt.Sprintf("[INFO] Accepting connections on port %s", port))
 
-		conn, err := ln.Accept()
+		conn, err = ln.Accept()
 		if err != nil && errors.Is(err, net.ErrClosed) {
 			return
 		}
@@ -159,19 +140,36 @@ func ListenAndServe(wg *sync.WaitGroup, newConnections chan net.Conn, shutdown c
 
 }
 
-func readStdin(wg *sync.WaitGroup, r io.Reader, lines chan string, shutdown chan struct{}) {
+func readStdin(wg *sync.WaitGroup, r *os.File, lines chan string, shutdown chan struct{}) {
 	defer func() {
 		wg.Done()
 		close(lines)
 	}()
 
-	scan := bufio.NewScanner(r)
-	for scan.Scan() {
-		log.Println("[Chat] Type a command :")
+	go func() {
 		select {
 		case <-shutdown:
-		case lines <- scan.Text():
+			r.Close()
+			log.Println("closed ", r.Name())
 		}
+	}()
+	for {
+
+		fi, err := r.Stat()
+		if err != nil {
+			panic(err)
+		}
+		if fi.Size() > 0 {
+			fmt.Println("there is something to read")
+			buffer := make([]byte, messageMaxSize)
+			log.Println("reading")
+			n, _ := r.Read(buffer)
+			log.Println("finished reading")
+			if n > 0 {
+				lines <- string(buffer[0:n])
+			}
+		}
+
 	}
 }
 
@@ -230,23 +228,6 @@ func handleConnection(chat *data.Chat, shutdown chan struct{}) error {
 	return nil
 }
 
-func openConnection(protocol, ip string, port int) (net.Conn, error) {
-	conn, err := net.Dial(protocol, fmt.Sprintf("%s:%d", ip, port))
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
-}
-
-func sendMessage(chat *data.Chat, content string) error {
-	buffer := []byte(content)
-	_, err := chat.Data.Conn.Write(buffer)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func handleClosure(wg *sync.WaitGroup, shutdown chan struct{}, ln net.Listener) {
 	<-shutdown
 	err := ln.Close()
@@ -256,4 +237,64 @@ func handleClosure(wg *sync.WaitGroup, shutdown chan struct{}, ln net.Listener) 
 
 	wg.Done()
 	log.Println("[INFO] handleClosure stopped")
+}
+
+func execute(cmd command, currentChat *data.Chat, chatList *data.Chat, newConnections chan net.Conn, connectionToClose chan int) error {
+	var err error
+
+	switch cmd.typology {
+	case connectCommandType:
+		var (
+			pt     int
+			addrIp string
+			conn   net.Conn
+		)
+
+		pt, err = strconv.Atoi(cmd.args[portArg])
+		if err != nil {
+			return err
+		}
+		addrIp, _ = cmd.args[addrArg]
+		if addrIp == localhost || addrIp == localhostDottedDecimal {
+			addrIp = ""
+		}
+
+		conn, err = openConnection(transportProtocol, addrIp, pt)
+		if err != nil {
+			return err
+		}
+
+		newConnections <- conn
+
+	case msgCommandType:
+		err = sendMessage(currentChat.Data.Conn, cmd.args[messageArg])
+		if err != nil {
+			return err
+		}
+
+	case closeCommandType:
+		// TODO
+	case switchDiscussionCommandType:
+		// TODO
+	case listDiscussionCommandType:
+		// TODO
+	}
+	return nil
+}
+
+func openConnection(protocol, ip string, port int) (net.Conn, error) {
+	conn, err := net.Dial(protocol, fmt.Sprintf("%s:%d", ip, port))
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+func sendMessage(conn net.Conn, content string) error {
+	buffer := []byte(content)
+	_, err := conn.Write(buffer)
+	if err != nil {
+		return err
+	}
+	return nil
 }

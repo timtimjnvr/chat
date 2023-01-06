@@ -25,12 +25,20 @@ const (
 	errorParseCommand = "can't parse command"
 	unknownCommand    = "unknow command"
 
-	connectCommandType          commandType = iota
 	msgCommandType              commandType = iota
+	connectCommandType          commandType = iota
 	closeCommandType            commandType = iota
 	switchDiscussionCommandType commandType = iota
 	listDiscussionCommandType   commandType = iota
 )
+
+var commandTypeByCode = map[string]commandType{
+	msg:              msgCommandType,
+	connect:          connectCommandType,
+	closeConnection:  closeCommandType,
+	switchConnection: switchDiscussionCommandType,
+	listDiscussion:   listDiscussionCommandType,
+}
 
 func parseCommand(text string) (command, error) {
 	split := strings.Split(text, " ")
@@ -39,59 +47,32 @@ func parseCommand(text string) (command, error) {
 	}
 
 	commandString := split[0]
-	switch commandString {
-	case connect:
-		args := getArgs(text, connectCommandType)
-
-		return command{
-			connectCommandType,
-			args,
-		}, nil
-
-	case msg:
-		args := getArgs(text, connectCommandType)
-
-		return command{
-			msgCommandType,
-			args,
-		}, nil
-
-	case switchConnection:
-		args := getArgs(text, switchDiscussionCommandType)
-
-		return command{
-			switchDiscussionCommandType,
-			args,
-		}, nil
-
-	case closeConnection:
-		args := getArgs(text, closeCommandType)
-
-		return command{
-			closeCommandType,
-			args,
-		}, nil
-
-	case listDiscussion:
-		return command{
-			listDiscussionCommandType,
-			nil,
-		}, nil
-
-	default:
+	typology, exists := commandTypeByCode[commandString]
+	if !exists {
 		return command{}, errors.New(unknownCommand)
 	}
+
+	args, err := getArgs(text, typology)
+
+	if err != nil {
+		return command{}, err
+	}
+
+	return command{
+		typology,
+		args,
+	}, nil
+
 }
 
-func getArgs(text string, command commandType) map[string]string {
+func getArgs(text string, command commandType) (map[string]string, error) {
 	args := make(map[string]string)
 	switch command {
 	case connectCommandType:
 		splitArgs := strings.Split(text, " ")
-		if len(splitArgs) <= 3 {
-			return args
+		if len(splitArgs) < 3 {
+			return args, nil
 		}
-
 		args[addrArg] = splitArgs[1]
 		args[portArg] = splitArgs[2]
 
@@ -106,5 +87,5 @@ func getArgs(text string, command commandType) map[string]string {
 		//TODO
 	}
 
-	return args
+	return args, nil
 }
