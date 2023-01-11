@@ -22,74 +22,59 @@ const (
 	switchConnection = "/switch"
 	listDiscussion   = "/list"
 
-	errorParseCommand = "can't parse command"
-	unknownCommand    = "unknow command"
-
 	connectCommandType          commandType = iota
 	msgCommandType              commandType = iota
 	closeCommandType            commandType = iota
 	switchDiscussionCommandType commandType = iota
 	listDiscussionCommandType   commandType = iota
+
+	connectErrorArgumentsMsg = "command syntax : " + connect + "<ip> <port>"
+)
+
+var (
+	commands = map[string]commandType{
+		msg:              msgCommandType,
+		connect:          connectCommandType,
+		closeConnection:  closeCommandType,
+		switchConnection: switchDiscussionCommandType,
+		listDiscussion:   listDiscussionCommandType,
+	}
+
+	errorParseCommand   = errors.New("can't parse command")
+	errorUnknownCommand = errors.New("unknow command")
+	errorInArguments    = errors.New("problem in arguments")
 )
 
 func parseCommand(text string) (command, error) {
 	split := strings.Split(text, " ")
 	if len(split) < 2 {
-		return command{}, errors.New(errorParseCommand)
+		return command{}, errorParseCommand
 	}
 
 	commandString := split[0]
-	switch commandString {
-	case connect:
-		args := getArgs(text, connectCommandType)
-
-		return command{
-			connectCommandType,
-			args,
-		}, nil
-
-	case msg:
-		args := getArgs(text, connectCommandType)
-
-		return command{
-			msgCommandType,
-			args,
-		}, nil
-
-	case switchConnection:
-		args := getArgs(text, switchDiscussionCommandType)
-
-		return command{
-			switchDiscussionCommandType,
-			args,
-		}, nil
-
-	case closeConnection:
-		args := getArgs(text, closeCommandType)
-
-		return command{
-			closeCommandType,
-			args,
-		}, nil
-
-	case listDiscussion:
-		return command{
-			listDiscussionCommandType,
-			nil,
-		}, nil
-
-	default:
-		return command{}, errors.New(unknownCommand)
+	typology, exist := commands[commandString]
+	if !exist {
+		return command{}, errorUnknownCommand
 	}
+
+	args, err := getArgs(text, typology)
+	if err != nil {
+		return command{}, errorInArguments
+	}
+
+	return command{
+		typology,
+		args,
+	}, nil
 }
 
-func getArgs(text string, command commandType) map[string]string {
+func getArgs(text string, command commandType) (map[string]string, error) {
 	args := make(map[string]string)
 	switch command {
 	case connectCommandType:
 		splitArgs := strings.Split(text, " ")
 		if len(splitArgs) <= 3 {
-			return args
+			return args, errors.Wrap(errorInArguments, connectErrorArgumentsMsg)
 		}
 
 		args[addrArg] = splitArgs[1]
@@ -106,5 +91,5 @@ func getArgs(text string, command commandType) map[string]string {
 		//TODO
 	}
 
-	return args
+	return args, nil
 }

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 	"log"
 	"net"
 	"os"
@@ -15,12 +16,15 @@ import (
 )
 
 const (
-	ip                = "ip"
-	port              = "port"
-	transportProtocol = "tcp"
-	messageArg        = "messageArgument"
-	addrArg           = "portArgument"
-	portArg           = "portArgument"
+	ip                      = "ip"
+	port                    = "port"
+	transportProtocol       = "tcp"
+	localhost               = "localhost"
+	localhostDecimalPointed = "127.0.0.1"
+
+	messageArg = "messageArgument"
+	portArg    = "portArgument"
+	addrArg    = "portArgument"
 
 	endOfStream                = "Ctrl+D\n\r"
 	maxSimultaneousConnections = 1000
@@ -82,24 +86,28 @@ func main() {
 			go handleConnection(chat, shutdown)
 
 		case line := <-stdin:
-			return
 			cmd, err := parseCommand(line)
 			if err != nil {
 				log.Println("[ERROR] ", err)
 			}
+
 			switch cmd.typology {
 			case connectCommandType:
 				var (
-					pt   int
-					conn net.Conn
+					pt, _ = strconv.Atoi(cmd.args[portArg])
+					addr  = cmd.args[portArg]
+					conn  net.Conn
 				)
 
-				pt, _ = strconv.Atoi(cmd.args[portArg])
+				if addr == localhost || addr == localhostDecimalPointed {
+					addr = ""
+				}
 
-				conn, err = openConnection(transportProtocol, "", pt)
+				conn, err = openConnection(transportProtocol, addr, pt)
 				if err != nil {
 					log.Println("[ERROR] ", err)
 				}
+
 				newConnections <- conn
 
 			case msgCommandType:
@@ -111,10 +119,10 @@ func main() {
 
 			case closeCommandType:
 				// TODO
+
 			case switchDiscussionCommandType:
 				//TODO
 			}
-
 		}
 	}
 }
@@ -165,32 +173,50 @@ func readStdin(wg *sync.WaitGroup, lines chan string, shutdown chan struct{}) {
 		log.Println("[INFO] readStdin stopped")
 	}()
 
-	r := os.Stdin
+	// writeClose is closed in order to signal readStdin stop signal
+	var readClose, writeClose, _ = os.Pipe()
 
 	go func() {
 		select {
 		case <-shutdown:
-			r.Write([]byte(endOfStream))
-			r.Sync()
-			r.Close()
-			log.Println("file closed")
+			writeClose.Close()
 		}
 	}()
 
 	for {
+		log.Println("[INFO] type a command")
+
 		var (
-			n      int
+			fdSet  = unix.FdSet{}
 			buffer = make([]byte, messageMaxSize)
 			err    error
 		)
-		// Maybe try to use a syscall.Select() to signal end of stream and not block in read
-		n, err = r.Read(buffer)
-		log.Println("finished reading")
 
+		fdSet.Clear(int(os.Stdin.Fd()))
+		fdSet.Clear(int(readClose.Fd()))
+
+		fdSet.Set(int(os.Stdin.Fd()))
+		fdSet.Set(int(readClose.Fd()))
+
+		// modifies r/w/e file descriptors in fdSet with ready to use file descriptors (ie for us stdin or readClose)
+		_, err = unix.Select(int(readClose.Fd()+1), &fdSet, nil, nil, &unix.Timeval{Sec: 60, Usec: 0})
 		if err != nil {
+			log.Fatal("[ERROR] ", err)
 			return
 		}
 
+		// shutdown
+		if fdSet.IsSet(int(readClose.Fd())) {
+			return
+		}
+
+		// default read stdin
+		var n int
+		n, err = os.Stdin.Read(buffer)
+		if err != nil {
+			log.Fatal("[ERROR] ", err)
+			return
+		}
 		if n > 0 {
 			lines <- string(buffer[0:n])
 		}
