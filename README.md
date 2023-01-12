@@ -12,9 +12,8 @@ P2P chat program built in golang.
 ## run 
 
 ```
-cd client
 go build ./...
-./client -p=8080
+./chat -p=8080
 ```
 
 ## commands

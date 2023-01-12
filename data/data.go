@@ -1,85 +1,110 @@
 package data
 
 import (
+	"log"
 	"net"
 	"sync"
-
-	"github.com/pkg/errors"
 )
 
 const notFound = "chat not found"
 
 type (
+	ChatList struct {
+		head   *Chat
+		length int
+	}
+
 	Chat struct {
-		Index int
-		Data  data
+		Infos ChatInfos
 		Next  *Chat
 	}
-	data struct {
-		Conn net.Conn
-		Wg   *sync.WaitGroup
+
+	ChatInfos struct {
+		Conn     net.Conn
+		Wg       *sync.WaitGroup
+		Shutdown chan struct{}
 	}
 )
 
-func NewChat(wg *sync.WaitGroup, conn net.Conn) Chat {
-	return Chat{
-		Index: 0,
-		Data: data{
-			Conn: conn,
-			Wg:   wg,
+func (l *ChatList) isEmpty() bool {
+	return l.length == 0
+}
+
+func NewChatList() (l *ChatList) {
+	return &ChatList{
+		head:   nil,
+		length: 0,
+	}
+}
+
+func NewChat(conn net.Conn) *Chat {
+	return &Chat{
+		Infos: ChatInfos{
+			Conn:     conn,
+			Wg:       &sync.WaitGroup{},
+			Shutdown: make(chan struct{}, 0),
 		},
 		Next: nil,
 	}
 }
 
-func AddChat(first *Chat, wg *sync.WaitGroup, conn net.Conn) *Chat {
-	var p, tmp Chat
-
-	if first == nil {
-		tmp = NewChat(wg, conn)
-		return &tmp
+func (l *ChatList) AddChat(c *Chat) {
+	if l.isEmpty() {
+		l.head = c
+		l.length += 1
+		return
 	}
 
-	p = *first
-	for p.Next != nil {
-		p = *p.Next
+	ptr := l.head
+	for ptr.Next != nil {
+		ptr = ptr.Next
 	}
-	p.Index = tmp.Index + 1
-	p.Data = data{
-		Wg:   wg,
-		Conn: conn,
-	}
-	p.Next = &tmp
 
-	return &p
+	ptr.Next = c
 }
 
-func RemoveChat(first *Chat, index int) *Chat {
-	var previous, tmp Chat
+func (l *ChatList) GetChat(position int) *Chat {
+	if l.isEmpty() || l.length-1 < position {
+		return nil
+	}
+	var chat = l.head
 
-	tmp = *first
+	for position != 0 {
+		position -= 1
+		chat = chat.Next
+	}
+
+	return chat
+}
+func (c *Chat) display(position int) {
+	log.Printf("%d: %s <-> %s\n", position, c.Infos.Conn.LocalAddr(), c.Infos.Conn.RemoteAddr())
+}
+
+func (l *ChatList) Display() {
+	var (
+		chat     = l.head
+		position int
+	)
+
+	for chat.Next != nil {
+		chat.display(position)
+		chat = chat.Next
+		position++
+	}
+
+	// last of the list
+	chat.display(position)
+}
+
+/*func (l *ChatList) RemoveChat(index int) {
+	var previous, tmp ChatList
+
+	tmp = *l
 	for tmp.Index != index || tmp.Next != nil {
-		previous = tmp
 		tmp = *tmp.Next
 	}
 
 	if tmp.Index == index {
 		previous.Next = tmp.Next
 	}
-
-	return first
-}
-
-func GetChat(first Chat, index int) (Chat, error) {
-	var tmp Chat
-
-	for tmp.Index != index || tmp.Next != nil {
-		tmp = *tmp.Next
-	}
-
-	if tmp.Index == index {
-		return tmp, nil
-	}
-
-	return Chat{}, errors.New(notFound)
-}
+}*/
