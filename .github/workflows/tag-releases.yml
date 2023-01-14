@@ -1,0 +1,97 @@
+name: Tag and releases
+
+on:
+  push:
+    branches: ["main"]
+
+  workflow_dispatch:
+jobs:
+  compute-version:
+    name: "Build new tag and release"
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: |
+          # Runs a set of commands using the runners shell
+          echo "Starting the taging process based on commit message"
+          
+          if [[ "${{ github.event.head_commit.message }}" == *"[ci-skip]"* ]]; then
+            exit 0
+          fi
+
+          # Gets highest tags across all branches, not just the current branch
+          TAG=`git describe --tags $(git rev-list --tags --max-count=1)`
+
+          # split into array
+          REGEX='([[[:digit:]]+)'
+          
+          global_rematch() {
+            local s=$1 regex=$2 
+            while [[ $s =~ $regex ]]; do 
+              echo ${BASH_REMATCH[1]}
+              s=${s#*"${BASH_REMATCH[1]}"}
+            done
+            }
+          
+          TAG_BITS=($(global_rematch $TAG $REGEX))
+          
+          MAJOR=${TAG_BITS[0]}
+          echo "MAJOR $MAJOR"
+          MINOR=${TAG_BITS[1]}
+          echo "MINOR $MINOR"
+          PATCH=${TAG_BITS[2]}
+          echo "PATCH $PATCH"
+
+          echo "Latest version tag: $TAG"
+          
+          # Initialize new tags
+          NEW_MAJOR=0
+          NEW_MINOR=0
+          NEW_PATCH=0
+
+          if [[ "${{ github.event.head_commit.message }}" == *"breaking(:"* ]]; then
+            NEW_MAJOR=$((MAJOR+1))
+          fi
+
+          if [[ "${{ github.event.head_commit.message }}" == *"changes("* ]]; then   
+            NEW_MAJOR=$MAJOR 
+            NEW_MINOR=$((MINOR+1))
+          fi
+
+          if [[ "${{ github.event.head_commit.message }}" == *"changes(:"* ]]; then   
+            NEW_MAJOR=$MAJOR 
+            NEW_MINOR=$MINOR
+            NEW_PATCH=$((PATCH+1))
+          fi
+
+          #create new tag
+          NEW_TAG="v$NEW_MAJOR.$NEW_MINOR.$NEW_PATCH"
+
+          if [ $NEW_MAJOR -gt 0 ] ||  [ $NEW_MINOR -gt 0 ] || [ $NEW_PATCH -gt 0 ]; then
+            echo "Updating $TAG to $NEW_TAG"
+            echo "Tagged with $NEW_TAG (Ignoring fatal:cannot describe - this means commit is untagged) "
+            git tag "$NEW_TAG"
+            git push origin --tags
+          else
+            echo "Current tag not changed : $TAG "
+          fi
+
+          if [ $NEW_MAJOR -gt 0 ] ||  [ $NEW_MINOR -gt 0 ] || [ $NEW_PATCH -gt 0 ]; then
+            if [ $NEW_MAJOR -eq 0 ] ||  [ $MAJOR -eq 0 ] ]; then
+            gh release create $NEW_TAG --generate-notes --prerelease
+            else
+              gh release create $NEW_TAG --generate-notes
+            fi
+          else
+            echo "Remain on last release : $TAG"
+          fi

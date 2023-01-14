@@ -1,2 +1,2 @@
 # chat
-Client server program.
+P2P chat program built in golang.

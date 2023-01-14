@@ -1,0 +1,35 @@
+name: Build
+
+# Controls when the workflow will run
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - main
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Set up go
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: "^1.19" # The Go version to download (if necessary) and use.
+      - run: go version
+
+      # Install dependencies
+      - name: Install dependencies
+        working-directory: ./
+        run: go get
+
+      # Run tests
+      - name: Run tests
+        working-directory: ./
+        run: go test
