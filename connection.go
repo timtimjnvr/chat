@@ -3,6 +3,7 @@ package main
 import (
 	"chat/data"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 	"log"
@@ -129,7 +130,7 @@ func readConn(wg *sync.WaitGroup, conn net.Conn, messages chan string, shutdown 
 	}
 }
 
-func handleConnection(wg *sync.WaitGroup, conn net.Conn, shutdown chan struct{}) {
+func handleConnection(wg *sync.WaitGroup, conn net.Conn, id uuid.UUID, done chan<- uuid.UUID, shutdown chan struct{}) {
 	log.Println("[INFO] new connection")
 
 	var (
@@ -141,6 +142,7 @@ func handleConnection(wg *sync.WaitGroup, conn net.Conn, shutdown chan struct{})
 		conn.Close()
 		wgReadConn.Wait()
 		wg.Done()
+		done <- id
 		log.Println("[INFO] connection lost for ", conn.LocalAddr())
 	}()
 

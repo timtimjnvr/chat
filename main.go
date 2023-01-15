@@ -3,6 +3,7 @@ package main
 import (
 	"chat/data"
 	"flag"
+	"github.com/google/uuid"
 	"log"
 	"net"
 	"os"
@@ -21,6 +22,8 @@ const (
 	messageMaxSize             = 10000
 	maxMessagesStdin           = 100
 	maxMessagesConn            = 100
+
+	noDiscussionSelected = "you must be in a discussion to send a message"
 )
 
 func main() {
@@ -39,13 +42,15 @@ func main() {
 		wgListen      = sync.WaitGroup{}
 		wgReadStdin   = sync.WaitGroup{}
 
-		stdin          = make(chan string, maxMessagesStdin)
-		newConnections = make(chan net.Conn, maxSimultaneousConnections)
+		stdin           = make(chan string, maxMessagesStdin)
+		newConnections  = make(chan net.Conn, maxSimultaneousConnections)
+		connectionsDone = make(chan uuid.UUID, maxSimultaneousConnections)
 	)
 
 	defer func() {
 		wgReadStdin.Wait()
 		wgListen.Wait()
+		chatList.CloseAndWaitChats()
 		log.Println("[INFO] program shutdown")
 	}()
 
@@ -68,12 +73,14 @@ func main() {
 			return
 
 		case conn := <-newConnections:
-			// add to chat list
 			currentChat = data.NewChat(conn)
 			chatList.AddChat(currentChat)
+			currentChat.Infos.Wg.Add(1)
+			go handleConnection(currentChat.Infos.Wg, currentChat.Infos.Conn, currentChat.Id, connectionsDone, currentChat.Infos.Shutdown)
 
-			go handleConnection(currentChat.Infos.Wg, currentChat.Infos.Conn, currentChat.Infos.Shutdown)
-			log.Println(chatList)
+		case id := <-connectionsDone:
+			chatList.RemoveChat(id)
+			currentChat = nil
 
 		case line := <-stdin:
 			cmd, err := parseCommand(line)
@@ -88,6 +95,7 @@ func main() {
 					conn net.Conn
 					pt   int
 				)
+
 				pt, err = strconv.Atoi(cmd.args[portArg])
 				if err != nil {
 					log.Println(err)
@@ -107,13 +115,18 @@ func main() {
 
 			case msgCommandType:
 				content := cmd.args[messageArg]
+				if currentChat == nil {
+					log.Println(noDiscussionSelected)
+					continue
+				}
+
 				err = sendMessage(currentChat, content)
 				if err != nil {
 					log.Println("[ERROR] ", err)
 				}
 
 			case closeCommandType:
-				close(currentChat.Infos.Shutdown)
+				currentChat.Stop()
 
 			case listDiscussionCommandType:
 				chatList.Display()
