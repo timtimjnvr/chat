@@ -63,12 +63,12 @@ jobs:
             NEW_MAJOR=$((MAJOR+1))
           fi
 
-          if [[ "${{ github.event.head_commit.message }}" == *"changes("* ]]; then   
+          if [[ "${{ github.event.head_commit.message }}" == *"changes("* ]] || [[ "${{ github.event.head_commit.message }}" == *"feat("* ]]; then   
             NEW_MAJOR=$MAJOR 
             NEW_MINOR=$((MINOR+1))
           fi
 
-          if [[ "${{ github.event.head_commit.message }}" == *"changes(:"* ]]; then   
+          if [[ "${{ github.event.head_commit.message }}" == *"fix(:"* ]]; then   
             NEW_MAJOR=$MAJOR 
             NEW_MINOR=$MINOR
             NEW_PATCH=$((PATCH+1))
