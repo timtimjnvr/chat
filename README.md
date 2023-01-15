@@ -23,5 +23,3 @@ go build ./...
 /msg hello, friend ! : send "hello, friend" in the current discussion.
 /close : close the current discussion.
 ```
-
-
