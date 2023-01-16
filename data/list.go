@@ -9,6 +9,14 @@ type (
 		head   *Chat
 		length int
 	}
+
+	chatList interface {
+		AddChat()
+		UpdateChat()
+		RemoveChat()
+		GetChatInfos()
+		Display()
+	}
 )
 
 func NewChatList() (l *ChatList) {
