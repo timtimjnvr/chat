@@ -1,13 +1,31 @@
 package crdt
 
+import "chat/node"
+
 type (
-	discussion struct {
+	chat struct {
 		name     string
+		nodes    []node.Node
 		messages []message
 	}
 
-	Discussion interface {
+	Chat interface {
+		AddNode()
 		AddMessage()
-		UpdateList()
+		UpdateMessages()
 	}
 )
+
+func NewChat(name string) Chat {
+	return &chat{
+		name:     name,
+		nodes:    []node.Node{},
+		messages: []message{},
+	}
+}
+
+// TODO
+
+func (c *chat) AddNode()        {}
+func (c *chat) AddMessage()     {}
+func (c *chat) UpdateMessages() {}

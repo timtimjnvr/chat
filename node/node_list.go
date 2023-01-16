@@ -1,32 +1,32 @@
-package data
+package node
 
 import "github.com/google/uuid"
 
 const notFound = "chat not found"
 
 type (
-	ChatList struct {
-		head   *Chat
+	list struct {
+		head   *Node
 		length int
 	}
 
-	chatList interface {
-		AddChat()
-		UpdateChat()
-		RemoveChat()
-		GetChatInfos()
+	NodeList interface {
+		AddNode(c *Node)
+		RemoveNode(id uuid.UUID)
+		GetNode(id uuid.UUID) (c *Node)
 		Display()
+		CloseAndWaitNode()
 	}
 )
 
-func NewChatList() (l *ChatList) {
-	return &ChatList{
+func NewNodeList() (l NodeList) {
+	return &list{
 		head:   nil,
 		length: 0,
 	}
 }
 
-func (l *ChatList) AddChat(c *Chat) {
+func (l *list) AddNode(c *Node) {
 	if l.isEmpty() {
 		l.head = c
 		l.length += 1
@@ -42,8 +42,8 @@ func (l *ChatList) AddChat(c *Chat) {
 	ptr.Next = c
 }
 
-func (l *ChatList) GetChat(position int) *Chat {
-	if l.isEmpty() || l.length-1 < position {
+func (l *list) GetNode(id uuid.UUID) *Node {
+	if l.isEmpty() {
 		return nil
 	}
 
@@ -52,15 +52,19 @@ func (l *ChatList) GetChat(position int) *Chat {
 		index int
 	)
 
-	for index != position {
+	for chat.Next != nil && chat.Id != id {
 		index += 1
 		chat = chat.Next
 	}
 
-	return chat
+	if chat.Id == id {
+		return chat
+	}
+
+	return nil
 }
 
-func (l *ChatList) Display() {
+func (l *list) Display() {
 	var (
 		chat     = l.head
 		position int
@@ -76,8 +80,8 @@ func (l *ChatList) Display() {
 	chat.display(position)
 }
 
-func (l *ChatList) RemoveChat(id uuid.UUID) {
-	var previous, tmp *Chat
+func (l *list) RemoveNode(id uuid.UUID) {
+	var previous, tmp *Node
 
 	// remove first element
 	if l.head.Id == id {
@@ -99,7 +103,7 @@ func (l *ChatList) RemoveChat(id uuid.UUID) {
 	}
 }
 
-func (l *ChatList) CloseAndWaitChats() {
+func (l *list) CloseAndWaitNode() {
 	var chat = l.head
 
 	for chat.Next != nil {
@@ -108,10 +112,10 @@ func (l *ChatList) CloseAndWaitChats() {
 
 	for chat.Next != nil {
 		chat.Infos.Wg.Wait()
-		l.RemoveChat(chat.Id)
+		l.RemoveNode(chat.Id)
 	}
 }
 
-func (l *ChatList) isEmpty() bool {
+func (l *list) isEmpty() bool {
 	return l.length == 0
 }

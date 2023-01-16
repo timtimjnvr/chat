@@ -1,7 +1,7 @@
 package main
 
 import (
-	"chat/data"
+	"chat/node"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -172,7 +172,7 @@ func openConnection(protocol, ip string, port int) (net.Conn, error) {
 	return conn, nil
 }
 
-func sendMessage(chat *data.Chat, content string) error {
+func sendMessage(chat *node.Node, content string) error {
 	buffer := []byte(content)
 	_, err := chat.Infos.Conn.Write(buffer)
 	if err != nil {

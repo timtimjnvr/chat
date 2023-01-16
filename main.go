@@ -1,7 +1,7 @@
 package main
 
 import (
-	"chat/data"
+	"chat/node"
 	parsestdin "chat/parsestdin"
 	"flag"
 	"github.com/google/uuid"
@@ -33,8 +33,8 @@ func main() {
 	flag.Parse()
 
 	var (
-		currentChat *data.Chat
-		chatList    = data.NewChatList()
+		currentDiscussion *node.Node
+		nodes             = node.NewNodeList()
 
 		sigc          = make(chan os.Signal, 1)
 		shutdown      = make(chan struct{})
@@ -51,7 +51,7 @@ func main() {
 	defer func() {
 		wgReadStdin.Wait()
 		wgListen.Wait()
-		chatList.CloseAndWaitChats()
+		nodes.CloseAndWaitNode()
 		log.Println("[INFO] program shutdown")
 	}()
 
@@ -74,14 +74,14 @@ func main() {
 			return
 
 		case conn := <-newConnections:
-			currentChat = data.NewChat(conn)
-			chatList.AddChat(currentChat)
-			currentChat.Infos.Wg.Add(1)
-			go handleConnection(currentChat.Infos.Wg, currentChat.Infos.Conn, currentChat.Id, connectionsDone, currentChat.Infos.Shutdown)
+			currentDiscussion = node.NewChat(conn)
+			nodes.AddNode(currentDiscussion)
+			currentDiscussion.Infos.Wg.Add(1)
+			go handleConnection(currentDiscussion.Infos.Wg, currentDiscussion.Infos.Conn, currentDiscussion.Id, connectionsDone, currentDiscussion.Infos.Shutdown)
 
 		case id := <-connectionsDone:
-			chatList.RemoveChat(id)
-			currentChat = nil
+			nodes.RemoveNode(id)
+			currentDiscussion = nil
 
 		case line := <-stdin:
 			cmd, err := parsestdin.NewCommand(line)
@@ -118,25 +118,24 @@ func main() {
 
 			case parsestdin.MsgCommandType:
 				content := args[parsestdin.MessageArg]
-				if currentChat == nil {
+				if currentDiscussion == nil {
 					log.Println(noDiscussionSelected)
 					continue
 				}
 
-				err = sendMessage(currentChat, content)
+				err = sendMessage(currentDiscussion, content)
 				if err != nil {
 					log.Println("[ERROR] ", err)
 				}
 
 			case parsestdin.CloseCommandType:
-				currentChat.Stop()
+				currentDiscussion.Stop()
 
 			case parsestdin.ListDiscussionCommandType:
-				chatList.Display()
+				nodes.Display()
 
 			case parsestdin.SwitchDiscussionCommandType:
-				chatId, _ := strconv.Atoi(args[parsestdin.IdChatArg])
-				currentChat = chatList.GetChat(chatId)
+				// chatId, _ := strconv.Atoi(args[parsestdin.IdChatArg])
 			}
 		}
 	}

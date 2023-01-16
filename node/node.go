@@ -1,4 +1,4 @@
-package data
+package node
 
 import (
 	"github.com/google/uuid"
@@ -8,24 +8,24 @@ import (
 )
 
 type (
-	Chat struct {
+	Node struct {
 		Id    uuid.UUID
-		Infos ChatInfos
-		Next  *Chat
+		Infos Infos
+		Next  *Node
 	}
 
-	ChatInfos struct {
+	Infos struct {
 		Conn     net.Conn
 		Wg       *sync.WaitGroup
 		Shutdown chan struct{}
 	}
 )
 
-func NewChat(conn net.Conn) *Chat {
+func NewChat(conn net.Conn) *Node {
 	id, _ := uuid.NewUUID()
-	return &Chat{
+	return &Node{
 		Id: id,
-		Infos: ChatInfos{
+		Infos: Infos{
 			Conn:     conn,
 			Wg:       &sync.WaitGroup{},
 			Shutdown: make(chan struct{}, 0),
@@ -34,11 +34,11 @@ func NewChat(conn net.Conn) *Chat {
 	}
 }
 
-func (c *Chat) Stop() {
+func (c *Node) Stop() {
 	close(c.Infos.Shutdown)
 	c.Infos.Wg.Wait()
 }
 
-func (c *Chat) display(position int) {
+func (c *Node) display(position int) {
 	log.Printf("%d: %s <-> %s\n", position, c.Infos.Conn.LocalAddr(), c.Infos.Conn.RemoteAddr())
 }
