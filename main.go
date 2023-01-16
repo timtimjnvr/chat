@@ -2,6 +2,7 @@ package main
 
 import (
 	"chat/data"
+	parsestdin "chat/parsestdin"
 	"flag"
 	"github.com/google/uuid"
 	"log"
@@ -83,20 +84,22 @@ func main() {
 			currentChat = nil
 
 		case line := <-stdin:
-			cmd, err := parseCommand(line)
+			cmd, err := parsestdin.NewCommand(line)
 			if err != nil {
 				log.Println("[ERROR] ", err)
 			}
 
-			switch cmd.typology {
-			case connectCommandType:
+			args := cmd.GetCommandArgs()
+
+			switch typology := cmd.GetCommandType(); typology {
+			case parsestdin.ConnectCommandType:
 				var (
-					addr = cmd.args[addrArg]
+					addr = args[parsestdin.AddrArg]
 					conn net.Conn
 					pt   int
 				)
 
-				pt, err = strconv.Atoi(cmd.args[portArg])
+				pt, err = strconv.Atoi(args[parsestdin.PortArg])
 				if err != nil {
 					log.Println(err)
 				}
@@ -113,8 +116,8 @@ func main() {
 
 				newConnections <- conn
 
-			case msgCommandType:
-				content := cmd.args[messageArg]
+			case parsestdin.MsgCommandType:
+				content := args[parsestdin.MessageArg]
 				if currentChat == nil {
 					log.Println(noDiscussionSelected)
 					continue
@@ -125,14 +128,14 @@ func main() {
 					log.Println("[ERROR] ", err)
 				}
 
-			case closeCommandType:
+			case parsestdin.CloseCommandType:
 				currentChat.Stop()
 
-			case listDiscussionCommandType:
+			case parsestdin.ListDiscussionCommandType:
 				chatList.Display()
 
-			case switchDiscussionCommandType:
-				chatId, _ := strconv.Atoi(cmd.args[idChatArg])
+			case parsestdin.SwitchDiscussionCommandType:
+				chatId, _ := strconv.Atoi(args[parsestdin.IdChatArg])
 				currentChat = chatList.GetChat(chatId)
 			}
 		}
