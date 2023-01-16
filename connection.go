@@ -79,7 +79,7 @@ func readStdin(wg *sync.WaitGroup, lines chan string, shutdown chan struct{}) {
 		fdSet.Set(int(os.Stdin.Fd()))
 		fdSet.Set(int(readClose.Fd()))
 
-		// modifies r/w/e file descriptors in fdSet with ready to use file descriptors (ie for us stdin or readClose)
+		// modifies r/w/e file descriptors in fdSet with ready to use file descriptors (ie for us parsestdin or readClose)
 		_, err = unix.Select(int(readClose.Fd()+1), &fdSet, nil, nil, &unix.Timeval{Sec: 60, Usec: 0})
 		if err != nil {
 			log.Fatal("[ERROR] ", err)
@@ -91,7 +91,7 @@ func readStdin(wg *sync.WaitGroup, lines chan string, shutdown chan struct{}) {
 			return
 		}
 
-		// default read stdin
+		// default read parsestdin
 		var n int
 		n, err = os.Stdin.Read(buffer)
 		if err != nil {
