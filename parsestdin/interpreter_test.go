@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func testParseCommandType(t *testing.T) {
+func TestParseCommandType(t *testing.T) {
 	ass := assert.New(t)
 
 	var tests = []struct {
@@ -36,7 +36,7 @@ func testParseCommandType(t *testing.T) {
 
 }
 
-func testGetArgs(t *testing.T) {
+func TestGetArgs(t *testing.T) {
 	ass := assert.New(t)
 
 	var tests = []struct {
@@ -48,49 +48,49 @@ func testGetArgs(t *testing.T) {
 		{
 			text:         "/msg content blabla\n",
 			typology:     MsgCommandType,
-			expectedArgs: map[string]string{MessageArg: "content content blabla"},
+			expectedArgs: map[string]string{MessageArg: "content blabla"},
 			expectedErr:  nil,
 		},
 		{
 			text:         "/connect 127.0.0.1 8080\n",
-			typology:     MsgCommandType,
-			expectedArgs: map[string]string{AddrArg: " 127.0.0.1", PortArg: "8080"},
+			typology:     ConnectCommandType,
+			expectedArgs: map[string]string{AddrArg: "127.0.0.1", PortArg: "8080"},
 			expectedErr:  nil,
 		},
 		{
 			text:         "/connect 127.0.0.1\n",
-			typology:     MsgCommandType,
-			expectedArgs: map[string]string{},
+			typology:     ConnectCommandType,
+			expectedArgs: make(map[string]string),
 			expectedErr:  ErrorInArguments,
 		},
 		{
 			text:         "/close\n",
 			typology:     CloseCommandType,
-			expectedArgs: map[string]string{},
+			expectedArgs: make(map[string]string),
 			expectedErr:  nil,
 		},
 		{
 			text:         "/list\n",
 			typology:     ListDiscussionCommandType,
-			expectedArgs: map[string]string{},
+			expectedArgs: make(map[string]string),
 			expectedErr:  nil,
 		},
 		{
 			text:         "/switch 3\n",
-			typology:     ListDiscussionCommandType,
+			typology:     SwitchDiscussionCommandType,
 			expectedArgs: map[string]string{IdChatArg: "3"},
 			expectedErr:  nil,
 		},
 		{
 			text:         "/switch 3 \n",
-			typology:     ListDiscussionCommandType,
+			typology:     SwitchDiscussionCommandType,
 			expectedArgs: map[string]string{IdChatArg: "3"},
 			expectedErr:  nil,
 		},
 		{
 			text:         "/switch aa \n",
-			typology:     ListDiscussionCommandType,
-			expectedArgs: map[string]string{},
+			typology:     SwitchDiscussionCommandType,
+			expectedArgs: make(map[string]string),
 			expectedErr:  ErrorInArguments,
 		},
 	}
