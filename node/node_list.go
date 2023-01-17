@@ -1,24 +1,32 @@
-package data
+package node
 
 import "github.com/google/uuid"
 
 const notFound = "chat not found"
 
 type (
-	ChatList struct {
-		head   *Chat
+	list struct {
+		head   *Node
 		length int
+	}
+
+	NodeList interface {
+		AddNode(c *Node)
+		RemoveNode(id uuid.UUID)
+		GetNode(id uuid.UUID) (c *Node)
+		Display()
+		CloseAndWaitNode()
 	}
 )
 
-func NewChatList() (l *ChatList) {
-	return &ChatList{
+func NewNodeList() (l NodeList) {
+	return &list{
 		head:   nil,
 		length: 0,
 	}
 }
 
-func (l *ChatList) AddChat(c *Chat) {
+func (l *list) AddNode(c *Node) {
 	if l.isEmpty() {
 		l.head = c
 		l.length += 1
@@ -34,8 +42,8 @@ func (l *ChatList) AddChat(c *Chat) {
 	ptr.Next = c
 }
 
-func (l *ChatList) GetChat(position int) *Chat {
-	if l.isEmpty() || l.length-1 < position {
+func (l *list) GetNode(id uuid.UUID) *Node {
+	if l.isEmpty() {
 		return nil
 	}
 
@@ -44,15 +52,19 @@ func (l *ChatList) GetChat(position int) *Chat {
 		index int
 	)
 
-	for index != position {
+	for chat.Next != nil && chat.Infos.Id != id {
 		index += 1
 		chat = chat.Next
 	}
 
-	return chat
+	if chat.Infos.Id == id {
+		return chat
+	}
+
+	return nil
 }
 
-func (l *ChatList) Display() {
+func (l *list) Display() {
 	var (
 		chat     = l.head
 		position int
@@ -68,11 +80,11 @@ func (l *ChatList) Display() {
 	chat.display(position)
 }
 
-func (l *ChatList) RemoveChat(id uuid.UUID) {
-	var previous, tmp *Chat
+func (l *list) RemoveNode(id uuid.UUID) {
+	var previous, tmp *Node
 
 	// remove first element
-	if l.head.Id == id {
+	if l.head.Infos.Id == id {
 		l.head = l.head.Next
 		return
 	}
@@ -80,30 +92,30 @@ func (l *ChatList) RemoveChat(id uuid.UUID) {
 	// second or more
 	previous = l.head
 	tmp = l.head.Next
-	for tmp.Next != nil && id != tmp.Id {
+	for tmp.Next != nil && id != tmp.Infos.Id {
 		previous = tmp
 		tmp = tmp.Next
 		tmp = previous.Next
 	}
 
-	if id != tmp.Id {
+	if id != tmp.Infos.Id {
 		previous.Next = tmp.Next
 	}
 }
 
-func (l *ChatList) CloseAndWaitChats() {
+func (l *list) CloseAndWaitNode() {
 	var chat = l.head
 
 	for chat.Next != nil {
-		close(chat.Infos.Shutdown)
+		close(chat.Business.Shutdown)
 	}
 
 	for chat.Next != nil {
-		chat.Infos.Wg.Wait()
-		l.RemoveChat(chat.Id)
+		chat.Business.Wg.Wait()
+		l.RemoveNode(chat.Infos.Id)
 	}
 }
 
-func (l *ChatList) isEmpty() bool {
+func (l *list) isEmpty() bool {
 	return l.length == 0
 }

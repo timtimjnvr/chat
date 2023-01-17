@@ -1,7 +1,7 @@
 package main
 
 import (
-	"chat/data"
+	"chat/node"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -69,7 +69,7 @@ func readStdin(wg *sync.WaitGroup, lines chan string, shutdown chan struct{}) {
 
 		var (
 			fdSet  = unix.FdSet{}
-			buffer = make([]byte, messageMaxSize)
+			buffer = make([]byte, maxMessageSize)
 			err    error
 		)
 
@@ -117,7 +117,7 @@ func readConn(wg *sync.WaitGroup, conn net.Conn, messages chan string, shutdown 
 			return
 
 		default:
-			buffer := make([]byte, messageMaxSize)
+			buffer := make([]byte, maxMessageSize)
 			n, err := conn.Read(buffer)
 			if err != nil {
 				return
@@ -169,12 +169,13 @@ func openConnection(protocol, ip string, port int) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return conn, nil
 }
 
-func sendMessage(chat *data.Chat, content string) error {
+func sendMessage(chat *node.Node, content string) error {
 	buffer := []byte(content)
-	_, err := chat.Infos.Conn.Write(buffer)
+	_, err := chat.Business.Conn.Write(buffer)
 	if err != nil {
 		return err
 	}

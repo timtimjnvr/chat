@@ -1,7 +1,7 @@
 package main
 
 import (
-	"chat/data"
+	"chat/node"
 	parsestdin "chat/parsestdin"
 	"flag"
 	"github.com/google/uuid"
@@ -20,9 +20,8 @@ const (
 	localhostDecimalPointed = "127.0.0.1"
 
 	maxSimultaneousConnections = 1000
-	messageMaxSize             = 10000
+	maxMessageSize             = 10000
 	maxMessagesStdin           = 100
-	maxMessagesConn            = 100
 
 	noDiscussionSelected = "you must be in a discussion to send a message"
 )
@@ -33,8 +32,8 @@ func main() {
 	flag.Parse()
 
 	var (
-		currentChat *data.Chat
-		chatList    = data.NewChatList()
+		currentDiscussion *node.Node
+		nodes             = node.NewNodeList()
 
 		sigc          = make(chan os.Signal, 1)
 		shutdown      = make(chan struct{})
@@ -51,7 +50,7 @@ func main() {
 	defer func() {
 		wgReadStdin.Wait()
 		wgListen.Wait()
-		chatList.CloseAndWaitChats()
+		nodes.CloseAndWaitNode()
 		log.Println("[INFO] program shutdown")
 	}()
 
@@ -67,22 +66,32 @@ func main() {
 	wgReadStdin.Add(1)
 	go readStdin(&wgReadStdin, stdin, shutdown)
 
+	/*
+		wgDisplay.Add(1)
+		go displayDiscussion(ptr sur data de la discussion en cours, ticker de syncronisation)
+	*/
+
 	for {
 		select {
 		case <-sigc:
 			close(shutdown)
 			return
 
-		case conn := <-newConnections:
-			currentChat = data.NewChat(conn)
-			chatList.AddChat(currentChat)
-			currentChat.Infos.Wg.Add(1)
-			go handleConnection(currentChat.Infos.Wg, currentChat.Infos.Conn, currentChat.Id, connectionsDone, currentChat.Infos.Shutdown)
+		// new incoming connection to join a chat room -> update chat room nodes
+		case <-newConnections:
+			/*
+				currentDiscussion = node.NewChat(conn)
+				currentDiscussion.AddNode()
+				currentDiscussion.Business.Wg.Add(1)
+				go handleConnection(currentDiscussion.Business.Wg, currentDiscussion.Business.Conn, currentDiscussion.Id, connectionsDone, currentDiscussion.Business.Shutdown)
+			*/
 
+		// user leaving chat room -> update chat room nodes
 		case id := <-connectionsDone:
-			chatList.RemoveChat(id)
-			currentChat = nil
+			nodes.RemoveNode(id)
+			currentDiscussion = nil
 
+		// input command
 		case line := <-stdin:
 			cmd, err := parsestdin.NewCommand(line)
 			if err != nil {
@@ -118,25 +127,24 @@ func main() {
 
 			case parsestdin.MsgCommandType:
 				content := args[parsestdin.MessageArg]
-				if currentChat == nil {
+				if currentDiscussion == nil {
 					log.Println(noDiscussionSelected)
 					continue
 				}
 
-				err = sendMessage(currentChat, content)
+				err = sendMessage(currentDiscussion, content)
 				if err != nil {
 					log.Println("[ERROR] ", err)
 				}
 
 			case parsestdin.CloseCommandType:
-				currentChat.Stop()
+				currentDiscussion.Stop()
 
 			case parsestdin.ListDiscussionCommandType:
-				chatList.Display()
+				nodes.Display()
 
 			case parsestdin.SwitchDiscussionCommandType:
-				chatId, _ := strconv.Atoi(args[parsestdin.IdChatArg])
-				currentChat = chatList.GetChat(chatId)
+				// chatId, _ := strconv.Atoi(args[parsestdin.IdChatArg])
 			}
 		}
 	}

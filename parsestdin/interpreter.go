@@ -50,11 +50,13 @@ func NewCommand(line string) (Command, error) {
 const (
 	/* COMMAND TYPES*/
 
+	CreateChatCommandType       commandType = iota
 	ConnectCommandType          commandType = iota
 	MsgCommandType              commandType = iota
 	CloseCommandType            commandType = iota
 	SwitchDiscussionCommandType commandType = iota
 	ListDiscussionCommandType   commandType = iota
+	QuitCommandType             commandType = iota
 
 	/* COMMANDS ARGS */
 
@@ -65,11 +67,13 @@ const (
 
 	/* INLINE COMMANDS */
 
+	chat             = "/chat"
 	msg              = "/msg"
 	connect          = "/connect"
 	closeConnection  = "/close"
 	switchConnection = "/switch"
 	listDiscussion   = "/list"
+	quit             = "/quit"
 
 	/* ERRORS FORMAT */
 
@@ -108,27 +112,24 @@ func parseCommandType(line string) (commandType, error) {
 
 func parseArgs(text string, command commandType) (map[string]string, error) {
 	args := make(map[string]string)
+
 	switch command {
 	case ConnectCommandType:
 		splitArgs := strings.Split(text, " ")
 		if len(splitArgs) < 3 {
 			return args, errors.Wrap(ErrorInArguments, connectErrorArgumentsMsg)
 		}
-
-		args[AddrArg] = splitArgs[1]
-		args[PortArg] = fmt.Sprintf(strings.Replace(splitArgs[2], "\n", "", 1))
+		args[AddrArg] = removeSubStrings(splitArgs[1], " ", "\n")
+		args[PortArg] = removeSubStrings(splitArgs[2], " ", "\n")
 
 	case MsgCommandType:
-		content := fmt.Sprintf(strings.Replace(text, fmt.Sprintf("%s ", msg), "", 1))
-
-		args[MessageArg] = content
+		args[MessageArg] = removeSubStrings(text, fmt.Sprintf("%s ", msg), "\n")
 
 	case SwitchDiscussionCommandType:
-		content := fmt.Sprintf(strings.Replace(text, fmt.Sprintf("%s ", switchConnection), "", 1))
-
+		content := removeSubStrings(text, fmt.Sprintf("%s ", switchConnection), " ", "\n")
 		_, err := strconv.Atoi(content)
 		if err != nil {
-			return args, errors.Wrap(err, ErrorInArguments.Error())
+			return args, errors.Wrap(ErrorInArguments, err.Error())
 		}
 
 		args[IdChatArg] = content
@@ -138,4 +139,13 @@ func parseArgs(text string, command commandType) (map[string]string, error) {
 	}
 
 	return args, nil
+}
+
+func removeSubStrings(source string, patterns ...string) string {
+	var result = source
+	for _, pattern := range patterns {
+		result = strings.Replace(result, pattern, "", -1)
+	}
+
+	return result
 }
