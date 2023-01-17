@@ -9,12 +9,20 @@ import (
 
 type (
 	Node struct {
-		Id    uuid.UUID
-		Infos Infos
-		Next  *Node
+		Infos    Infos
+		Business Business
+		Next     *Node
 	}
 
 	Infos struct {
+		Id      uuid.UUID `json:"id"`
+		Port    int       `json:"port"`
+		Address string    `json:"address"`
+	}
+
+	Business struct {
+		Port     int
+		Addr     int
 		Conn     net.Conn
 		Wg       *sync.WaitGroup
 		Shutdown chan struct{}
@@ -22,10 +30,8 @@ type (
 )
 
 func NewChat(conn net.Conn) *Node {
-	id, _ := uuid.NewUUID()
 	return &Node{
-		Id: id,
-		Infos: Infos{
+		Business: Business{
 			Conn:     conn,
 			Wg:       &sync.WaitGroup{},
 			Shutdown: make(chan struct{}, 0),
@@ -35,10 +41,10 @@ func NewChat(conn net.Conn) *Node {
 }
 
 func (c *Node) Stop() {
-	close(c.Infos.Shutdown)
-	c.Infos.Wg.Wait()
+	close(c.Business.Shutdown)
+	c.Business.Wg.Wait()
 }
 
 func (c *Node) display(position int) {
-	log.Printf("%d: %s <-> %s\n", position, c.Infos.Conn.LocalAddr(), c.Infos.Conn.RemoteAddr())
+	log.Printf("%d: %s <-> %s\n", position, c.Business.Conn.LocalAddr(), c.Business.Conn.RemoteAddr())
 }

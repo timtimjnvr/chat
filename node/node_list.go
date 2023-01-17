@@ -52,12 +52,12 @@ func (l *list) GetNode(id uuid.UUID) *Node {
 		index int
 	)
 
-	for chat.Next != nil && chat.Id != id {
+	for chat.Next != nil && chat.Infos.Id != id {
 		index += 1
 		chat = chat.Next
 	}
 
-	if chat.Id == id {
+	if chat.Infos.Id == id {
 		return chat
 	}
 
@@ -84,7 +84,7 @@ func (l *list) RemoveNode(id uuid.UUID) {
 	var previous, tmp *Node
 
 	// remove first element
-	if l.head.Id == id {
+	if l.head.Infos.Id == id {
 		l.head = l.head.Next
 		return
 	}
@@ -92,13 +92,13 @@ func (l *list) RemoveNode(id uuid.UUID) {
 	// second or more
 	previous = l.head
 	tmp = l.head.Next
-	for tmp.Next != nil && id != tmp.Id {
+	for tmp.Next != nil && id != tmp.Infos.Id {
 		previous = tmp
 		tmp = tmp.Next
 		tmp = previous.Next
 	}
 
-	if id != tmp.Id {
+	if id != tmp.Infos.Id {
 		previous.Next = tmp.Next
 	}
 }
@@ -107,12 +107,12 @@ func (l *list) CloseAndWaitNode() {
 	var chat = l.head
 
 	for chat.Next != nil {
-		close(chat.Infos.Shutdown)
+		close(chat.Business.Shutdown)
 	}
 
 	for chat.Next != nil {
-		chat.Infos.Wg.Wait()
-		l.RemoveNode(chat.Id)
+		chat.Business.Wg.Wait()
+		l.RemoveNode(chat.Infos.Id)
 	}
 }
 

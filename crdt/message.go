@@ -8,9 +8,9 @@ import (
 type (
 	message struct {
 		id      uuid.UUID `json:"id"`
-		sender  string    `json:"sender"`
-		content string    `json:"content"`
-		date    time.Time `json:"date"`
+		Sender  string    `json:"sender"`
+		Content string    `json:"content"`
+		Date    time.Time `json:"date"`
 	}
 
 	Message interface {
@@ -23,9 +23,9 @@ type (
 
 func NewMessage(sender, content string) Message {
 	return &message{
-		sender:  sender,
-		content: content,
-		date:    time.Now(),
+		Sender:  sender,
+		Content: content,
+		Date:    time.Now(),
 	}
 }
 
@@ -34,13 +34,13 @@ func (m *message) GetId() uuid.UUID {
 }
 
 func (m *message) GetSender() string {
-	return m.sender
+	return m.Sender
 }
 
 func (m *message) GetContent() string {
-	return m.content
+	return m.Content
 }
 
 func (m *message) UpdateContent(content string) {
-	m.content = content
+	m.Content = content
 }

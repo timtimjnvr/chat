@@ -46,7 +46,7 @@ func (c *chat) GetMessages() []Message {
 
 func (c *chat) containsNode(node *node.Node) bool {
 	for _, n := range c.nodes {
-		if n.Id == node.Id {
+		if n.Infos.Id == node.Infos.Id {
 			return true
 		}
 	}
@@ -61,5 +61,3 @@ func (c *chat) containsMessage(message Message) bool {
 	}
 	return false
 }
-
-func sync

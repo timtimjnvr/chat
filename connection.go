@@ -175,7 +175,7 @@ func openConnection(protocol, ip string, port int) (net.Conn, error) {
 
 func sendMessage(chat *node.Node, content string) error {
 	buffer := []byte(content)
-	_, err := chat.Infos.Conn.Write(buffer)
+	_, err := chat.Business.Conn.Write(buffer)
 	if err != nil {
 		return err
 	}

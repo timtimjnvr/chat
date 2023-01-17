@@ -20,9 +20,8 @@ const (
 	localhostDecimalPointed = "127.0.0.1"
 
 	maxSimultaneousConnections = 1000
-	messageMaxSize             = 10000
+	maxMessageSize             = 10000
 	maxMessagesStdin           = 100
-	maxMessagesConn            = 100
 
 	noDiscussionSelected = "you must be in a discussion to send a message"
 )
@@ -67,22 +66,32 @@ func main() {
 	wgReadStdin.Add(1)
 	go readStdin(&wgReadStdin, stdin, shutdown)
 
+	/*
+		wgDisplay.Add(1)
+		go displayDiscussion(ptr sur data de la discussion en cours, ticker de syncronisation)
+	*/
+
 	for {
 		select {
 		case <-sigc:
 			close(shutdown)
 			return
 
-		case conn := <-newConnections:
-			currentDiscussion = node.NewChat(conn)
-			nodes.AddNode(currentDiscussion)
-			currentDiscussion.Infos.Wg.Add(1)
-			go handleConnection(currentDiscussion.Infos.Wg, currentDiscussion.Infos.Conn, currentDiscussion.Id, connectionsDone, currentDiscussion.Infos.Shutdown)
+		// new incoming connection to join a chat room -> update chat room nodes
+		case <-newConnections:
+			/*
+				currentDiscussion = node.NewChat(conn)
+				currentDiscussion.AddNode()
+				currentDiscussion.Business.Wg.Add(1)
+				go handleConnection(currentDiscussion.Business.Wg, currentDiscussion.Business.Conn, currentDiscussion.Id, connectionsDone, currentDiscussion.Business.Shutdown)
+			*/
 
+		// user leaving chat room -> update chat room nodes
 		case id := <-connectionsDone:
 			nodes.RemoveNode(id)
 			currentDiscussion = nil
 
+		// input command
 		case line := <-stdin:
 			cmd, err := parsestdin.NewCommand(line)
 			if err != nil {
