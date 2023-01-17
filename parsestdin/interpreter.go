@@ -50,11 +50,13 @@ func NewCommand(line string) (Command, error) {
 const (
 	/* COMMAND TYPES*/
 
+	CreateChatCommandType       commandType = iota
 	ConnectCommandType          commandType = iota
 	MsgCommandType              commandType = iota
 	CloseCommandType            commandType = iota
 	SwitchDiscussionCommandType commandType = iota
 	ListDiscussionCommandType   commandType = iota
+	QuitCommandType             commandType = iota
 
 	/* COMMANDS ARGS */
 
@@ -65,11 +67,13 @@ const (
 
 	/* INLINE COMMANDS */
 
+	chat             = "/chat"
 	msg              = "/msg"
 	connect          = "/connect"
 	closeConnection  = "/close"
 	switchConnection = "/switch"
 	listDiscussion   = "/list"
+	quit             = "/quit"
 
 	/* ERRORS FORMAT */
 

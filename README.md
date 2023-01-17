@@ -20,10 +20,16 @@ go build && ./chat -p=8080
 ```
 
 ## commands
+
 ```
-/connnect addr port : open a new chat with a client.
-/msg hello, friend ! : send "hello, friend" in the current discussion.
-/close : close the current discussion.
+/chat name : create a new chat room and enter it.
+/connnect <addr> <port> <chat_room>: join a chat room.
+/msg hello, friend ! : send "hello, friend" in the current chat room.
+/quit : exit the current chat room.
+/list : display current joined chat rooms.
+/switch <chat_room> : enter the chat room named 'chat_room'
+
+/close kills the program
 ```
 
 ## Doc

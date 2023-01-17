@@ -1,14 +1,20 @@
 package crdt
 
-import "time"
+import (
+	"github.com/google/uuid"
+	"time"
+)
 
 type (
 	message struct {
-		sender, content string
-		date            time.Time
+		id      uuid.UUID `json:"id"`
+		sender  string    `json:"sender"`
+		content string    `json:"content"`
+		date    time.Time `json:"date"`
 	}
 
 	Message interface {
+		GetId() uuid.UUID
 		GetSender() string
 		GetContent() string
 		UpdateContent(content string)
@@ -21,6 +27,10 @@ func NewMessage(sender, content string) Message {
 		content: content,
 		date:    time.Now(),
 	}
+}
+
+func (m *message) GetId() uuid.UUID {
+	return m.id
 }
 
 func (m *message) GetSender() string {
