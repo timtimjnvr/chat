@@ -1,32 +1,69 @@
 package crdt
 
 import (
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"log"
+	"reflect"
 	"testing"
 	"time"
 )
 
 func TestGetSyncBytes(t *testing.T) {
-	id, _ := uuid.NewUUID()
-	m := &message{
-		id:      id,
-		Sender:  "toto",
-		Content: "J'aime me battre",
-		Date:    time.Now(),
+
+	var (
+		id, _ = uuid.Parse("4b8e153b-834f-4190-b5d3-aba2f35ead56")
+
+		m = &message{
+			id:      id,
+			Sender:  "toto",
+			Content: "J'aime",
+			Date:    time.Time{},
+		}
+
+		tests = []struct {
+			inputStruct   Operable
+			operation     operationType
+			expectedRunes []rune
+		}{
+			{
+				inputStruct:   m,
+				operation:     add,
+				expectedRunes: []rune{0, 0, 36, 52, 98, 56, 101, 49, 53, 51, 98, 45, 56, 51, 52, 102, 45, 52, 49, 57, 48, 45, 98, 53, 100, 51, 45, 97, 98, 97, 50, 102, 51, 53, 101, 97, 100, 53, 54, 4, 116, 111, 116, 111, 6, 74, 39, 97, 105, 109, 101, 20, 48, 48, 48, 49, 45, 48, 49, 45, 48, 49, 84, 48, 48, 58, 48, 48, 58, 48, 48, 90},
+			},
+		}
+	)
+
+	for i, test := range tests {
+		res := test.inputStruct.toRunes(test.operation)
+		assert.True(t, reflect.DeepEqual(res, test.expectedRunes), fmt.Sprintf("test %d failed on runes returned", i))
 	}
-
-	bytes := m.GetSyncBytes(add)
-	log.Println(string(bytes))
-
-	assert.Fail(t, "failed - testing")
 }
 
 func TestGetMessageFromBytes(t *testing.T) {
-	bytes := []byte{36, 56, 55, 101, 98, 97, 48, 99, 45, 57, 55, 99, 100, 45, 49, 49, 101, 100, 45, 57, 49, 54, 50, 45, 49, 54, 48, 102, 48, 97, 53, 54, 48, 54, 54, 101, 4, 111, 116, 111, 16, 39, 97, 105, 109, 101, 32, 109, 101, 32, 98, 97, 116, 116, 114, 101, 25, 48, 50, 51, 45, 48, 49, 45, 49, 57, 84, 48, 56, 58, 53, 48, 58, 49, 52, 43, 48, 49, 58, 48, 48}
-	log.Println(string(bytes))
-	m := GetMessageFromBytes(bytes)
-	log.Println(m)
-	assert.Fail(t, "failed - testing")
+
+	var (
+		id, _ = uuid.Parse("4b8e153b-834f-4190-b5d3-aba2f35ead56")
+
+		m = message{
+			id:      id,
+			Sender:  "toto",
+			Content: "J'aime",
+			Date:    time.Time{},
+		}
+
+		tests = []struct {
+			runes          []rune
+			expectedStruct interface{}
+		}{
+			{
+				runes:          []rune{36, 52, 98, 56, 101, 49, 53, 51, 98, 45, 56, 51, 52, 102, 45, 52, 49, 57, 48, 45, 98, 53, 100, 51, 45, 97, 98, 97, 50, 102, 51, 53, 101, 97, 100, 53, 54, 4, 116, 111, 116, 111, 6, 74, 39, 97, 105, 109, 101, 20, 48, 48, 48, 49, 45, 48, 49, 45, 48, 49, 84, 48, 48, 58, 48, 48, 58, 48, 48, 90},
+				expectedStruct: m,
+			},
+		}
+	)
+	for i, test := range tests {
+		res := GetMessageFromBytes(test.runes)
+		assert.True(t, reflect.DeepEqual(res, test.expectedStruct), fmt.Sprintf("test %d failed on struct returned", i))
+	}
 }

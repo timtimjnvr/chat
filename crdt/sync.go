@@ -5,10 +5,15 @@ type (
 	targetType    int
 	operation     [1000]byte
 
-	Operation interface {
-		getOperationType() operationType
+	Operable interface {
+		toRunes(operation operationType) []rune
 	}
 )
+
+/*
+ADD A MESSAGE
+operationType targetType message
+*/
 
 const (
 	add    operationType = iota
@@ -20,21 +25,3 @@ const (
 	messageType targetType = iota
 	nodeType
 )
-
-func (b *operation) setOperation(op operationType) {
-	b[0] = byte(op)
-}
-
-func (b *operation) getOperationType() operationType {
-	return operationType(b[0])
-}
-
-/*func GetOperationFromBytes(bytes []byte) operation {
-	_ := int(bytes[0])
-	target := int(bytes[1])
-	switch target {
-	case messageType:
-		m := GetMessageFromBytes(bytes[2:])
-	}
-
-}*/

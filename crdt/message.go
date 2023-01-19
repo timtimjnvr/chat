@@ -2,7 +2,6 @@ package crdt
 
 import (
 	"github.com/google/uuid"
-	"log"
 	"time"
 )
 
@@ -20,7 +19,7 @@ type (
 		GetContent() string
 		GetDate() string
 		UpdateContent(content string)
-		GetSyncBytes(operation operationType) []byte
+		toRunes(operation operationType) []rune
 	}
 )
 
@@ -52,32 +51,26 @@ func (m *message) UpdateContent(content string) {
 	m.Content = content
 }
 
-func (m *message) OperationToBytes(typology operationType) {
-	b := new(operation)
-	b.setOperation(typology)
-}
-
-func (m *message) GetSyncBytes(operation operationType) []byte {
-	// add operation
+func (m *message) toRunes(operation operationType) []rune {
 	var (
-		operationByte = byte(operation)
-		target        = byte(messageType)
-		idBytes       = []byte(m.GetId().String())
-		senderBytes   = []byte(m.GetSender())
-		contentBytes  = []byte(m.GetContent())
-		dateByte      = []byte(m.GetDate())
+		operationByte = int32(operation)
+		targetByte    = int32(messageType)
+		idBytes       = []rune(m.GetId().String())
+		senderBytes   = []rune(m.GetSender())
+		contentBytes  = []rune(m.GetContent())
+		dateByte      = []rune(m.GetDate())
 	)
 
-	addBytes := func(destination []byte, source ...byte) []byte {
-		lenBytes := byte(len(source))
-		destination = append(destination, lenBytes)
-		destination = append(destination, source[0:]...)
+	addBytes := func(destination []rune, source ...rune) []rune {
+		lenBytes := []rune{int32(len(source))}
+		destination = append(destination, lenBytes...)
+		destination = append(destination, source...)
+
 		return destination
 	}
 
-	bytes := make([]byte, 2)
-	bytes[0] = operationByte
-	bytes[1] = target
+	bytes := []rune{operationByte, targetByte}
+
 	bytes = addBytes(bytes, idBytes...)
 	bytes = addBytes(bytes, senderBytes...)
 	bytes = addBytes(bytes, contentBytes...)
@@ -86,22 +79,21 @@ func (m *message) GetSyncBytes(operation operationType) []byte {
 	return bytes
 }
 
-func GetMessageFromBytes(bytes []byte) (m message) {
+func GetMessageFromBytes(bytes []rune) (m message) {
 	var (
-		idBytes      []byte
-		senderBytes  []byte
-		contentBytes []byte
-		dateByte     []byte
+		idBytes      []rune
+		senderBytes  []rune
+		contentBytes []rune
+		dateByte     []rune
 	)
 
-	getField := func(offest int, source []byte) (int, []byte) {
+	getField := func(offest int, source []rune) (int, []rune) {
 		lenField := int(source[offest])
-		return offest + lenField, source[offest : offest+lenField]
+		return offest + lenField + 1, source[offest+1 : offest+lenField+1]
 	}
 
 	offset := 0
 	offset, idBytes = getField(offset, bytes)
-	log.Println(offset, string(idBytes))
 	offset, senderBytes = getField(offset, bytes)
 	offset, contentBytes = getField(offset, bytes)
 	_, dateByte = getField(offset, bytes)
