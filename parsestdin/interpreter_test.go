@@ -71,27 +71,9 @@ func TestGetArgs(t *testing.T) {
 		},
 		{
 			text:         "/list\n",
-			typology:     ListDiscussionCommandType,
+			typology:     ListUsersCommandType,
 			expectedArgs: make(map[string]string),
 			expectedErr:  nil,
-		},
-		{
-			text:         "/switch 3\n",
-			typology:     SwitchDiscussionCommandType,
-			expectedArgs: map[string]string{IdChatArg: "3"},
-			expectedErr:  nil,
-		},
-		{
-			text:         "/switch 3 \n",
-			typology:     SwitchDiscussionCommandType,
-			expectedArgs: map[string]string{IdChatArg: "3"},
-			expectedErr:  nil,
-		},
-		{
-			text:         "/switch aa \n",
-			typology:     SwitchDiscussionCommandType,
-			expectedArgs: make(map[string]string),
-			expectedErr:  ErrorInArguments,
 		},
 	}
 

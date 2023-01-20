@@ -2,7 +2,6 @@ package parsestdin
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -50,30 +49,29 @@ func NewCommand(line string) (Command, error) {
 const (
 	/* COMMAND TYPES*/
 
-	CreateChatCommandType       commandType = iota
-	ConnectCommandType          commandType = iota
-	MsgCommandType              commandType = iota
-	CloseCommandType            commandType = iota
-	SwitchDiscussionCommandType commandType = iota
-	ListDiscussionCommandType   commandType = iota
-	QuitCommandType             commandType = iota
+	CreateChatCommandType commandType = iota
+	ConnectCommandType    commandType = iota
+	MsgCommandType        commandType = iota
+	CloseCommandType      commandType = iota
+	ListUsersCommandType  commandType = iota
+	QuitCommandType       commandType = iota
 
 	/* COMMANDS ARGS */
 
-	MessageArg = "messageArgument"
-	PortArg    = "portArgument"
-	AddrArg    = "addrArgument"
-	IdChatArg  = "idChatArgument"
+	MessageArg  = "messageArgument"
+	PortArg     = "portArgument"
+	AddrArg     = "addrArgument"
+	IdChatArg   = "idChatArgument"
+	ChatRoomArg = "chatRoomArgument"
 
 	/* INLINE COMMANDS */
 
-	chat             = "/chat"
-	msg              = "/msg"
-	connect          = "/connect"
-	closeConnection  = "/close"
-	switchConnection = "/switch"
-	listDiscussion   = "/list"
-	quit             = "/quit"
+	chat            = "/chat"
+	msg             = "/msg"
+	connect         = "/connect"
+	closeConnection = "/close"
+	listUsers       = "/list"
+	quit            = "/quit"
 
 	/* ERRORS FORMAT */
 
@@ -82,11 +80,12 @@ const (
 
 var (
 	commands = map[string]commandType{
-		msg:              MsgCommandType,
-		connect:          ConnectCommandType,
-		closeConnection:  CloseCommandType,
-		switchConnection: SwitchDiscussionCommandType,
-		listDiscussion:   ListDiscussionCommandType,
+		chat:            CreateChatCommandType,
+		msg:             MsgCommandType,
+		connect:         ConnectCommandType,
+		closeConnection: CloseCommandType,
+		listUsers:       ListUsersCommandType,
+		quit:            QuitCommandType,
 	}
 
 	/* PACKAGE ERRORS */
@@ -124,15 +123,6 @@ func parseArgs(text string, command commandType) (map[string]string, error) {
 
 	case MsgCommandType:
 		args[MessageArg] = removeSubStrings(text, fmt.Sprintf("%s ", msg), "\n")
-
-	case SwitchDiscussionCommandType:
-		content := removeSubStrings(text, fmt.Sprintf("%s ", switchConnection), " ", "\n")
-		_, err := strconv.Atoi(content)
-		if err != nil {
-			return args, errors.Wrap(ErrorInArguments, err.Error())
-		}
-
-		args[IdChatArg] = content
 
 	default:
 		// no args

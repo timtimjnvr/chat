@@ -1,6 +1,7 @@
 package main
 
 import (
+	"chat/crdt"
 	"chat/node"
 	parsestdin "chat/parsestdin"
 	"flag"
@@ -27,18 +28,19 @@ const (
 )
 
 func main() {
-	portPtr := flag.String("p", "8080", "port number used to accept connection")
-	addrPtr := flag.String("a", "", "address used to accept connection")
+	myPortPtr := flag.String("p", "8080", "port number used to accept connection")
+	myAddrPtr := flag.String("a", "", "address used to accept connection")
+	myNamePtr := flag.String("u", "Tim", "address used to accept connection")
 	flag.Parse()
 
 	var (
-		currentDiscussion *node.Node
+		currentDiscussion = crdt.NewChat(*myNamePtr)
 		nodes             = node.NewNodeList()
 
 		sigc          = make(chan os.Signal, 1)
 		shutdown      = make(chan struct{})
-		portAccept    = *portPtr
-		addressAccept = *addrPtr
+		portAccept    = *myPortPtr
+		addressAccept = *myAddrPtr
 		wgListen      = sync.WaitGroup{}
 		wgReadStdin   = sync.WaitGroup{}
 
@@ -66,32 +68,25 @@ func main() {
 	wgReadStdin.Add(1)
 	go readStdin(&wgReadStdin, stdin, shutdown)
 
-	/*
-		wgDisplay.Add(1)
-		go displayDiscussion(ptr sur data de la discussion en cours, ticker de syncronisation)
-	*/
-
 	for {
 		select {
 		case <-sigc:
 			close(shutdown)
 			return
 
-		// new incoming connection to join a chat room -> update chat room nodes
-		case <-newConnections:
-			/*
-				currentDiscussion = node.NewChat(conn)
-				currentDiscussion.AddNode()
-				currentDiscussion.Business.Wg.Add(1)
-				go handleConnection(currentDiscussion.Business.Wg, currentDiscussion.Business.Conn, currentDiscussion.Id, connectionsDone, currentDiscussion.Business.Shutdown)
-			*/
+		/* Save the connection and handle connection*/
+		case conn := <-newConnections:
+			newNode := node.NewNode(conn)
+			nodes.AddNode(newNode)
 
-		// user leaving chat room -> update chat room nodes
+			newNode.Business.Wg.Add(1)
+			go handleConnection(newNode.Business.Wg, newNode.Business.Conn, newNode.Infos.Id, connectionsDone, newNode.Business.Shutdown)
+
+		/* Node done */
 		case id := <-connectionsDone:
 			nodes.RemoveNode(id)
-			currentDiscussion = nil
 
-		// input command
+		/* Command input */
 		case line := <-stdin:
 			cmd, err := parsestdin.NewCommand(line)
 			if err != nil {
@@ -104,6 +99,7 @@ func main() {
 			case parsestdin.ConnectCommandType:
 				var (
 					addr = args[parsestdin.AddrArg]
+					// chatRoom = args[parsestdin.ChatRoomArg]
 					conn net.Conn
 					pt   int
 				)
@@ -117,13 +113,18 @@ func main() {
 					addr = ""
 				}
 
+				// Open connection
 				conn, err = openConnection(transportProtocol, addr, pt)
 				if err != nil {
 					log.Println("[ERROR] ", err)
 					continue
 				}
 
+				// Saves new connection
 				newConnections <- conn
+
+				// ask to enter chat room
+				// TODO
 
 			case parsestdin.MsgCommandType:
 				content := args[parsestdin.MessageArg]
@@ -132,19 +133,21 @@ func main() {
 					continue
 				}
 
-				err = sendMessage(currentDiscussion, content)
-				if err != nil {
-					log.Println("[ERROR] ", err)
-				}
+				// Add the message to discussion
+				message := crdt.NewMessage(*myNamePtr, content)
+				currentDiscussion.AddMessage(message)
+
+				// build operation
+				// operation := crdt.GetOperationRunes(crdt.AddMessage, message)
+
+				// sync nodes by sending operation
+				// TODO
 
 			case parsestdin.CloseCommandType:
-				currentDiscussion.Stop()
+				// TODO : leave discussion and gracefully shutdown connection with all nodes
 
-			case parsestdin.ListDiscussionCommandType:
-				nodes.Display()
-
-			case parsestdin.SwitchDiscussionCommandType:
-				// chatId, _ := strconv.Atoi(args[parsestdin.IdChatArg])
+			case parsestdin.QuitCommandType:
+				// TODO : leave all discussions and gracefully shutdown connection with all nodes
 			}
 		}
 	}

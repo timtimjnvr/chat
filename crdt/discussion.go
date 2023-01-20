@@ -1,9 +1,13 @@
 package crdt
 
-import "chat/node"
+import (
+	"chat/node"
+	"github.com/google/uuid"
+)
 
 type (
 	chat struct {
+		id       uuid.UUID
 		name     string
 		nodes    []*node.Node
 		messages []Message
@@ -18,7 +22,9 @@ type (
 )
 
 func NewChat(name string) Chat {
+	id, _ := uuid.NewUUID()
 	return &chat{
+		id:       id,
 		name:     name,
 		nodes:    []*node.Node{},
 		messages: []Message{},
@@ -33,6 +39,7 @@ func (c *chat) AddNode(node *node.Node) {
 
 func (c *chat) AddMessage(message Message) {
 	if !c.containsMessage(message) {
+		// TODO : insert message in array by comparing dates
 		c.messages = append(c.messages, message)
 	}
 }
@@ -61,3 +68,5 @@ func (c *chat) containsMessage(message Message) bool {
 	}
 	return false
 }
+
+func (c *chat) chatHandler() {}

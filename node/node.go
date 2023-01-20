@@ -21,23 +21,37 @@ type (
 	}
 
 	Business struct {
-		Port     int
-		Addr     int
 		Conn     net.Conn
 		Wg       *sync.WaitGroup
 		Shutdown chan struct{}
 	}
 )
 
-func NewChat(conn net.Conn) *Node {
+func NewNode(conn net.Conn) *Node {
+	id := uuid.New()
 	return &Node{
 		Business: Business{
 			Conn:     conn,
 			Wg:       &sync.WaitGroup{},
 			Shutdown: make(chan struct{}, 0),
 		},
+		Infos: Infos{
+			Id: id,
+		},
 		Next: nil,
 	}
+}
+
+func NewNodeInfos(id uuid.UUID, addr string, pt int) Infos {
+	return Infos{
+		Id:      id,
+		Port:    pt,
+		Address: addr,
+	}
+}
+
+func (c *Node) SetConn(conn net.Conn) {
+	c.Business.Conn = conn
 }
 
 func (c *Node) Stop() {

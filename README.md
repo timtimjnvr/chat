@@ -7,29 +7,28 @@ Decentralized P2P chat built in golang.
 ## Initial dev -> v1.0.0
 
 - client - client connections (2 nodes) :
-  - Open a new chat discussion given an ip address and a port.
-  - Basic text messages exchanges.
-  - List current discussions.
-  - Switch discussion.
+  - Open a new discussion given an ip address and a port and the discussion name.
+  - Basic text message exchanges.
+  - List current users in discussion.
   - Close a chat discussion.
-  - Order messages with operation based CRDTS.
+  - Order messages and handle new users with operation based CRDTs.
 
 ## run
+
 ```
-go build && ./chat -p=8080
+go build && ./chat -p=<port_number> -u=<your_nickname>
 ```
+Default port_number : 8080
 
 ## commands
 
 ```
-/chat name : create a new chat room and enter it.
-/connnect <addr> <port> <chat_room>: join a chat room.
+/chat <chat_room> : create a new chat room named chat_room and enter it.
+/connnect <addr> <port> <chat_room>: join the chat room named chat_room.
 /msg hello, friend ! : send "hello, friend" in the current chat room.
-/quit : exit the current chat room.
-/list : display current joined chat rooms.
-/switch <chat_room> : enter the chat room named 'chat_room'
-
-/close kills the program
+/close : exit the current chat room.
+/list : display user(s) in the room.
+/quit kills the program
 ```
 
 ## Doc
