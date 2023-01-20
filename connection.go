@@ -1,7 +1,6 @@
 package main
 
 import (
-	"chat/node"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -138,6 +137,8 @@ func handleConnection(wg *sync.WaitGroup, conn net.Conn, id uuid.UUID, done chan
 		messages   = make(chan string)
 	)
 
+	// first check discussion
+
 	defer func() {
 		conn.Close()
 		wgReadConn.Wait()
@@ -154,12 +155,15 @@ func handleConnection(wg *sync.WaitGroup, conn net.Conn, id uuid.UUID, done chan
 		case <-shutdown:
 			return
 
-		case message, ok := <-messages:
+		case _, ok := <-messages:
 			if !ok {
 				// connection closed on the other side
 				return
 			}
-			log.Println("[INFO]: received message : ", message)
+
+			// operation should be parsed and executed
+
+			// log.Println("[INFO]: received operation : ", operation)
 		}
 	}
 }
@@ -173,9 +177,8 @@ func openConnection(protocol, ip string, port int) (net.Conn, error) {
 	return conn, nil
 }
 
-func sendMessage(chat *node.Node, content string) error {
-	buffer := []byte(content)
-	_, err := chat.Business.Conn.Write(buffer)
+func send(conn net.Conn, message []byte) error {
+	_, err := conn.Write(message)
 	if err != nil {
 		return err
 	}

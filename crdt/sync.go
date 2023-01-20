@@ -1,26 +1,30 @@
 package crdt
 
 type (
-	operationType int
-	targetType    int
+	operationType int32
 
+	// message or node
 	Operable interface {
-		toRunes(operation operationType) []rune
+		ToRunes() []rune
+		SendNodes(content []byte)
 	}
+)
+
+const (
+	AddMessage    operationType = iota
+	removeMessage operationType = iota
+	updateMessage operationType = iota
 )
 
 /*
 ADD A MESSAGE
-operationType targetType message
+operationType message
 */
 
-const (
-	add    operationType = iota
-	remove operationType = iota
-	update operationType = iota
-)
+func toRunes(operation operationType) []rune {
+	return []rune{int32(operation)}
+}
 
-const (
-	messageType targetType = iota
-	nodeType
-)
+func GetOperationRunes(operation operationType, data Operable) []rune {
+	return append(toRunes(operation), data.ToRunes()...)
+}

@@ -19,7 +19,8 @@ type (
 		GetContent() string
 		GetDate() string
 		UpdateContent(content string)
-		toRunes(operation operationType) []rune
+		ToRunes() []rune
+		SendNodes(content []byte)
 	}
 )
 
@@ -51,14 +52,13 @@ func (m *message) UpdateContent(content string) {
 	m.Content = content
 }
 
-func (m *message) toRunes(operation operationType) []rune {
+func (m *message) ToRunes() []rune {
 	var (
-		operationByte = int32(operation)
-		targetByte    = int32(messageType)
-		idBytes       = []rune(m.GetId().String())
-		senderBytes   = []rune(m.GetSender())
-		contentBytes  = []rune(m.GetContent())
-		dateByte      = []rune(m.GetDate())
+		idBytes      = []rune(m.GetId().String())
+		senderBytes  = []rune(m.GetSender())
+		contentBytes = []rune(m.GetContent())
+		dateByte     = []rune(m.GetDate())
+		bytes        []rune
 	)
 
 	addBytes := func(destination []rune, source ...rune) []rune {
@@ -68,8 +68,6 @@ func (m *message) toRunes(operation operationType) []rune {
 
 		return destination
 	}
-
-	bytes := []rune{operationByte, targetByte}
 
 	bytes = addBytes(bytes, idBytes...)
 	bytes = addBytes(bytes, senderBytes...)
@@ -107,4 +105,8 @@ func GetMessageFromBytes(bytes []rune) (m message) {
 		Content: string(contentBytes),
 		Date:    date,
 	}
+}
+
+func (m *message) SendNodes(content []byte) {
+	// send all nodes
 }
