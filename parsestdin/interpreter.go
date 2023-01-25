@@ -1,8 +1,13 @@
 package parsestdin
 
 import (
+	"chat/conn"
 	"fmt"
+	"golang.org/x/sys/unix"
+	"log"
+	"os"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 )
@@ -138,4 +143,61 @@ func removeSubStrings(source string, patterns ...string) string {
 	}
 
 	return result
+}
+
+func ReadStdin(wg *sync.WaitGroup, lines chan string, shutdown chan struct{}) {
+	defer func() {
+		close(lines)
+		wg.Done()
+		log.Println("[INFO] readStdin stopped")
+	}()
+
+	// writeClose is closed in order to signal readStdin stop signal
+	var readClose, writeClose, _ = os.Pipe()
+
+	go func() {
+		select {
+		case <-shutdown:
+			writeClose.Close()
+		}
+	}()
+
+	for {
+		log.Println("[INFO] type a command")
+
+		var (
+			fdSet  = unix.FdSet{}
+			buffer = make([]byte, conn.MaxMessageSize)
+			err    error
+		)
+
+		fdSet.Clear(int(os.Stdin.Fd()))
+		fdSet.Clear(int(readClose.Fd()))
+
+		fdSet.Set(int(os.Stdin.Fd()))
+		fdSet.Set(int(readClose.Fd()))
+
+		// modifies r/w/e file descriptors in fdSet with ready to use file descriptors (ie for us parsestdin or readClose)
+		_, err = unix.Select(int(readClose.Fd()+1), &fdSet, nil, nil, &unix.Timeval{Sec: 60, Usec: 0})
+		if err != nil {
+			log.Fatal("[ERROR] ", err)
+			return
+		}
+
+		// shutdown
+		if fdSet.IsSet(int(readClose.Fd())) {
+			return
+		}
+
+		// default read parsestdin
+		var n int
+		n, err = os.Stdin.Read(buffer)
+		if err != nil {
+			return
+		}
+
+		if n > 0 {
+			lines <- string(buffer[0:n])
+		}
+	}
 }

@@ -1,6 +1,7 @@
 package crdt
 
 import (
+	"chat/conn"
 	"chat/node"
 	"github.com/google/uuid"
 )
@@ -8,6 +9,7 @@ import (
 type (
 	chat struct {
 		id       uuid.UUID
+		myNodeId uuid.UUID
 		name     string
 		nodes    []*node.Node
 		messages []Message
@@ -16,8 +18,7 @@ type (
 	Chat interface {
 		AddNode(node *node.Node)
 		AddMessage(message Message)
-		UpdateMessages(messages []Message)
-		GetMessages() []Message
+		Send(data []byte)
 	}
 )
 
@@ -43,13 +44,6 @@ func (c *chat) AddMessage(message Message) {
 		c.messages = append(c.messages, message)
 	}
 }
-func (c *chat) UpdateMessages(messages []Message) {
-
-}
-
-func (c *chat) GetMessages() []Message {
-	return c.messages
-}
 
 func (c *chat) containsNode(node *node.Node) bool {
 	for _, n := range c.nodes {
@@ -69,4 +63,12 @@ func (c *chat) containsMessage(message Message) bool {
 	return false
 }
 
-func (c *chat) chatHandler() {}
+func (c *chat) Send(data []byte) {
+	for _, node := range c.nodes {
+		if c.myNodeId == node.Infos.Id {
+			continue
+		}
+
+		conn.Send(node.Business.Conn, data)
+	}
+}

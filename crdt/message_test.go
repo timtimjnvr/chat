@@ -64,7 +64,7 @@ func TestGetMessageFromBytes(t *testing.T) {
 		}
 	)
 	for i, test := range tests {
-		res := GetMessageFromBytes(test.runes)
+		res := DecodeMessage(test.runes)
 		assert.True(t, reflect.DeepEqual(res, test.expectedStruct), fmt.Sprintf("test %d failed on struct returned", i))
 	}
 }
