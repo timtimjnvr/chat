@@ -18,9 +18,7 @@ type (
 		GetSender() string
 		GetContent() string
 		GetDate() string
-		UpdateContent(content string)
 		ToRunes() []rune
-		SendNodes(content []byte)
 	}
 )
 
@@ -48,10 +46,6 @@ func (m *message) GetDate() string {
 	return m.Date.Format(time.RFC3339)
 }
 
-func (m *message) UpdateContent(content string) {
-	m.Content = content
-}
-
 func (m *message) ToRunes() []rune {
 	var (
 		idBytes      = []rune(m.GetId().String())
@@ -77,7 +71,7 @@ func (m *message) ToRunes() []rune {
 	return bytes
 }
 
-func GetMessageFromBytes(bytes []rune) (m message) {
+func DecodeMessage(bytes []rune) (m message) {
 	var (
 		idBytes      []rune
 		senderBytes  []rune
@@ -85,9 +79,9 @@ func GetMessageFromBytes(bytes []rune) (m message) {
 		dateByte     []rune
 	)
 
-	getField := func(offest int, source []rune) (int, []rune) {
-		lenField := int(source[offest])
-		return offest + lenField + 1, source[offest+1 : offest+lenField+1]
+	getField := func(offset int, source []rune) (int, []rune) {
+		lenField := int(source[offset])
+		return offset + lenField + 1, source[offset+1 : offset+lenField+1]
 	}
 
 	offset := 0
@@ -105,8 +99,4 @@ func GetMessageFromBytes(bytes []rune) (m message) {
 		Content: string(contentBytes),
 		Date:    date,
 	}
-}
-
-func (m *message) SendNodes(content []byte) {
-	// send all nodes
 }

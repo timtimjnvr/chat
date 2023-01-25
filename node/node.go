@@ -21,19 +21,27 @@ type (
 	}
 
 	Business struct {
-		Conn     net.Conn
-		Wg       *sync.WaitGroup
-		Shutdown chan struct{}
+		Conn             net.Conn
+		MessagesReceived chan string
+		MessagesToSend   chan string
+		Wg               *sync.WaitGroup
+		Shutdown         chan struct{}
 	}
+)
+
+const (
+	maxSimultaneousMessages = 1000
 )
 
 func NewNode(conn net.Conn) *Node {
 	id := uuid.New()
 	return &Node{
 		Business: Business{
-			Conn:     conn,
-			Wg:       &sync.WaitGroup{},
-			Shutdown: make(chan struct{}, 0),
+			Conn:             conn,
+			MessagesReceived: make(chan string, maxSimultaneousMessages),
+			MessagesToSend:   make(chan string, maxSimultaneousMessages),
+			Wg:               &sync.WaitGroup{},
+			Shutdown:         make(chan struct{}, 0),
 		},
 		Infos: Infos{
 			Id: id,

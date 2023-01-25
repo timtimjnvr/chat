@@ -26,9 +26,9 @@ func NewNodeList() (l NodeList) {
 	}
 }
 
-func (l *list) AddNode(c *Node) {
+func (l *list) AddNode(node *Node) {
 	if l.isEmpty() {
-		l.head = c
+		l.head = node
 		l.length += 1
 		return
 	}
@@ -39,7 +39,7 @@ func (l *list) AddNode(c *Node) {
 	}
 
 	l.length += 1
-	ptr.Next = c
+	ptr.Next = node
 }
 
 func (l *list) GetNode(id uuid.UUID) *Node {
@@ -48,17 +48,17 @@ func (l *list) GetNode(id uuid.UUID) *Node {
 	}
 
 	var (
-		chat  = l.head
+		node  = l.head
 		index int
 	)
 
-	for chat.Next != nil && chat.Infos.Id != id {
+	for node.Next != nil && node.Infos.Id != id {
 		index += 1
-		chat = chat.Next
+		node = node.Next
 	}
 
-	if chat.Infos.Id == id {
-		return chat
+	if node.Infos.Id == id {
+		return node
 	}
 
 	return nil
@@ -66,18 +66,18 @@ func (l *list) GetNode(id uuid.UUID) *Node {
 
 func (l *list) Display() {
 	var (
-		chat     = l.head
+		node     = l.head
 		position int
 	)
 
-	for chat.Next != nil {
-		chat.display(position)
-		chat = chat.Next
+	for node.Next != nil {
+		node.display(position)
+		node = node.Next
 		position++
 	}
 
 	// last of the list
-	chat.display(position)
+	node.display(position)
 }
 
 func (l *list) RemoveNode(id uuid.UUID) {
@@ -104,15 +104,15 @@ func (l *list) RemoveNode(id uuid.UUID) {
 }
 
 func (l *list) CloseAndWaitNode() {
-	var chat = l.head
+	var node = l.head
 
-	for chat.Next != nil {
-		close(chat.Business.Shutdown)
+	for node.Next != nil {
+		close(node.Business.Shutdown)
 	}
 
-	for chat.Next != nil {
-		chat.Business.Wg.Wait()
-		l.RemoveNode(chat.Infos.Id)
+	for node.Next != nil {
+		node.Business.Wg.Wait()
+		l.RemoveNode(node.Infos.Id)
 	}
 }
 
