@@ -2,7 +2,6 @@ package node
 
 import (
 	"github.com/google/uuid"
-	"log"
 	"net"
 	"sync"
 )
@@ -11,7 +10,6 @@ type (
 	Node struct {
 		Infos    Infos
 		Business Business
-		Next     *Node
 	}
 
 	Infos struct {
@@ -29,9 +27,7 @@ type (
 	}
 )
 
-const (
-	maxSimultaneousMessages = 1000
-)
+const maxSimultaneousMessages = 1000
 
 func NewNode(conn net.Conn) *Node {
 	id := uuid.New()
@@ -46,7 +42,6 @@ func NewNode(conn net.Conn) *Node {
 		Infos: Infos{
 			Id: id,
 		},
-		Next: nil,
 	}
 }
 
@@ -65,8 +60,4 @@ func (c *Node) SetConn(conn net.Conn) {
 func (c *Node) Stop() {
 	close(c.Business.Shutdown)
 	c.Business.Wg.Wait()
-}
-
-func (c *Node) display(position int) {
-	log.Printf("%d: %s <-> %s\n", position, c.Business.Conn.LocalAddr(), c.Business.Conn.RemoteAddr())
 }
