@@ -3,6 +3,7 @@ package main
 import (
 	"chat/conn"
 	"chat/crdt"
+	"chat/linked"
 	"chat/node"
 	parsestdin "chat/parsestdin"
 	"flag"
@@ -34,10 +35,9 @@ func main() {
 	flag.Parse()
 
 	var (
-		currentChat = crdt.NewChat(*myNamePtr)
-		chats       = []crdt.Chat{currentChat}
-		nodes       = node.NewNodeList()
-
+		currentChat   = crdt.NewChat(*myNamePtr)
+		nodes         = linked.NewList()
+		chats         = linked.NewList()
 		sigc          = make(chan os.Signal, 1)
 		shutdown      = make(chan struct{})
 		portAccept    = *myPortPtr
@@ -53,7 +53,7 @@ func main() {
 	defer func() {
 		wgReadStdin.Wait()
 		wgListen.Wait()
-		nodes.CloseAndWaitNode()
+		// TODO Stop all running nodes
 		log.Println("[INFO] program shutdown")
 	}()
 
@@ -63,6 +63,7 @@ func main() {
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 
+	_ = chats.Add(currentChat)
 	wgListen.Add(1)
 	go conn.ListenAndServe(&wgListen, newNodes, shutdown, transportProtocol, addressAccept, portAccept)
 
@@ -77,13 +78,13 @@ func main() {
 
 		/* Save the connection and handle connection*/
 		case newNode := <-newNodes:
-			nodes.AddNode(newNode)
+			nodes.Add(newNode)
 			newNode.Business.Wg.Add(1)
 			go conn.HandleConnection(newNode, connectionsDone, newNode.Business.Shutdown)
 
 		/* Node done */
 		case id := <-connectionsDone:
-			nodes.RemoveNode(id)
+			nodes.Delete(id)
 
 		/* Command input */
 		case line := <-stdin:
@@ -101,8 +102,7 @@ func main() {
 					newChat  = crdt.NewChat(chatName)
 				)
 
-				chats = append(chats, newChat)
-				currentChat = newChat
+				chats.Add(newChat)
 
 			case parsestdin.ConnectCommandType:
 				var (
