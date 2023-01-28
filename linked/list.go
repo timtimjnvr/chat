@@ -3,7 +3,9 @@ package linked
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 )
+var NotFound = errors.New("Not found")
 
 type (
 	element struct {
@@ -21,6 +23,7 @@ type (
 	List interface {
 		Len() int
 		Add(value interface{}) uuid.UUID
+		GetByIndex(index int) (*element, error)
 		Delete(key uuid.UUID)
 	}
 
@@ -63,6 +66,21 @@ func (l *list) Add(value interface{}) uuid.UUID {
 	}
 	return l.tail.key
 }
+
+func (l *list) GetByIndex(index int) (*element, error){
+	if index >= l.Len(){
+		return nil, NotFound
+	}
+	i := 0
+	for l.head != nil && i != index{
+		l.head = l.head.next
+	}
+
+	return l.head, nil
+}
+
+// TODO
+// func (l *list) GetById(id uuid.UUID) *element{}
 
 func (l *list) Delete(key uuid.UUID) {
 	var previous, tmp *element

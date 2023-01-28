@@ -145,9 +145,9 @@ func removeSubStrings(source string, patterns ...string) string {
 	return result
 }
 
-func ReadStdin(wg *sync.WaitGroup, lines chan string, shutdown chan struct{}) {
+func ReadStdin(wg *sync.WaitGroup, stdin chan<- []byte, shutdown chan struct{}) {
 	defer func() {
-		close(lines)
+		close(stdin)
 		wg.Done()
 		log.Println("[INFO] readStdin stopped")
 	}()
@@ -197,7 +197,7 @@ func ReadStdin(wg *sync.WaitGroup, lines chan string, shutdown chan struct{}) {
 		}
 
 		if n > 0 {
-			lines <- string(buffer[0:n])
+			stdin <- buffer[0:n]
 		}
 	}
 }
