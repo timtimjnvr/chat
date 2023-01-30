@@ -91,7 +91,6 @@ func orchestrate(wg *sync.WaitGroup, initialChat *string, stdin, fromConnections
 				}
 
 				/* sync -> add the new newNode to other nodes */
-
 			case parsestdin.MsgCommandType:
 				content := args[parsestdin.MessageArg]
 				if currentChat == nil {

@@ -43,9 +43,9 @@ func (op *operation) SetOperationData(data Operable) {
 }
 
 func DecodeOperation(bytes []rune) Operable {
-	getField := func(offest int, source []rune) (int, []rune) {
-		lenField := int(source[offest])
-		return offest + lenField + 1, source[offest+1 : offest+lenField+1]
+	getField := func(offset int, source []rune) (int, []rune) {
+		lenField := int(source[offset])
+		return offset + lenField + 1, source[offset+1 : offset+lenField+1]
 	}
 	var (
 		offset = 0
@@ -62,7 +62,7 @@ func DecodeOperation(bytes []rune) Operable {
 }
 
 func (op *operation) ToRunes() []rune {
-	bytes := []rune{}
+	var bytes []rune
 
 	// 1st add operation id
 	bytes = append(bytes, int32(op.typology))

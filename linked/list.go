@@ -78,7 +78,6 @@ func (l *list) GetByIndex(index int) (*element, error){
 
 	return l.head, nil
 }
-
 // TODO
 // func (l *list) GetById(id uuid.UUID) *element{}
 

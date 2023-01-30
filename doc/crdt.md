@@ -1,10 +1,19 @@
-# Mutual agreement in messages order between nodes
+# Mutual agreement in messages order and nodes management in a multi-user chat.
 
 ## Operation based CRDTs
-propagation of commutative operations rather than whole node state (chat history) :
+Propagation of commutative operations rather than whole node state (chat history) :
  
-- add, update or remove a message from a discussion given the message id (uuid).
+- add, update or remove a message from a discussion history given the message id (uuid).
 - messages order is chosen based on sending date.
 
-## Synchronisation strategy (IN PROGRESS)
-For now, each node propagates his operations to all other nodes.
+## Synchronisation strategy
+For now, each node propagates his operations to all other nodes (except himself). 
+
+Synchronisation happens when :
+- a message is sent.
+- a new node arrives in the chat.
+- a node leaves the chat.
+
+### Example scenario
+
+![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/scenario.png?raw=true)
