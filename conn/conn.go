@@ -15,7 +15,7 @@ const (
 	MaxMessageSize          = 10000
 )
 
-func ListenAndServe(wg *sync.WaitGroup, newNodes chan *node.Node, shutdown chan struct{}, transportProtocol, addr, port string) {
+func ListenAndServe(wg *sync.WaitGroup, newConnections chan net.Conn, shutdown chan struct{}, transportProtocol, addr, port string) {
 	var (
 		conn      net.Conn
 		wgClosure = sync.WaitGroup{}
@@ -47,8 +47,7 @@ func ListenAndServe(wg *sync.WaitGroup, newNodes chan *node.Node, shutdown chan 
 			continue
 		}
 
-		newNode := node.NewNode(conn)
-		newNodes <- newNode
+		newConnections <- conn
 	}
 }
 

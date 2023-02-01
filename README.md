@@ -34,3 +34,6 @@ Default port_number : 8080
 ## Doc
 - Node managment : [CRDTs choices](doc/crdt.md)
 
+## TODO
+- add node to chat room (how to join a chat room by id or by name does the owner has to send chat id after connect)
+- clean sync operation building and decoding

@@ -1,7 +1,6 @@
 package crdt
 
 import (
-	"chat/conn"
 	"chat/node"
 	"github.com/google/uuid"
 )
@@ -11,14 +10,14 @@ type (
 		id       uuid.UUID
 		myNodeId uuid.UUID
 		name     string
-		nodes    []*node.Node
+		nodes    []*node.Infos
 		messages []Message
 	}
 
 	Chat interface {
-		AddNode(node *node.Node)
+		AddNode(infos *node.Infos)
 		AddMessage(message Message)
-		Send(data []byte)
+		GetNodesInfos() []*node.Infos
 	}
 )
 
@@ -27,14 +26,14 @@ func NewChat(name string) Chat {
 	return &chat{
 		id:       id,
 		name:     name,
-		nodes:    []*node.Node{},
+		nodes:    []*node.Infos{},
 		messages: []Message{},
 	}
 }
 
-func (c *chat) AddNode(node *node.Node) {
-	if !c.containsNode(node) {
-		c.nodes = append(c.nodes, node)
+func (c *chat) AddNodeInfos(i *node.Infos) {
+	if !c.containsNode(i.Id) {
+		c.nodes = append(c.nodes, i)
 	}
 }
 
@@ -45,9 +44,9 @@ func (c *chat) AddMessage(message Message) {
 	}
 }
 
-func (c *chat) containsNode(node *node.Node) bool {
+func (c *chat) containsNode(id uuid.UUID) bool {
 	for _, n := range c.nodes {
-		if n.Infos.Id == node.Infos.Id {
+		if n.Id == id {
 			return true
 		}
 	}
@@ -63,12 +62,12 @@ func (c *chat) containsMessage(message Message) bool {
 	return false
 }
 
-func (c *chat) Send(data []byte) {
-	for _, node := range c.nodes {
-		if c.myNodeId == node.Infos.Id {
-			continue
-		}
+func (c *chat) GetNodesInfos() []*node.Infos {
+	return c.nodes
+}
 
-		conn.Send(node.Business.Conn, data)
+func (c *chat) AddNode(infos *node.Infos) {
+	if !c.containsNode(infos.Id) {
+		c.nodes = append(c.nodes, infos)
 	}
 }
