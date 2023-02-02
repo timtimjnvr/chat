@@ -15,9 +15,11 @@ type (
 	}
 
 	Chat interface {
+		GetId() uuid.UUID
+		GetName() string
+		GetNodesInfos() []*node.Infos
 		AddNode(infos *node.Infos)
 		AddMessage(message Message)
-		GetNodesInfos() []*node.Infos
 	}
 )
 
@@ -28,6 +30,24 @@ func NewChat(name string) Chat {
 		name:     name,
 		nodes:    []*node.Infos{},
 		messages: []Message{},
+	}
+}
+
+func (c *chat) GetNodesInfos() []*node.Infos {
+	return c.nodes
+}
+
+func (c *chat) GetId() uuid.UUID {
+	return c.id
+}
+
+func (c *chat) GetName() string {
+	return c.name
+}
+
+func (c *chat) AddNode(infos *node.Infos) {
+	if !c.containsNode(infos.Id) {
+		c.nodes = append(c.nodes, infos)
 	}
 }
 
@@ -60,14 +80,4 @@ func (c *chat) containsMessage(message Message) bool {
 		}
 	}
 	return false
-}
-
-func (c *chat) GetNodesInfos() []*node.Infos {
-	return c.nodes
-}
-
-func (c *chat) AddNode(infos *node.Infos) {
-	if !c.containsNode(infos.Id) {
-		c.nodes = append(c.nodes, infos)
-	}
 }

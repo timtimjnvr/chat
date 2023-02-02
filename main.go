@@ -15,9 +15,7 @@ import (
 )
 
 const (
-	transportProtocol       = "tcp"
-	localhost               = "localhost"
-	localhostDecimalPointed = "127.0.0.1"
+	transportProtocol = "tcp"
 
 	maxSimultaneousConnections = 1000
 	maxMessagesStdin           = 100
@@ -45,11 +43,6 @@ func main() {
 		wgOrchestrate = sync.WaitGroup{}
 		wgListen      = sync.WaitGroup{}
 		wgReadStdin   = sync.WaitGroup{}
-
-		stdin           = make(chan []byte, maxMessagesStdin)
-		fromConnections = make(chan []byte, maxSimultaneousConnections)
-		newConnections  = make(chan net.Conn, maxSimultaneousConnections)
-		// newNodes        = make(chan *node.Node, maxSimultaneousConnections)
 	)
 
 	defer func() {
@@ -66,15 +59,18 @@ func main() {
 		syscall.SIGQUIT)
 
 	wgListen.Add(1)
-	go conn.ListenAndServe(&wgListen, newConnections, shutdown, transportProtocol, addressAccept, portAccept)
+	var newConnections = make(chan net.Conn, maxSimultaneousConnections)
+	go conn.ListenAndServe(&wgListen, transportProtocol, addressAccept, portAccept, newConnections, shutdown)
 
 	wgReadStdin.Add(1)
+	var stdin = make(chan []byte, maxMessagesStdin)
 	go parsestdin.ReadStdin(&wgReadStdin, stdin, shutdown)
 
 	wgOrchestrate.Add(1)
-	go orchestrate(&wgOrchestrate, myInfos, stdin, fromConnections, newConnections, chats, nodes, shutdown)
+	var fromConnections = make(chan []byte, maxSimultaneousConnections)
+	go orchestrate(&wgOrchestrate, myInfos, chats, nodes, stdin, fromConnections, newConnections, shutdown)
 
-	// go display(chats, refresh <-chan uuid.UUID)
+	// TODO display
 
 	for {
 		select {

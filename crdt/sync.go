@@ -1,9 +1,12 @@
 package crdt
 
+import "github.com/google/uuid"
+
 type (
 	operation struct {
-		typology operationType
-		data     []rune
+		typology     operationType
+		targetedChat uuid.UUID
+		data         []rune
 	}
 
 	operationType int32
@@ -17,14 +20,15 @@ const (
 	JoinChat                    = iota
 	LeaveChat                   = iota
 	AddMessage    operationType = iota
-	removeMessage operationType = iota
-	updateMessage operationType = iota
+	RemoveMessage operationType = iota
+	UpdateMessage operationType = iota
 )
 
-func NewOperation(typology operationType, data []rune) operation {
+func NewOperation(typology operationType, targetedChat uuid.UUID, data []rune) operation {
 	return operation{
-		typology: typology,
-		data:     data,
+		typology:     typology,
+		targetedChat: targetedChat,
+		data:         data,
 	}
 }
 
@@ -36,6 +40,10 @@ func (op *operation) GetOperationData() []rune {
 	return op.data
 }
 
+func (op *operation) GetTargetedChat() uuid.UUID {
+	return op.targetedChat
+}
+
 func (op *operation) SetOperationType(typology operationType) {
 	op.typology = typology
 }
@@ -44,7 +52,7 @@ func (op *operation) SetOperationData(data Operable) {
 	op.data = data.ToRunes()
 }
 
-func DecodeOperation(bytes []rune) Operable {
+func DecodeOperation(bytes []rune) operation {
 	getField := func(offset int, source []rune) (int, []rune) {
 		lenField := int(source[offset])
 		return offset + lenField + 1, source[offset+1 : offset+lenField+1]
@@ -57,7 +65,7 @@ func DecodeOperation(bytes []rune) Operable {
 	typology := operationType(bytes[offset])
 	_, data = getField(offset+1, bytes)
 
-	return &operation{
+	return operation{
 		typology: typology,
 		data:     data,
 	}

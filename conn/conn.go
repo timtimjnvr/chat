@@ -11,11 +11,13 @@ import (
 )
 
 const (
+	localhost               = "localhost"
+	localhostDecimalPointed = "127.0.0.1"
 	maxMessagesInConnection = 100
 	MaxMessageSize          = 10000
 )
 
-func ListenAndServe(wg *sync.WaitGroup, newConnections chan net.Conn, shutdown chan struct{}, transportProtocol, addr, port string) {
+func ListenAndServe(wg *sync.WaitGroup, transportProtocol, addr, port string, newConnections chan net.Conn, shutdown chan struct{}) {
 	var (
 		conn      net.Conn
 		wgClosure = sync.WaitGroup{}
@@ -108,6 +110,10 @@ func HandleConnection(node *node.Node, done chan<- uuid.UUID, shutdown chan stru
 }
 
 func OpenConnection(protocol, ip string, port int) (net.Conn, error) {
+	if ip == localhost || ip == localhostDecimalPointed {
+		ip = ""
+	}
+
 	conn, err := net.Dial(protocol, fmt.Sprintf("%s:%d", ip, port))
 	if err != nil {
 		return nil, err
