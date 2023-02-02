@@ -13,14 +13,14 @@ Decentralized P2P chat built in golang.
   - Close a chat discussion.
   - Order messages and handle new users with operation based CRDTs.
 
-## run
+## Run
 
 ```
 go build && ./chat -p=<port_number> -u=<your_nickname>
 ```
 Default port_number : 8080
 
-## commands
+## Commands
 
 ```
 /chat <chat_room> : create a new chat room named chat_room and enter it.
@@ -34,6 +34,7 @@ Default port_number : 8080
 ## Doc
 - Node managment : [CRDTs choices](doc/crdt.md)
 
-## TODO
-- add node to chat room (how to join a chat room by id or by name does the owner has to send chat id after connect)
-- clean sync operation building and decoding
+## Todo
+- refactor building & decode process of sync operations + tests
+- add proper functions for operations handling
+- handle node closure
