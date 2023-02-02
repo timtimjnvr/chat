@@ -7,6 +7,7 @@ import (
 	parsestdin "chat/parsestdin"
 	"flag"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"sync"
@@ -14,9 +15,7 @@ import (
 )
 
 const (
-	transportProtocol       = "tcp"
-	localhost               = "localhost"
-	localhostDecimalPointed = "127.0.0.1"
+	transportProtocol = "tcp"
 
 	maxSimultaneousConnections = 1000
 	maxMessagesStdin           = 100
@@ -25,9 +24,12 @@ const (
 )
 
 func main() {
-	myPortPtr := flag.String("p", "8080", "port number used to accept conn")
-	myAddrPtr := flag.String("a", "", "address used to accept conn")
-	myNamePtr := flag.String("u", "Tim", "address used to accept conn")
+
+	var (
+		myPortPtr = flag.String("p", "8080", "port number used to accept conn")
+		myAddrPtr = flag.String("a", "", "address used to accept conn")
+		myNamePtr = flag.String("u", "Tim", "address used to accept conn")
+	)
 	flag.Parse()
 
 	var (
@@ -37,13 +39,10 @@ func main() {
 		shutdown      = make(chan struct{})
 		portAccept    = *myPortPtr
 		addressAccept = *myAddrPtr
+		myInfos       = node.NewNodeInfos(*myNamePtr, addressAccept, portAccept)
 		wgOrchestrate = sync.WaitGroup{}
 		wgListen      = sync.WaitGroup{}
 		wgReadStdin   = sync.WaitGroup{}
-
-		stdin           = make(chan []byte, maxMessagesStdin)
-		fromConnections = make(chan []byte, maxSimultaneousConnections)
-		newNodes        = make(chan *node.Node, maxSimultaneousConnections)
 	)
 
 	defer func() {
@@ -60,15 +59,18 @@ func main() {
 		syscall.SIGQUIT)
 
 	wgListen.Add(1)
-	go conn.ListenAndServe(&wgListen, newNodes, shutdown, transportProtocol, addressAccept, portAccept)
+	var newConnections = make(chan net.Conn, maxSimultaneousConnections)
+	go conn.ListenAndServe(&wgListen, transportProtocol, addressAccept, portAccept, newConnections, shutdown)
 
 	wgReadStdin.Add(1)
+	var stdin = make(chan []byte, maxMessagesStdin)
 	go parsestdin.ReadStdin(&wgReadStdin, stdin, shutdown)
 
 	wgOrchestrate.Add(1)
-	go orchestrate(&wgOrchestrate, myNamePtr, stdin, fromConnections, newNodes, chats, nodes, shutdown)
+	var fromConnections = make(chan []byte, maxSimultaneousConnections)
+	go orchestrate(&wgOrchestrate, myInfos, chats, nodes, stdin, fromConnections, newConnections, shutdown)
 
-	// go display(chats, refresh <-chan uuid.UUID)
+	// TODO display
 
 	for {
 		select {

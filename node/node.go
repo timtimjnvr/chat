@@ -14,8 +14,9 @@ type (
 
 	Infos struct {
 		Id      uuid.UUID `json:"id"`
-		Port    int       `json:"port"`
+		Port    string    `json:"port"`
 		Address string    `json:"address"`
+		Name    string    `json: "name"`
 	}
 
 	Business struct {
@@ -30,7 +31,6 @@ type (
 const maxSimultaneousMessages = 1000
 
 func NewNode(conn net.Conn) *Node {
-	id := uuid.New()
 	return &Node{
 		Business: Business{
 			Conn:             conn,
@@ -39,25 +39,57 @@ func NewNode(conn net.Conn) *Node {
 			Wg:               &sync.WaitGroup{},
 			Shutdown:         make(chan struct{}, 0),
 		},
-		Infos: Infos{
-			Id: id,
-		},
 	}
 }
 
-func NewNodeInfos(id uuid.UUID, addr string, pt int) Infos {
-	return Infos{
+func (n *Node) SetNodeInfos(id uuid.UUID, addr, port string) {
+	n.Infos = Infos{
 		Id:      id,
-		Port:    pt,
+		Port:    port,
 		Address: addr,
 	}
 }
 
-func (c *Node) SetConn(conn net.Conn) {
-	c.Business.Conn = conn
+func NewNodeInfos(addr string, port, name string) Infos {
+	id, _ := uuid.NewUUID()
+	return Infos{
+		Id:      id,
+		Port:    port,
+		Address: addr,
+		Name:    name,
+	}
 }
 
-func (c *Node) Stop() {
-	close(c.Business.Shutdown)
-	c.Business.Wg.Wait()
+func (n *Node) SetConn(conn net.Conn) {
+	n.Business.Conn = conn
+}
+
+func (n *Node) Stop() {
+	close(n.Business.Shutdown)
+	n.Business.Wg.Wait()
+}
+
+func (i *Infos) ToRunes() []rune {
+	var (
+		idBytes   = []rune(i.Id.String())
+		portBytes = []rune(i.Port)
+		addrBytes = []rune(i.Address)
+		nameBytes = []rune(i.Name)
+		bytes     []rune
+	)
+
+	addBytes := func(destination []rune, source ...rune) []rune {
+		lenBytes := []rune{int32(len(source))}
+		destination = append(destination, lenBytes...)
+		destination = append(destination, source...)
+
+		return destination
+	}
+
+	bytes = addBytes(bytes, idBytes...)
+	bytes = addBytes(bytes, portBytes...)
+	bytes = addBytes(bytes, addrBytes...)
+	bytes = addBytes(bytes, nameBytes...)
+
+	return bytes
 }

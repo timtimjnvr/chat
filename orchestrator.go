@@ -13,32 +13,36 @@ import (
 	"sync"
 )
 
-func orchestrate(wg *sync.WaitGroup, initialChat *string, stdin, fromConnections <-chan []byte, newNodes chan *node.Node, chats linked.List, nodes  linked.List, shutdown <-chan struct{} ){
+// orchestrate maintains node list & chat infos consistency by parsing the different inputs (stdin, fromConnections, newConnections), it propagates sync operations to other nodes if needed
+func orchestrate(wg *sync.WaitGroup, myInfos node.Infos, chats linked.List, nodes linked.List, stdin, fromConnections <-chan []byte, newConnections chan net.Conn, shutdown <-chan struct{}) {
 	defer func() {
 		wg.Done()
 	}()
 
 	var (
-		currentChat   = crdt.NewChat(*initialChat)
+		chatNameId      = make(map[string]uuid.UUID)
+		currentChat     = crdt.NewChat(myInfos.Name)
 		connectionsDone = make(chan uuid.UUID, maxSimultaneousConnections)
 	)
+
+	// used by users join chat by name
+	chatNameId[currentChat.GetName()] = currentChat.GetId()
 
 	for {
 		select {
 		case <-shutdown:
 			return
 
-		/* Save the connection and handle connection*/
-		case newNode := <-newNodes:
-			nodes.Add(newNode)
+		case newConn := <-newConnections:
+			newNode := node.NewNode(newConn)
 			newNode.Business.Wg.Add(1)
 			go conn.HandleConnection(newNode, connectionsDone, newNode.Business.Shutdown)
 
-		/* Node done */
 		case id := <-connectionsDone:
 			nodes.Delete(id)
 
-		/* Command input */
+			// TODO update all chats where the node was inside
+
 		case line := <-stdin:
 			cmd, err := parsestdin.NewCommand(string(line))
 			if err != nil {
@@ -60,7 +64,6 @@ func orchestrate(wg *sync.WaitGroup, initialChat *string, stdin, fromConnections
 				var (
 					addr     = args[parsestdin.AddrArg]
 					chatRoom = args[parsestdin.ChatRoomArg]
-					newConn  net.Conn
 					pt       int
 				)
 
@@ -69,42 +72,59 @@ func orchestrate(wg *sync.WaitGroup, initialChat *string, stdin, fromConnections
 					log.Println(err)
 				}
 
-				if addr == localhost || addr == localhostDecimalPointed {
-					addr = ""
-				}
-
 				/* Open connection */
+				var newConn net.Conn
 				newConn, err = conn.OpenConnection(transportProtocol, addr, pt)
 				if err != nil {
 					log.Println("[ERROR] ", err)
 					continue
 				}
 
-				/* Saves the new connection into newNode List */
-				newNode := node.NewNode(newConn)
-				newNode.Business.Wg.Add(1)
-				go conn.HandleConnection(newNode, connectionsDone, newNode.Business.Shutdown)
+				newConnections <- newConn
 
-				/* Add the newNode to chatRoom */
-				if chatRoom == *initialChat {
-					currentChat.AddNode(newNode)
-				}
+				/* Sends a sync operation to the connected node to enter the chat room with all his infos */
+				syncMessage := crdt.NewOperation(crdt.JoinChat, chatNameId[chatRoom], myInfos.ToRunes())
+				bytesSyncMessage := []byte(string(syncMessage.ToRunes()))
+				conn.Send(newConn, bytesSyncMessage)
 
-				/* sync -> add the new newNode to other nodes */
 			case parsestdin.MsgCommandType:
-				content := args[parsestdin.MessageArg]
+				// content := args[parsestdin.MessageArg]
 				if currentChat == nil {
 					log.Println(noDiscussionSelected)
 					continue
 				}
 
-				/* Add the message to discussion */
-				message := crdt.NewMessage(*initialChat, content)
-				currentChat.AddMessage(message)
+				/* Add the message to discussion & sync with other nodes */
+				/*
+					message := crdt.NewMessage(myInfos.Name, content)
+					currentChat.AddMessage(message)
+					syncMessage := crdt.NewOperation(crdt.AddMessage, currentChat.GetId(), message.ToRunes())
+					bytesSyncMessage := []byte(string(syncMessage.ToRunes()))
 
-				syncMessage := crdt.NewOperation(crdt.AddMessage, message.ToRunes())
-				bytesSyncMessage := []byte(string(syncMessage.ToRunes()))
-				currentChat.Send(bytesSyncMessage)
+					var nodeIds = make([]uuid.UUID, 0, chats.Len())
+					for _, nodesInfos := range currentChat.GetNodesInfos() {
+						if nodesInfos.Id == myInfos.Id {
+							continue
+						}
+
+						nodeIds = append(nodeIds, nodesInfos.Id)
+					}
+				*/
+
+				// TODO send to nodes
+
+				/* for _, i := range nodesInfos {
+					var n interface{}
+					n, err = nodes.GetById(i.Id)
+					if err != nil {
+						continue
+					}
+
+					node := n.(node.Node)
+
+					conn.Send(node.Business.Conn, bytesSyncMessage)
+				}
+				*/
 
 			case parsestdin.CloseCommandType:
 				/* TODO
@@ -118,9 +138,39 @@ func orchestrate(wg *sync.WaitGroup, initialChat *string, stdin, fromConnections
 			}
 
 		case <-fromConnections:
-				// decode & execute operation
+			/*operation := crdt.DecodeOperation(operationBytes)
+
+			var targetedChat interface{}
+			targetedChat, err := chats.GetById(operation.targetedChat)
+			if err != nil {
+				log.Println("[ERROR] no chat id in operation")
+			}
+
+			chat := targetedChat.(crdt.Chat)
+
+			switch operation.GetOperationType() {
+			case crdt.JoinChat:
+				/*nodeInfos := DecodeNodeInfos(operation.GetOperationData())
+
+				for _, i := range nodesInfos {
+					var n interface{}
+					n, err = nodes.GetById(i.Id)
+					if err != nil {
+						continue
+					}
+
+					node := n.(node.Node)
+
+					conn.Send(node.Business.Conn, bytesSyncMessage)
+				}
+
+			case crdt.AddMessage:
+			case crdt.RemoveMessage:
+			case crdt.UpdateMessage:
+			case crdt.LeaveChat:
+			}
+			*/
 		}
-
-
 	}
+
 }
