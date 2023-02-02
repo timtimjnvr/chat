@@ -88,26 +88,28 @@ func orchestrate(wg *sync.WaitGroup, myInfos node.Infos, chats linked.List, node
 				conn.Send(newConn, bytesSyncMessage)
 
 			case parsestdin.MsgCommandType:
-				content := args[parsestdin.MessageArg]
+				// content := args[parsestdin.MessageArg]
 				if currentChat == nil {
 					log.Println(noDiscussionSelected)
 					continue
 				}
 
 				/* Add the message to discussion & sync with other nodes */
-				message := crdt.NewMessage(myInfos.Name, content)
-				currentChat.AddMessage(message)
-				syncMessage := crdt.NewOperation(crdt.AddMessage, currentChat.GetId(), message.ToRunes())
-				bytesSyncMessage := []byte(string(syncMessage.ToRunes()))
+				/*
+					message := crdt.NewMessage(myInfos.Name, content)
+					currentChat.AddMessage(message)
+					syncMessage := crdt.NewOperation(crdt.AddMessage, currentChat.GetId(), message.ToRunes())
+					bytesSyncMessage := []byte(string(syncMessage.ToRunes()))
 
-				var nodeIds = make([]uuid.UUID, 0, chats.Len())
-				for _, nodesInfos := range currentChat.GetNodesInfos() {
-					if nodesInfos.Id == myInfos.Id {
-						continue
+					var nodeIds = make([]uuid.UUID, 0, chats.Len())
+					for _, nodesInfos := range currentChat.GetNodesInfos() {
+						if nodesInfos.Id == myInfos.Id {
+							continue
+						}
+
+						nodeIds = append(nodeIds, nodesInfos.Id)
 					}
-
-					nodeIds = append(nodeIds, nodesInfos.Id)
-				}
+				*/
 
 				// TODO send to nodes
 
