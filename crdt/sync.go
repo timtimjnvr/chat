@@ -4,27 +4,34 @@ import "github.com/google/uuid"
 
 type (
 	operation struct {
-		typology     operationType
+		typology     OperationType
 		targetedChat uuid.UUID
-		data         []rune
+		data         []byte
 	}
 
-	operationType int32
+	OperationType int32
 
 	Operable interface {
 		ToRunes() []rune
+	}
+
+	Operation interface {
+		GetOperationType() OperationType
+		GetTargetedChat() uuid.UUID
+		GetOperationData() []byte
+		ToBytes() []byte
 	}
 )
 
 const (
 	JoinChat                    = iota
 	LeaveChat                   = iota
-	AddMessage    operationType = iota
-	RemoveMessage operationType = iota
-	UpdateMessage operationType = iota
+	AddMessage    OperationType = iota
+	RemoveMessage OperationType = iota
+	UpdateMessage OperationType = iota
 )
 
-func NewOperation(typology operationType, targetedChat uuid.UUID, data []rune) operation {
+func NewOperation(typology OperationType, targetedChat uuid.UUID, data []byte) operation {
 	return operation{
 		typology:     typology,
 		targetedChat: targetedChat,
@@ -32,11 +39,11 @@ func NewOperation(typology operationType, targetedChat uuid.UUID, data []rune) o
 	}
 }
 
-func (op *operation) GetOperationType() operationType {
+func (op *operation) GetOperationType() OperationType {
 	return op.typology
 }
 
-func (op *operation) GetOperationData() []rune {
+func (op *operation) GetOperationData() []byte {
 	return op.data
 }
 
@@ -44,40 +51,37 @@ func (op *operation) GetTargetedChat() uuid.UUID {
 	return op.targetedChat
 }
 
-func (op *operation) SetOperationType(typology operationType) {
-	op.typology = typology
-}
-
-func (op *operation) SetOperationData(data Operable) {
-	op.data = data.ToRunes()
-}
-
-func DecodeOperation(bytes []rune) operation {
-	getField := func(offset int, source []rune) (int, []rune) {
+func DecodeOperation(bytes []byte) (operation, error) {
+	getField := func(offset int, source []byte) (int, []byte) {
 		lenField := int(source[offset])
 		return offset + lenField + 1, source[offset+1 : offset+lenField+1]
 	}
+
 	var (
 		offset = 0
-		data   []rune
+		data, targetedChat   []byte
 	)
 
-	typology := operationType(bytes[offset])
+	typology := OperationType(bytes[offset])
+	offset, targetedChat = getField(offset, bytes)
 	_, data = getField(offset+1, bytes)
 
+	targetedChatId, err := uuid.Parse(string(targetedChat))
+	if err != nil {
+		return operation{}, err
+	}
 	return operation{
 		typology: typology,
+		targetedChat: targetedChatId,
 		data:     data,
-	}
+	}, nil
 }
 
-func (op *operation) ToRunes() []rune {
-	var bytes []rune
+func (op *operation) ToBytes() []byte {
+	var bytes []byte
 
-	// 1st add operation id
-	bytes = append(bytes, int32(op.typology))
-
-	//2nd add operation data
+	bytes = append(bytes, uint8(op.typology))
+	bytes = append(bytes, []byte(op.targetedChat.String())...)
 	bytes = append(bytes, op.data...)
 
 	return bytes
