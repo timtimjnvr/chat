@@ -35,6 +35,6 @@ Default port_number : 8080
 - Node managment : [CRDTs choices](doc/crdt.md)
 
 ## Todo
-- refactor building & decode process of sync operations + tests
 - add proper functions for operations handling
+- integrate operation building in stdin parser
 - handle node closure

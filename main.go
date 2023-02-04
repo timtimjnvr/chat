@@ -2,9 +2,8 @@ package main
 
 import (
 	"chat/conn"
-	"chat/linked"
-	"chat/node"
-	parsestdin "chat/parsestdin"
+	"chat/crdt"
+	"chat/parsestdin"
 	"flag"
 	"log"
 	"net"
@@ -14,41 +13,32 @@ import (
 	"syscall"
 )
 
-const (
-	transportProtocol = "tcp"
-
-	maxSimultaneousConnections = 1000
-	maxMessagesStdin           = 100
-
-	noDiscussionSelected = "you must be in a discussion to send a message"
-)
-
 func main() {
-
+	// Program arguments
 	var (
 		myPortPtr = flag.String("p", "8080", "port number used to accept conn")
 		myAddrPtr = flag.String("a", "", "address used to accept conn")
-		myNamePtr = flag.String("u", "Tim", "address used to accept conn")
+		myNamePtr = flag.String("u", "Tim", "nickname used in chats")
 	)
 	flag.Parse()
 
 	var (
-		nodes         = linked.NewList()
-		chats         = linked.NewList()
+		myInfos       = crdt.NewNodeInfos(*myNamePtr, *myAddrPtr, *myPortPtr)
+
 		sigc          = make(chan os.Signal, 1)
 		shutdown      = make(chan struct{})
-		portAccept    = *myPortPtr
-		addressAccept = *myAddrPtr
-		myInfos       = node.NewNodeInfos(*myNamePtr, addressAccept, portAccept)
-		wgOrchestrate = sync.WaitGroup{}
+
+		wgHandleNodes = sync.WaitGroup{}
 		wgListen      = sync.WaitGroup{}
-		wgReadStdin   = sync.WaitGroup{}
+		wgHandleChats = sync.WaitGroup{}
+		wgHandleStdin = sync.WaitGroup{}
 	)
 
 	defer func() {
-		wgReadStdin.Wait()
+		wgHandleStdin.Wait()
+		wgHandleChats.Wait()
 		wgListen.Wait()
-		// TODO Stop all running nodes
+		wgHandleNodes.Wait()
 		log.Println("[INFO] program shutdown")
 	}()
 
@@ -58,19 +48,23 @@ func main() {
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 
+	var (
+		newNodes  = make(chan net.Conn, conn.MaxSimultaneousConnections)
+		toSend    = make(chan []byte, conn.MaxSimultaneousMessages)
+		toExecute = make(chan []byte, conn.MaxSimultaneousMessages)
+	)
+
+	wgHandleNodes.Add(1)
+	go conn.HandleNodes(&wgHandleNodes, newNodes, toSend, toExecute, shutdown)
+
 	wgListen.Add(1)
-	var newConnections = make(chan net.Conn, maxSimultaneousConnections)
-	go conn.ListenAndServe(&wgListen, transportProtocol, addressAccept, portAccept, newConnections, shutdown)
+	go conn.ListenAndServe(&wgListen, *myAddrPtr, *myPortPtr, newNodes, shutdown)
 
-	wgReadStdin.Add(1)
-	var stdin = make(chan []byte, maxMessagesStdin)
-	go parsestdin.ReadStdin(&wgReadStdin, stdin, shutdown)
+	wgHandleChats.Add(1)
+	go crdt.HandleChats(&wgHandleChats, myInfos, toExecute, shutdown)
 
-	wgOrchestrate.Add(1)
-	var fromConnections = make(chan []byte, maxSimultaneousConnections)
-	go orchestrate(&wgOrchestrate, myInfos, chats, nodes, stdin, fromConnections, newConnections, shutdown)
-
-	// TODO display
+	wgHandleStdin.Add(1)
+	go parsestdin.HandleStdin(&wgHandleStdin, myInfos, newNodes, toExecute, shutdown)
 
 	for {
 		select {

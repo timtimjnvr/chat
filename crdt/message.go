@@ -19,7 +19,7 @@ type (
 		GetSender() string
 		GetContent() string
 		GetDate() string
-		ToBytes() ([]byte,error)
+		ToBytes() ([]byte, error)
 	}
 )
 
