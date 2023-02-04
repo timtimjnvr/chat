@@ -10,10 +10,10 @@ import (
 
 type (
 	node struct {
-		slot             int
-		Conn             net.Conn
-		Wg               *sync.WaitGroup
-		Shutdown         chan struct{}
+		slot     int
+		Conn     net.Conn
+		Wg       *sync.WaitGroup
+		Shutdown chan struct{}
 	}
 )
 
@@ -107,7 +107,7 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int
 	log.Println("[INFO] new conn")
 
 	var (
-		wgReadConn = sync.WaitGroup{}
+		wgReadConn      = sync.WaitGroup{}
 		messageReceived = make(chan []byte, MaxSimultaneousMessages)
 	)
 
@@ -133,7 +133,8 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int
 				return
 			}
 
-			outGoingMessages <- message
+			// add slot to message
+			outGoingMessages <- append([]byte{uint8(node.slot)}, message...)
 		}
 	}
 }
@@ -153,9 +154,9 @@ func OpenConnection(ip string, port int) (net.Conn, error) {
 
 func NewNode(conn net.Conn) node {
 	return node{
-		Conn:             conn,
-		Wg:               &sync.WaitGroup{},
-		Shutdown:         make(chan struct{}, 0),
+		Conn:     conn,
+		Wg:       &sync.WaitGroup{},
+		Shutdown: make(chan struct{}, 0),
 	}
 }
 

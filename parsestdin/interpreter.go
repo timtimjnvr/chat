@@ -30,8 +30,6 @@ type (
 )
 
 const (
-	/* COMMAND TYPES*/
-
 	CreateChatCommandType commandType = iota
 	ConnectCommandType    commandType = iota
 	MsgCommandType        commandType = iota
@@ -39,15 +37,10 @@ const (
 	ListUsersCommandType  commandType = iota
 	QuitCommandType       commandType = iota
 
-	/* COMMANDS ARGS */
-
 	MessageArg  = "messageArgument"
 	PortArg     = "portArgument"
 	AddrArg     = "addrArgument"
-	IdChatArg   = "idChatArgument"
 	ChatRoomArg = "chatRoomArgument"
-
-	/* INLINE COMMANDS */
 
 	chat            = "/chat"
 	msg             = "/msg"
@@ -56,10 +49,7 @@ const (
 	listUsers       = "/list"
 	quit            = "/quit"
 
-	/* ERRORS FORMAT */
-
 	connectErrorArgumentsMsg = "command syntax : " + connect + "<ip> <port>"
-
 
 	maxMessagesStdin     = 100
 	noDiscussionSelected = "you must be in a discussion to send a message"
@@ -77,7 +67,6 @@ var (
 
 	/* PACKAGE ERRORS */
 
-	ErrorParseCommand   = errors.New("can't parse command")
 	ErrorUnknownCommand = errors.New("unknown command")
 	ErrorInArguments    = errors.New("problem in arguments")
 )
@@ -165,7 +154,7 @@ func ReadStdin(wg *sync.WaitGroup, stdin chan<- []byte, shutdown chan struct{}) 
 	go func() {
 		select {
 		case <-shutdown:
-			writeClose.Close()
+			_ = writeClose.Close()
 		}
 	}()
 
@@ -217,6 +206,7 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, newConnections chan<- n
 
 	defer func() {
 		wgReadStdin.Wait()
+		wg.Done()
 	}()
 
 	wgReadStdin.Add(1)
@@ -240,8 +230,8 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, newConnections chan<- n
 			case CreateChatCommandType:
 				var (
 					bytesChat []byte
-					chatName = args[ChatRoomArg]
-					newChat  = crdt.NewChat(chatName)
+					chatName  = args[ChatRoomArg]
+					newChat   = crdt.NewChat(chatName)
 				)
 				bytesChat, err = newChat.ToBytes()
 				if err != nil {
@@ -270,9 +260,13 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, newConnections chan<- n
 					log.Println("[ERROR] ", err)
 					break
 				}
+
 				myInfosBytes, _ := myInfos.ToBytes()
 				joinOperation := crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfosBytes)
-				conn.Send(newConn, joinOperation.ToBytes())
+				err = conn.Send(newConn, joinOperation.ToBytes())
+				if err != nil {
+					log.Println("[ERROR] ", err)
+				}
 
 				newConnections <- newConn
 

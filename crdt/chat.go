@@ -13,15 +13,15 @@ type (
 		Id       string `json:"Id"`
 		myNodeId uuid.UUID
 		Name     string `json:"name"`
-		nodes    []*Infos
+		nodes    []Infos
 		messages []Message
 	}
 
 	Chat interface {
 		GetId() string
 		GetName() string
-		GetNodesInfos() []*Infos
-		AddNode(infos *Infos)
+		GetNodesInfos() []Infos
+		AddNode(infos Infos)
 		AddMessage(message Message)
 		ToBytes() ([]byte, error)
 	}
@@ -32,12 +32,12 @@ func NewChat(name string) Chat {
 	return &chat{
 		Id:       id.String(),
 		Name:     name,
-		nodes:    []*Infos{},
+		nodes:    []Infos{},
 		messages: []Message{},
 	}
 }
 
-func (c *chat) GetNodesInfos() []*Infos {
+func (c *chat) GetNodesInfos() []Infos {
 	return c.nodes
 }
 
@@ -49,7 +49,7 @@ func (c *chat) GetName() string {
 	return c.Name
 }
 
-func (c *chat) AddNode(i *Infos) {
+func (c *chat) AddNode(i Infos) {
 	c.nodes = append(c.nodes, i)
 }
 
@@ -94,16 +94,16 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toExecute <-chan []byte, shu
 			return
 
 		case operationBytes := <-toExecute:
+			slot := int(operationBytes[0])
+			op, err := DecodeOperation(operationBytes[1:])
 
-			op, err := DecodeOperation(operationBytes)
-
-			var c  Chat
+			var c Chat
 
 			switch op.typology {
 
 			case JoinChatByName:
 				var (
-					chatName = op.targetedChat
+					chatName      = op.targetedChat
 					numberOfChats = chats.Len()
 				)
 
@@ -133,21 +133,31 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toExecute <-chan []byte, shu
 				var chatValue interface{}
 				chatValue, err = chats.GetById(id)
 				if err != nil {
-					log.Println("[ERROR] no chat id in op")
+					log.Println("[ERROR]", err)
 					continue
 				}
 
 				c = chatValue.(Chat)
 			}
 
-
 			switch op.typology {
-				case JoinChatByName:
-				case AddMessage:
-				case LeaveChat:
+			case JoinChatByName:
+				newNodeInfos, err := DecodeInfos(op.GetOperationData())
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
+
+				newNodeInfos.SetSlot(slot)
+				c.AddNode(newNodeInfos)
+
+			case AddMessage:
+				newMessage, err := DecodeMessage(op.GetOperationData())
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
+				c.AddMessage(newMessage)
 			}
 		}
 	}
 
 }
-

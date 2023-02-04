@@ -24,7 +24,7 @@ type (
 )
 
 const (
-	AddChat = iota
+	AddChat                      = iota
 	JoinChatByName               = iota
 	LeaveChat                    = iota
 	AddMessage     OperationType = iota

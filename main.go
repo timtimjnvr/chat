@@ -23,10 +23,10 @@ func main() {
 	flag.Parse()
 
 	var (
-		myInfos       = crdt.NewNodeInfos(*myNamePtr, *myAddrPtr, *myPortPtr)
+		myInfos = crdt.NewNodeInfos(*myNamePtr, *myAddrPtr, *myPortPtr)
 
-		sigc          = make(chan os.Signal, 1)
-		shutdown      = make(chan struct{})
+		sigc     = make(chan os.Signal, 1)
+		shutdown = make(chan struct{})
 
 		wgHandleNodes = sync.WaitGroup{}
 		wgListen      = sync.WaitGroup{}

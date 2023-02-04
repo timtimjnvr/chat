@@ -7,10 +7,11 @@ type (
 		slot    int
 		Port    string `json:"port"`
 		Address string `json:"address"`
-		name    string `json: "name"`
+		Name    string `json:"name"`
 	}
 
 	Infos interface {
+		SetSlot(slot int)
 		GetName() string
 		ToBytes() ([]byte, error)
 	}
@@ -21,15 +22,19 @@ func NewNodeInfos(addr string, port, name string) Infos {
 		slot:    -1,
 		Port:    port,
 		Address: addr,
-		name:    name,
+		Name:    name,
 	}
 }
 
-func (i infos) GetName() string {
-	return i.name
+func (i *infos) GetName() string {
+	return i.Name
 }
 
-func (i infos) ToBytes() ([]byte, error) {
+func (i *infos) SetSlot(slot int) {
+	i.slot = slot
+}
+
+func (i *infos) ToBytes() ([]byte, error) {
 	bytesMessage, err := json.Marshal(i)
 	if err != nil {
 		return nil, err
@@ -45,5 +50,5 @@ func DecodeInfos(bytes []byte) (Infos, error) {
 		return nil, err
 	}
 
-	return i, nil
+	return &i, nil
 }
