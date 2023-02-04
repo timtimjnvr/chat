@@ -1,60 +1,56 @@
 package crdt
 
 import (
-	"chat/node"
+	"chat/linked"
+	"encoding/json"
 	"github.com/google/uuid"
+	"log"
+	"sync"
 )
 
 type (
 	chat struct {
-		id       uuid.UUID
+		Id       string `json:"Id"`
 		myNodeId uuid.UUID
-		name     string
-		nodes    []*node.Infos
+		Name     string `json:"name"`
+		nodes    []Infos
 		messages []Message
 	}
 
 	Chat interface {
-		GetId() uuid.UUID
+		GetId() string
 		GetName() string
-		GetNodesInfos() []*node.Infos
-		AddNode(infos *node.Infos)
+		GetNodesInfos() []Infos
+		AddNode(infos Infos)
 		AddMessage(message Message)
+		ToBytes() ([]byte, error)
 	}
 )
 
 func NewChat(name string) Chat {
 	id, _ := uuid.NewUUID()
 	return &chat{
-		id:       id,
-		name:     name,
-		nodes:    []*node.Infos{},
+		Id:       id.String(),
+		Name:     name,
+		nodes:    []Infos{},
 		messages: []Message{},
 	}
 }
 
-func (c *chat) GetNodesInfos() []*node.Infos {
+func (c *chat) GetNodesInfos() []Infos {
 	return c.nodes
 }
 
-func (c *chat) GetId() uuid.UUID {
-	return c.id
+func (c *chat) GetId() string {
+	return c.Id
 }
 
 func (c *chat) GetName() string {
-	return c.name
+	return c.Name
 }
 
-func (c *chat) AddNode(infos *node.Infos) {
-	if !c.containsNode(infos.Id) {
-		c.nodes = append(c.nodes, infos)
-	}
-}
-
-func (c *chat) AddNodeInfos(i *node.Infos) {
-	if !c.containsNode(i.Id) {
-		c.nodes = append(c.nodes, i)
-	}
+func (c *chat) AddNode(i Infos) {
+	c.nodes = append(c.nodes, i)
 }
 
 func (c *chat) AddMessage(message Message) {
@@ -64,15 +60,6 @@ func (c *chat) AddMessage(message Message) {
 	}
 }
 
-func (c *chat) containsNode(id uuid.UUID) bool {
-	for _, n := range c.nodes {
-		if n.Id == id {
-			return true
-		}
-	}
-	return false
-}
-
 func (c *chat) containsMessage(message Message) bool {
 	for _, m := range c.messages {
 		if m.GetId() == message.GetId() {
@@ -80,4 +67,115 @@ func (c *chat) containsMessage(message Message) bool {
 		}
 	}
 	return false
+}
+
+func (c *chat) ToBytes() ([]byte, error) {
+	bytesChat, err := json.Marshal(c)
+	if err != nil {
+		return nil, err
+	}
+
+	return bytesChat, nil
+}
+
+// HandleChats maintains chat infos consistency by parsing the different inputs (stdi & fromConnections), it propagates sync operations to node handler nodes if needed
+func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExecute <-chan []byte, shutdown <-chan struct{}) {
+	defer func() {
+		wg.Done()
+	}()
+
+	var (
+		chats = linked.NewList()
+	)
+
+	for {
+		select {
+		case <-shutdown:
+			return
+
+		case operationBytes := <-toExecute:
+			slot := int(operationBytes[0])
+			op, err := decodeOperation(operationBytes[1:])
+
+			var c Chat
+
+			switch op.typology {
+
+			case JoinChatByName:
+				var (
+					chatName      = op.targetedChat
+					numberOfChats = chats.Len()
+				)
+
+				for index := 0; index < numberOfChats; index++ {
+					var chatValue interface{}
+					chatValue, _ = chats.GetByIndex(index)
+					c = chatValue.(Chat)
+
+					if c.GetName() == chatName {
+						break
+					}
+				}
+
+				if err != nil || c == nil {
+					log.Println("[ERROR] ", err)
+					continue
+				}
+
+			default:
+				var id uuid.UUID
+				id, err = uuid.Parse(op.targetedChat)
+				if err != nil {
+					log.Println("[ERROR]", err)
+					continue
+				}
+
+				var chatValue interface{}
+				chatValue, err = chats.GetById(id)
+				if err != nil {
+					log.Println("[ERROR]", err)
+					continue
+				}
+
+				c = chatValue.(Chat)
+			}
+
+			switch op.typology {
+			case JoinChatByName:
+				newNodeInfos, err := DecodeInfos(op.data)
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
+
+				newNodeInfos.SetSlot(slot)
+				c.AddNode(newNodeInfos)
+
+				var chatInfos []byte
+				chatInfos, err = c.ToBytes()
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
+
+
+				var myInfosByte []byte
+				myInfosByte, err = myInfos.ToBytes()
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
+
+				createChatOperation := NewOperation(AddChat,c.GetId(), chatInfos).ToBytes()
+				addNodeOperation := NewOperation(AddNode,c.GetId(), myInfosByte).ToBytes()
+				toSend <-createChatOperation
+				toSend <- addNodeOperation
+
+			case AddMessage:
+				newMessage, err := DecodeMessage(op.data)
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
+				c.AddMessage(newMessage)
+			}
+		}
+	}
+
 }
