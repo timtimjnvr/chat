@@ -1,7 +1,5 @@
 package crdt
 
-import "github.com/google/uuid"
-
 type (
 	operation struct {
 		typology     OperationType
@@ -17,8 +15,7 @@ type (
 
 	Operation interface {
 		GetOperationType() OperationType
-		GetTargetedChat() uuid.UUID
-		GetOperationData() []byte
+		getOperationData() []byte
 		ToBytes() []byte
 	}
 )
@@ -39,18 +36,6 @@ func NewOperation(typology OperationType, targetedChat string, data []byte) oper
 	}
 }
 
-func (op operation) GetOperationType() OperationType {
-	return op.typology
-}
-
-func (op operation) GetOperationData() []byte {
-	return op.data
-}
-
-func (op operation) GetTargetedChat() string {
-	return op.targetedChat
-}
-
 func (op operation) ToBytes() []byte {
 	var bytes []byte
 
@@ -61,7 +46,7 @@ func (op operation) ToBytes() []byte {
 	return bytes
 }
 
-func DecodeOperation(bytes []byte) (operation, error) {
+func decodeOperation(bytes []byte) (operation, error) {
 	getField := func(offset int, source []byte) (int, []byte) {
 		lenField := int(source[offset])
 		return offset + lenField + 1, source[offset+1 : offset+lenField+1]
@@ -82,3 +67,13 @@ func DecodeOperation(bytes []byte) (operation, error) {
 		data:         data,
 	}, nil
 }
+
+
+func (op operation) getTargetedChat() string {
+	return op.targetedChat
+}
+
+func (op operation) getOperationData() []byte {
+	return op.data
+}
+

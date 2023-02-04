@@ -61,7 +61,7 @@ func main() {
 	go conn.ListenAndServe(&wgListen, *myAddrPtr, *myPortPtr, newNodes, shutdown)
 
 	wgHandleChats.Add(1)
-	go crdt.HandleChats(&wgHandleChats, myInfos, toExecute, shutdown)
+	go crdt.HandleChats(&wgHandleChats, myInfos, toSend, toExecute, shutdown)
 
 	wgHandleStdin.Add(1)
 	go parsestdin.HandleStdin(&wgHandleStdin, myInfos, newNodes, toExecute, shutdown)

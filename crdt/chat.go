@@ -79,7 +79,7 @@ func (c *chat) ToBytes() ([]byte, error) {
 }
 
 // HandleChats maintains chat infos consistency by parsing the different inputs (stdi & fromConnections), it propagates sync operations to node handler nodes if needed
-func HandleChats(wg *sync.WaitGroup, myInfos Infos, toExecute <-chan []byte, shutdown <-chan struct{}) {
+func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExecute <-chan []byte, shutdown <-chan struct{}) {
 	defer func() {
 		wg.Done()
 	}()
@@ -95,7 +95,7 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toExecute <-chan []byte, shu
 
 		case operationBytes := <-toExecute:
 			slot := int(operationBytes[0])
-			op, err := DecodeOperation(operationBytes[1:])
+			op, err := decodeOperation(operationBytes[1:])
 
 			var c Chat
 
@@ -124,7 +124,7 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toExecute <-chan []byte, shu
 
 			default:
 				var id uuid.UUID
-				id, err = uuid.Parse(op.GetTargetedChat())
+				id, err = uuid.Parse(op.targetedChat)
 				if err != nil {
 					log.Println("[ERROR]", err)
 					continue
@@ -142,7 +142,7 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toExecute <-chan []byte, shu
 
 			switch op.typology {
 			case JoinChatByName:
-				newNodeInfos, err := DecodeInfos(op.GetOperationData())
+				newNodeInfos, err := DecodeInfos(op.data)
 				if err != nil {
 					log.Println("[ERROR]", err)
 				}
@@ -150,8 +150,26 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toExecute <-chan []byte, shu
 				newNodeInfos.SetSlot(slot)
 				c.AddNode(newNodeInfos)
 
+				var chatInfos []byte
+				chatInfos, err = c.ToBytes()
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
+
+
+				var myInfosByte []byte
+				myInfosByte, err = myInfos.ToBytes()
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
+
+				createChatOperation := NewOperation(AddChat,c.GetId(), chatInfos).ToBytes()
+				addNodeOperation := NewOperation(AddNode,c.GetId(), myInfosByte).ToBytes()
+				toSend <-createChatOperation
+				toSend <- addNodeOperation
+
 			case AddMessage:
-				newMessage, err := DecodeMessage(op.GetOperationData())
+				newMessage, err := DecodeMessage(op.data)
 				if err != nil {
 					log.Println("[ERROR]", err)
 				}
