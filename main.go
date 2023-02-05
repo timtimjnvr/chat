@@ -4,6 +4,7 @@ import (
 	"chat/conn"
 	"chat/crdt"
 	"chat/parsestdin"
+
 	"flag"
 	"github.com/google/uuid"
 	"log"

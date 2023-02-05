@@ -2,7 +2,6 @@ package crdt
 
 import (
 	"fmt"
-	"log"
 	"reflect"
 	"testing"
 	"time"
@@ -38,7 +37,6 @@ func TestGetSyncBytes(t *testing.T) {
 
 	for i, test := range tests {
 		res, _ := test.message.ToBytes()
-		log.Println(res)
 		assert.True(t, reflect.DeepEqual(res, test.expectedbytes), fmt.Sprintf("test %d failed on runes returned", i))
 	}
 }
