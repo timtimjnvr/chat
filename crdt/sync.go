@@ -15,19 +15,20 @@ type (
 
 	Operation interface {
 		GetOperationType() OperationType
-		getOperationData() []byte
+		GetTargetedChat() string
+		GetOperationData() []byte
 		ToBytes() []byte
 	}
 )
 
 const (
-	CreateChat     = iota
-	JoinChatByName = iota
-	AddNode        = iota
-	AddMessage     = iota
-	LeaveChat      = iota
-	ListUsers      = iota
-	Quit           = iota
+	CreateChat     OperationType = iota
+	JoinChatByName OperationType = iota
+	AddNode        OperationType = iota
+	AddMessage     OperationType = iota
+	LeaveChat      OperationType = iota
+	ListUsers     OperationType = iota
+	Quit          OperationType  = iota
 )
 
 func NewOperation(typology OperationType, targetedChat string, data []byte) operation {
@@ -36,6 +37,10 @@ func NewOperation(typology OperationType, targetedChat string, data []byte) oper
 		targetedChat: targetedChat,
 		data:         data,
 	}
+}
+
+func  (op operation) GetOperationType() OperationType{
+	return op.typology
 }
 
 func (op operation) ToBytes() []byte {
@@ -48,7 +53,7 @@ func (op operation) ToBytes() []byte {
 	return bytes
 }
 
-func decodeOperation(bytes []byte) (operation, error) {
+func DecodeOperation(bytes []byte) (Operation, error) {
 	getField := func(offset int, source []byte) (int, []byte) {
 		lenField := int(source[offset])
 		return offset + lenField + 1, source[offset+1 : offset+lenField+1]
@@ -70,10 +75,10 @@ func decodeOperation(bytes []byte) (operation, error) {
 	}, nil
 }
 
-func (op operation) getTargetedChat() string {
+func (op operation) GetTargetedChat() string {
 	return op.targetedChat
 }
 
-func (op operation) getOperationData() []byte {
+func (op operation) GetOperationData() []byte {
 	return op.data
 }

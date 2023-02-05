@@ -234,6 +234,7 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.
 					pt       int
 				)
 
+				// check if port is an int
 				pt, err = strconv.Atoi(args[PortArg])
 				if err != nil {
 					log.Println(err)
@@ -241,7 +242,7 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.
 
 				/* Open connection */
 				var newConn net.Conn
-				newConn, err = conn.OpenConnection(addr, pt)
+				newConn, err = conn.OpenConnection(addr, strconv.Itoa(pt))
 				if err != nil {
 					log.Println("[ERROR] ", err)
 					break

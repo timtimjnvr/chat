@@ -17,8 +17,10 @@ type (
 	Infos interface {
 		getId() uuid.UUID
 		getSlot() int
-		SetSlot(slot int)
+		GetAddr() string
+		GetPort() string
 		GetName() string
+		SetSlot(slot int)
 		ToBytes() ([]byte, error)
 	}
 )
@@ -43,6 +45,14 @@ func (i *infos) GetName() string {
 
 func (i *infos) getSlot() int {
 	return i.slot
+}
+
+func (i *infos) GetAddr() string {
+	return i.Address
+}
+
+func (i *infos) GetPort() string {
+	return i.Port
 }
 
 func (i *infos) SetSlot(slot int) {
