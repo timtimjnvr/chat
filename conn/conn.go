@@ -4,6 +4,7 @@ import (
 	"chat/crdt"
 	"fmt"
 	"github.com/pkg/errors"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -43,28 +44,30 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, operationsToS
 		log.Println("[INFO] HandleNodes stopped")
 	}()
 
-	select {
-	case <-shutdown:
-		return
+	for {
+		select {
+		case <-shutdown:
+			log.Println(" HandleNodes shutting down")
+			return
 
-	case newConn := <-newConnections:
-		newNode := NewNode(newConn)
-		newNode.Wg.Add(1)
-		go handleConnection(newNode, fromConnections, connectionsDone)
-		nodes = append(nodes, newNode)
+		case newConn := <-newConnections:
+			newNode := NewNode(newConn)
+			newNode.Wg.Add(1)
+			go handleConnection(newNode, fromConnections, connectionsDone)
+			nodes = append(nodes, newNode)
 
-	case slot := <-connectionsDone:
-		log.Printf("[INFO] slot %d done\n", slot)
-		// TODO
-		/*
-			build and send operation to chat handler to remove node identified by <slot> from all chats
-		*/
+		case slot := <-connectionsDone:
+			log.Printf("[INFO] slot %d done\n", slot)
+			// TODO
+			/*
+				build and send operation to chat handler to remove node identified by <slot> from all chats
+			*/
 
-	case operation := <-operationsToSend:
-		slot := operation[0]
-		_ = Send(nodes[slot].Conn, operation[:1])
+		case operation := <-operationsToSend:
+			slot := operation[0]
+			_ = Send(nodes[slot].Conn, operation[:1])
 
-	case message := <-fromConnections:
+		case message := <-fromConnections:
 
 			operation, err := crdt.DecodeOperation(message)
 			if err != nil {
@@ -88,6 +91,7 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, operationsToS
 			}
 
 			outGoingOperations <- message
+		}
 	}
 }
 
@@ -152,7 +156,9 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int
 			return
 
 		case message, ok := <-messageReceived:
+			log.Println("message received ")
 			if !ok {
+				log.Println("not ok")
 				// conn closed on the other side
 				return
 			}
@@ -207,14 +213,18 @@ func readConn(wg *sync.WaitGroup, conn net.Conn, messages chan []byte, shutdown 
 	for {
 		select {
 		case <-shutdown:
+			log.Println("[ERROR] readConn shutting down")
+
 			return
 
 		default:
 			buffer := make([]byte, MaxMessageSize)
 			n, err := conn.Read(buffer)
-			if err != nil {
+			if err == io.EOF {
+				log.Println("[ERROR] ", err)
 				return
 			}
+
 			if n > 0 {
 				log.Print(string(buffer))
 				messages <- buffer[0:n]

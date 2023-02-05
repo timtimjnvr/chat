@@ -65,7 +65,7 @@ func DecodeOperation(bytes []byte) (Operation, error) {
 	)
 
 	typology := OperationType(bytes[offset])
-	offset, targetedChat = getField(offset, bytes)
+	offset, targetedChat = getField(offset+1, bytes)
 	_, data = getField(offset+1, bytes)
 
 	return operation{
