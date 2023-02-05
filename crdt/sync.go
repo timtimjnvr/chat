@@ -21,11 +21,13 @@ type (
 )
 
 const (
-	AddChat                      = iota
-	JoinChatByName               = iota
-	LeaveChat                    = iota
-	AddMessage     OperationType = iota
-	AddNode                      = iota
+	CreateChat     = iota
+	JoinChatByName = iota
+	AddNode        = iota
+	AddMessage     = iota
+	LeaveChat      = iota
+	ListUsers      = iota
+	Quit           = iota
 )
 
 func NewOperation(typology OperationType, targetedChat string, data []byte) operation {
@@ -68,7 +70,6 @@ func decodeOperation(bytes []byte) (operation, error) {
 	}, nil
 }
 
-
 func (op operation) getTargetedChat() string {
 	return op.targetedChat
 }
@@ -76,4 +77,3 @@ func (op operation) getTargetedChat() string {
 func (op operation) getOperationData() []byte {
 	return op.data
 }
-

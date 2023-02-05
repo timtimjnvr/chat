@@ -1,9 +1,11 @@
 package parsestdin
 
 import (
+	"chat/crdt"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"reflect"
 	"testing"
 )
@@ -13,24 +15,25 @@ func TestParseCommandType(t *testing.T) {
 
 	var tests = []struct {
 		line             string
-		expectedTypology commandType
+		expectedTypology crdt.OperationType
 		expectedErr      error
 	}{
 		{
 			line:             "/msg blabla\n",
-			expectedTypology: MsgCommandType,
+			expectedTypology: crdt.AddMessage,
 			expectedErr:      nil,
 		},
 		{
 			line:             "/toto blabla\n",
-			expectedTypology: *new(commandType),
+			expectedTypology: *new(crdt.OperationType),
 			expectedErr:      ErrorUnknownCommand,
 		},
 	}
 
 	for i, test := range tests {
 		typology, err := parseCommandType(test.line)
-		ass.True(reflect.DeepEqual(typology, test.expectedTypology), fmt.Sprintf("test %d failed on computing typology", i))
+		log.Println(typology, test.expectedTypology)
+		ass.Equal(typology, test.expectedTypology, fmt.Sprintf("test %d failed on computing typology", i))
 		ass.True(errors.Is(err, test.expectedErr), fmt.Sprintf("test %d failed on error returned", i))
 	}
 
@@ -41,37 +44,37 @@ func TestGetArgs(t *testing.T) {
 
 	var tests = []struct {
 		text         string
-		typology     commandType
+		typology     crdt.OperationType
 		expectedArgs map[string]string
 		expectedErr  error
 	}{
 		{
 			text:         "/msg content blabla\n",
-			typology:     MsgCommandType,
+			typology:     crdt.AddMessage,
 			expectedArgs: map[string]string{MessageArg: "content blabla"},
 			expectedErr:  nil,
 		},
 		{
-			text:         "/connect 127.0.0.1 8080\n",
-			typology:     ConnectCommandType,
+			text:         "/join 127.0.0.1 8080\n",
+			typology:     crdt.JoinChatByName,
 			expectedArgs: map[string]string{AddrArg: "127.0.0.1", PortArg: "8080"},
 			expectedErr:  nil,
 		},
 		{
-			text:         "/connect 127.0.0.1\n",
-			typology:     ConnectCommandType,
+			text:         "/join 127.0.0.1\n",
+			typology:     crdt.JoinChatByName,
 			expectedArgs: make(map[string]string),
 			expectedErr:  ErrorInArguments,
 		},
 		{
 			text:         "/close\n",
-			typology:     CloseCommandType,
+			typology:     crdt.LeaveChat,
 			expectedArgs: make(map[string]string),
 			expectedErr:  nil,
 		},
 		{
 			text:         "/list\n",
-			typology:     ListUsersCommandType,
+			typology:     crdt.ListUsers,
 			expectedArgs: make(map[string]string),
 			expectedErr:  nil,
 		},

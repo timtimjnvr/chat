@@ -17,52 +17,43 @@ import (
 
 type (
 	Command interface {
-		getCommandType() commandType
+		getCommandType() crdt.OperationType
 		getCommandArgs() map[string]string
 	}
 
 	command struct {
-		typology commandType
+		typology crdt.OperationType
 		args     map[string]string
 	}
-
-	commandType int
 )
 
 const (
-	CreateChatCommandType commandType = iota
-	ConnectCommandType    commandType = iota
-	MsgCommandType        commandType = iota
-	CloseCommandType      commandType = iota
-	ListUsersCommandType  commandType = iota
-	QuitCommandType       commandType = iota
+	newChatCommand   = "/chat"
+	msgCommand       = "/msg"
+	joinChatCommand  = "/join"
+	leaveChatCommand = "/close"
+	listUsersCommand = "/list"
+	quitCommand      = "/quit"
 
 	MessageArg  = "messageArgument"
 	PortArg     = "portArgument"
 	AddrArg     = "addrArgument"
 	ChatRoomArg = "chatRoomArgument"
 
-	chat            = "/chat"
-	msg             = "/msg"
-	connect         = "/connect"
-	closeConnection = "/close"
-	listUsers       = "/list"
-	quit            = "/quit"
-
-	connectErrorArgumentsMsg = "command syntax : " + connect + "<ip> <port>"
+	connectErrorArgumentsMsg = "command syntax : " + joinChatCommand + "<ip> <port>"
 
 	maxMessagesStdin     = 100
 	noDiscussionSelected = "you must be in a discussion to send a message"
 )
 
 var (
-	commands = map[string]commandType{
-		chat:            CreateChatCommandType,
-		msg:             MsgCommandType,
-		connect:         ConnectCommandType,
-		closeConnection: CloseCommandType,
-		listUsers:       ListUsersCommandType,
-		quit:            QuitCommandType,
+	commandToOperation = map[string]crdt.OperationType{
+		newChatCommand:   crdt.CreateChat,
+		msgCommand:       crdt.AddMessage,
+		joinChatCommand:  crdt.JoinChatByName,
+		leaveChatCommand: crdt.LeaveChat,
+		listUsersCommand: crdt.ListUsers,
+		quitCommand:      crdt.Quit,
 	}
 
 	/* PACKAGE ERRORS */
@@ -88,7 +79,7 @@ func newCommand(line string) (Command, error) {
 	}, nil
 }
 
-func (c command) getCommandType() commandType {
+func (c command) getCommandType() crdt.OperationType {
 	return c.typology
 }
 
@@ -96,25 +87,25 @@ func (c command) getCommandArgs() map[string]string {
 	return c.args
 }
 
-func parseCommandType(line string) (commandType, error) {
+func parseCommandType(line string) (crdt.OperationType, error) {
 	text := fmt.Sprintf(strings.Replace(line, "\n", "", 1))
 	split := strings.Split(text, " ")
 
 	commandString := split[0]
-	typology, exist := commands[commandString]
+	operationTypology, exist := commandToOperation[commandString]
 
 	if !exist {
-		return typology, ErrorUnknownCommand
+		return operationTypology, ErrorUnknownCommand
 	}
 
-	return typology, nil
+	return operationTypology, nil
 }
 
-func parseArgs(text string, command commandType) (map[string]string, error) {
+func parseArgs(text string, command crdt.OperationType) (map[string]string, error) {
 	args := make(map[string]string)
 
 	switch command {
-	case ConnectCommandType:
+	case crdt.JoinChatByName:
 		splitArgs := strings.Split(text, " ")
 		if len(splitArgs) < 3 {
 			return args, errors.Wrap(ErrorInArguments, connectErrorArgumentsMsg)
@@ -122,8 +113,8 @@ func parseArgs(text string, command commandType) (map[string]string, error) {
 		args[AddrArg] = removeSubStrings(splitArgs[1], " ", "\n")
 		args[PortArg] = removeSubStrings(splitArgs[2], " ", "\n")
 
-	case MsgCommandType:
-		args[MessageArg] = removeSubStrings(text, fmt.Sprintf("%s ", msg), "\n")
+	case crdt.AddMessage:
+		args[MessageArg] = removeSubStrings(text, fmt.Sprintf("%s ", msgCommand), "\n")
 
 	default:
 		// no args
@@ -227,7 +218,7 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, newConnections chan<- n
 			args := cmd.getCommandArgs()
 
 			switch typology := cmd.getCommandType(); typology {
-			case CreateChatCommandType:
+			case crdt.CreateChat:
 				var (
 					bytesChat []byte
 					chatName  = args[ChatRoomArg]
@@ -237,11 +228,11 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, newConnections chan<- n
 				if err != nil {
 					log.Println(err)
 				}
-				newChatOperation := crdt.NewOperation(crdt.AddChat, newChat.GetId(), bytesChat)
+				newChatOperation := crdt.NewOperation(crdt.CreateChat, newChat.GetId(), bytesChat)
 				newChatOperationBytes := newChatOperation.ToBytes()
 				newOperations <- newChatOperationBytes
 
-			case ConnectCommandType:
+			case crdt.JoinChatByName:
 				var (
 					addr     = args[AddrArg]
 					chatRoom = args[ChatRoomArg]
@@ -270,7 +261,7 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, newConnections chan<- n
 
 				newConnections <- newConn
 
-			case MsgCommandType:
+			case crdt.AddMessage:
 				content := args[MessageArg]
 				if currentChat == nil {
 					log.Println(noDiscussionSelected)
@@ -289,12 +280,12 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, newConnections chan<- n
 
 				newOperations <- bytesSyncMessage
 
-			case CloseCommandType:
+			case crdt.LeaveChat:
 				/* TODO
 				leave discussion and gracefully shutdown connection with all nodes
 				*/
 
-			case QuitCommandType:
+			case crdt.Quit:
 				/* TODO
 				leave all discussions and gracefully shutdown connection with all nodes
 				*/
