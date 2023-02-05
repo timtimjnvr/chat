@@ -34,6 +34,7 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, operationsToS
 		nodes           []node
 		connectionsDone = make(chan int, MaxSimultaneousConnections)
 		fromConnections = make(chan []byte)
+		err             error
 	)
 
 	defer func() {
@@ -68,11 +69,7 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, operationsToS
 			_ = Send(nodes[slot].Conn, operation[:1])
 
 		case message := <-fromConnections:
-
-			operation, err := crdt.DecodeOperation(message)
-			if err != nil {
-				log.Println("[ERROR] ", err)
-			}
+			operation := crdt.DecodeOperation(message)
 
 			if operation.GetOperationType() == crdt.AddNode {
 				nodeInfos, _ := crdt.DecodeInfos(operation.GetOperationData())
@@ -156,7 +153,6 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int
 			return
 
 		case message, ok := <-messageReceived:
-			log.Println("message received ")
 			if !ok {
 				log.Println("not ok")
 				// conn closed on the other side
@@ -226,8 +222,8 @@ func readConn(wg *sync.WaitGroup, conn net.Conn, messages chan []byte, shutdown 
 			}
 
 			if n > 0 {
-				log.Print(string(buffer))
-				messages <- buffer[0:n]
+				log.Print("[INFO] readConn :", string(buffer))
+				messages <- buffer[:n]
 			}
 		}
 	}

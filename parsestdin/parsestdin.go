@@ -266,10 +266,7 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.
 
 				/* Add the message to discussion & sync with other nodes */
 				var message []byte
-				message, err = crdt.NewMessage(myInfos.GetName(), content).ToBytes()
-				if err != nil {
-					log.Println("[ERROR] ", err)
-				}
+				message = crdt.NewMessage(myInfos.GetName(), content).ToBytes()
 
 				addMessageSync := crdt.NewOperation(crdt.AddMessage, currentChat.GetId(), message).ToBytes()
 				operationsCreated <- addMessageSync

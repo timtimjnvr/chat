@@ -26,7 +26,7 @@ func main() {
 
 	var (
 		id, _   = uuid.NewUUID()
-		myInfos = crdt.NewNodeInfos(id, *myNamePtr, *myAddrPtr, *myPortPtr)
+		myInfos = crdt.NewNodeInfos(id, *myAddrPtr, *myPortPtr, *myNamePtr)
 
 		sigc     = make(chan os.Signal, 1)
 		shutdown = make(chan struct{})

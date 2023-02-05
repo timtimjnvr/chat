@@ -109,113 +109,114 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 
 			var (
 				slot = int(operationBytes[0])
-				op, err = DecodeOperation(operationBytes[1:])
-				c Chat
+				op   = DecodeOperation(operationBytes[1:])
+				c    Chat
+				err  error
 			)
 
 			// get targeted chat
 			switch op.GetOperationType() {
 
-				// by name
-				case JoinChatByName:
-					var (
-						chatName      = op.GetTargetedChat()
-						numberOfChats = chats.Len()
-					)
+			// by name
+			case JoinChatByName:
+				var (
+					chatName      = op.GetTargetedChat()
+					numberOfChats = chats.Len()
+				)
 
-					for index := 0; index < numberOfChats; index++ {
-						var chatValue interface{}
-						chatValue, _ = chats.GetByIndex(index)
-						c = chatValue.(Chat)
-
-						if c.GetName() == chatName {
-							break
-						}
-					}
-
-					if err != nil || c == nil {
-						log.Println("[ERROR] not found :", err)
-						continue
-					}
-
-				// by id
-				default:
-					var id uuid.UUID
-					id, err = uuid.Parse(op.GetTargetedChat())
-					if err != nil {
-						log.Println("[ERROR] not found :", err)
-						continue
-					}
-
+				for index := 0; index < numberOfChats; index++ {
 					var chatValue interface{}
-					chatValue, err = chats.GetById(id)
-					if err != nil {
-						log.Println("[ERROR]", err)
-						continue
-					}
-
+					chatValue, _ = chats.GetByIndex(index)
 					c = chatValue.(Chat)
 
-				// no targeted chat needed
-				case Quit:
+					if c.GetName() == chatName {
+						break
+					}
+				}
+
+				if err != nil || c == nil {
+					log.Println("[ERROR] not found :", err)
+					continue
+				}
+
+			// by id
+			default:
+				var id uuid.UUID
+				id, err = uuid.Parse(op.GetTargetedChat())
+				if err != nil {
+					log.Println("[ERROR] not found :", err)
+					continue
+				}
+
+				var chatValue interface{}
+				chatValue, err = chats.GetById(id)
+				if err != nil {
+					log.Println("[ERROR]", err)
+					continue
+				}
+
+				c = chatValue.(Chat)
+
+			// no targeted chat needed
+			case Quit:
 			}
 
 			// execute operation
 			switch op.GetOperationType() {
-				case JoinChatByName:
-					var newNodeInfos Infos
-					newNodeInfos, err = DecodeInfos(op.GetOperationData())
-					if err != nil {
-						log.Println("[ERROR]", err)
-					}
+			case JoinChatByName:
+				var newNodeInfos Infos
+				newNodeInfos, err = DecodeInfos(op.GetOperationData())
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
 
-					newNodeInfos.SetSlot(slot)
-					c.AddNode(newNodeInfos)
+				newNodeInfos.SetSlot(slot)
+				c.AddNode(newNodeInfos)
 
-					var chatInfos []byte
-					chatInfos, err = c.ToBytes()
-					if err != nil {
-						log.Println("[ERROR]", err)
-					}
+				var chatInfos []byte
+				chatInfos, err = c.ToBytes()
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
 
-					var myInfosByte []byte
-					myInfosByte, err = myInfos.ToBytes()
-					if err != nil {
-						log.Println("[ERROR]", err)
-					}
+				var myInfosByte []byte
+				myInfosByte, err = myInfos.ToBytes()
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
 
-					createChatOperation := NewOperation(CreateChat, c.GetId(), chatInfos).ToBytes()
-					toSend <- AddSlot(slot, createChatOperation)
+				createChatOperation := NewOperation(CreateChat, c.GetId(), chatInfos).ToBytes()
+				toSend <- AddSlot(slot, createChatOperation)
 
-					addNodeOperation := NewOperation(AddNode, c.GetId(), myInfosByte).ToBytes()
+				addNodeOperation := NewOperation(AddNode, c.GetId(), myInfosByte).ToBytes()
 
-					// propagates new node to other chats
-					slots := c.getSlots()
-					for _, s := range slots {
-						toSend <- AddSlot(s, addNodeOperation)
-					}
+				// propagates new node to other chats
+				slots := c.getSlots()
+				for _, s := range slots {
+					toSend <- AddSlot(s, addNodeOperation)
+				}
 
-				case AddNode:
-					var newNodeInfos Infos
-					newNodeInfos, err = DecodeInfos(op.GetOperationData())
-					if err != nil {
-						log.Println("[ERROR]", err)
-					}
+			case AddNode:
+				var newNodeInfos Infos
+				newNodeInfos, err = DecodeInfos(op.GetOperationData())
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
 
-					newNodeInfos.SetSlot(slot)
-					c.AddNode(newNodeInfos)
+				newNodeInfos.SetSlot(slot)
+				c.AddNode(newNodeInfos)
 
-				case AddMessage:
-					newMessage, err := DecodeMessage(op.GetOperationData())
-					if err != nil {
-						log.Println("[ERROR]", err)
-					}
-					c.AddMessage(newMessage)
+			case AddMessage:
+				newMessage, err := DecodeMessage(op.GetOperationData())
+				if err != nil {
+					log.Println("[ERROR]", err)
+				}
+				c.AddMessage(newMessage)
 
-					slots := c.getSlots()
-					for _, s := range slots {
-						toSend <- AddSlot(s, operationBytes)
-					}
+				slots := c.getSlots()
+				for _, s := range slots {
+					toSend <- AddSlot(s, operationBytes)
+				}
 			}
 		}
 	}
