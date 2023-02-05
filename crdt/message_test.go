@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetSyncBytes(t *testing.T) {
+func TestGetMessageBytes(t *testing.T) {
 
 	var (
 		id, _ = uuid.Parse("4b8e153b-834f-4190-b5d3-aba2f35ead56")
@@ -41,7 +41,7 @@ func TestGetSyncBytes(t *testing.T) {
 	}
 }
 
-func TestGetMessageFromBytes(t *testing.T) {
+func TestDecodeMessage(t *testing.T) {
 
 	var (
 		id, _ = uuid.Parse("4b8e153b-834f-4190-b5d3-aba2f35ead56")
