@@ -8,7 +8,7 @@ import (
 
 type (
 	message struct {
-		Id      uuid.UUID `json:"id"`
+		Id      uuid.UUID `json:"Id"`
 		Sender  string    `json:"sender"`
 		Content string    `json:"content"`
 		Date    time.Time `json:"date"`
@@ -19,7 +19,7 @@ type (
 		GetSender() string
 		GetContent() string
 		GetDate() string
-		ToBytes() ([]byte, error)
+		ToBytes() []byte
 	}
 )
 
@@ -27,7 +27,7 @@ func NewMessage(sender, content string) Message {
 	return &message{
 		Sender:  sender,
 		Content: content,
-		Date:    time.Now(),
+		Date:    time.Now().UTC(),
 	}
 }
 
@@ -47,13 +47,9 @@ func (m message) GetDate() string {
 	return m.Date.Format(time.RFC3339)
 }
 
-func (m message) ToBytes() ([]byte, error) {
-	bytesMessage, err := json.Marshal(m)
-	if err != nil {
-		return nil, err
-	}
-
-	return bytesMessage, nil
+func (m message) ToBytes() []byte {
+	bytesMessage, _ := json.Marshal(m)
+	return bytesMessage
 }
 
 func DecodeMessage(bytes []byte) (Message, error) {

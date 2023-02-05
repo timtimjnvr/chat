@@ -4,7 +4,9 @@ import (
 	"chat/conn"
 	"chat/crdt"
 	"chat/parsestdin"
+
 	"flag"
+	"github.com/google/uuid"
 	"log"
 	"net"
 	"os"
@@ -23,7 +25,8 @@ func main() {
 	flag.Parse()
 
 	var (
-		myInfos = crdt.NewNodeInfos(*myNamePtr, *myAddrPtr, *myPortPtr)
+		id, _   = uuid.NewUUID()
+		myInfos = crdt.NewNodeInfos(id, *myAddrPtr, *myPortPtr, *myNamePtr)
 
 		sigc     = make(chan os.Signal, 1)
 		shutdown = make(chan struct{})

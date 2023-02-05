@@ -14,6 +14,6 @@ Synchronisation happens when :
 - a new node arrives in the chat.
 - a node leaves the chat.
 
-### Example scenario
+### operation structure
 
-![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/scenario.png?raw=true)
+![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/operation.png?raw=true)

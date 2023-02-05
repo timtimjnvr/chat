@@ -33,8 +33,5 @@ Default port_number : 8080
 
 ## Doc
 - Node managment : [CRDTs choices](doc/crdt.md)
-
-## Todo
-- add proper functions for operations handling
-- integrate operation building in stdin parser
-- handle node closure
+- Architecture
+![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/architecture.png?raw=true)

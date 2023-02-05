@@ -1,33 +1,58 @@
 package crdt
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"github.com/google/uuid"
+)
 
 type (
 	infos struct {
 		slot    int
-		Port    string `json:"port"`
-		Address string `json:"address"`
-		Name    string `json:"name"`
+		Id      uuid.UUID `json:"Id"`
+		Port    string    `json:"port"`
+		Address string    `json:"address"`
+		Name    string    `json:"name"`
 	}
 
 	Infos interface {
-		SetSlot(slot int)
+		getId() uuid.UUID
+		getSlot() int
+		GetAddr() string
+		GetPort() string
 		GetName() string
+		SetSlot(slot int)
 		ToBytes() ([]byte, error)
 	}
 )
 
-func NewNodeInfos(addr string, port, name string) Infos {
+func NewNodeInfos(id uuid.UUID, addr string, port, name string) Infos {
 	return &infos{
 		slot:    -1,
+		Id:      id,
 		Port:    port,
 		Address: addr,
 		Name:    name,
 	}
 }
 
+func (i *infos) getId() uuid.UUID {
+	return i.Id
+}
+
 func (i *infos) GetName() string {
 	return i.Name
+}
+
+func (i *infos) getSlot() int {
+	return i.slot
+}
+
+func (i *infos) GetAddr() string {
+	return i.Address
+}
+
+func (i *infos) GetPort() string {
+	return i.Port
 }
 
 func (i *infos) SetSlot(slot int) {
