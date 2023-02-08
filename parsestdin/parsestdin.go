@@ -223,9 +223,7 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.
 					log.Println(err)
 				}
 
-				newChatOperation := crdt.NewOperation(crdt.CreateChat, newChat.GetId(), bytesChat)
-				newChatOperationBytes := newChatOperation.ToBytes()
-				operationsCreated <- newChatOperationBytes
+				operationsCreated <- crdt.NewOperation(crdt.CreateChat, newChat.GetId(), bytesChat).ToBytes()
 
 			case crdt.JoinChatByName:
 				var (
@@ -248,9 +246,7 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.
 					break
 				}
 
-				myInfosBytes, _ := myInfos.ToBytes()
-				joinOperation := crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfosBytes)
-				err = conn.Send(newConn, joinOperation.ToBytes())
+				err = conn.Send(newConn, crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos.ToBytes()).ToBytes())
 				if err != nil {
 					log.Println("[ERROR] ", err)
 				}
@@ -264,28 +260,16 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.
 					continue
 				}
 
-				/* Add the message to discussion & sync with other nodes */
-				var message []byte
-				message = crdt.NewMessage(myInfos.GetName(), content).ToBytes()
-
-				addMessageSync := crdt.NewOperation(crdt.AddMessage, currentChat.GetId(), message).ToBytes()
-				operationsCreated <- addMessageSync
+				/* Add the messageBytes to discussion & sync with other nodes */
+				var messageBytes []byte
+				messageBytes = crdt.NewMessage(myInfos.GetName(), content).ToBytes()
+				operationsCreated <- crdt.NewOperation(crdt.AddMessage, currentChat.GetId(), messageBytes).ToBytes()
 
 			case crdt.LeaveChat:
-				myInfosBytes, _ := myInfos.ToBytes()
-				if err != nil {
-					log.Println("[ERROR] ", err)
-				}
-				leaveChatSync := crdt.NewOperation(crdt.LeaveChat, currentChat.GetId(), myInfosBytes).ToBytes()
-				operationsCreated <- leaveChatSync
+				operationsCreated <- crdt.NewOperation(crdt.LeaveChat, currentChat.GetId(), myInfos.ToBytes()).ToBytes()
 
 			case crdt.Quit:
-				myInfosBytes, _ := myInfos.ToBytes()
-				if err != nil {
-					log.Println("[ERROR] ", err)
-				}
-				quitSync := crdt.NewOperation(crdt.Quit, "", myInfosBytes).ToBytes()
-				operationsCreated <- quitSync
+				operationsCreated <- crdt.NewOperation(crdt.Quit, "", myInfos.ToBytes()).ToBytes()
 			}
 		}
 	}
