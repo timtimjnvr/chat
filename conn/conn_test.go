@@ -6,6 +6,7 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestListenAndServe(t *testing.T) {
@@ -20,7 +21,7 @@ func TestListenAndServe(t *testing.T) {
 
 	wg.Add(1)
 	go ListenAndServe(&wg, ip, port, newConnections, shutdown)
-
+	<-time.Tick(1 * time.Second)
 	for i := 0; i < MaxSimultaneousConnections; i++ {
 		_, err = net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
 		if err != nil {
