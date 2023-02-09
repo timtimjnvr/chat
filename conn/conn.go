@@ -92,7 +92,7 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, operationsToS
 	}
 }
 
-func ListenAndServe(wg *sync.WaitGroup, addr, port string, newConnections chan net.Conn, shutdown chan struct{}) {
+func ListenAndServe(wg *sync.WaitGroup, isListening *sync.Cond, addr, port string, newConnections chan net.Conn, shutdown chan struct{}) {
 	var (
 		conn      net.Conn
 		wgClosure = sync.WaitGroup{}
@@ -107,8 +107,11 @@ func ListenAndServe(wg *sync.WaitGroup, addr, port string, newConnections chan n
 
 	ln, err := net.Listen(transportProtocol, fmt.Sprintf("%s:%s", addr, port))
 	if err != nil {
-		log.Fatal(err)
+		log.Println("[ERROR]", err)
+		return
 	}
+
+	isListening.Signal()
 
 	wgClosure.Add(1)
 	go handleClosure(&wgClosure, shutdown, ln)
