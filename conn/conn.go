@@ -4,11 +4,12 @@ import (
 	"chat/crdt"
 	"fmt"
 	"github.com/pkg/errors"
-	"io"
 	"log"
 	"net"
+	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 type (
@@ -205,40 +206,69 @@ func Send(conn net.Conn, message []byte) error {
 }
 
 func read(wg *sync.WaitGroup, conn net.Conn, messages chan []byte, shutdown chan struct{}) {
+	var (
+		done                   = make(chan struct{}, 0)
+		wgDone                 = sync.WaitGroup{}
+		splitAndInsertMessages = func(buffer []byte, messages chan []byte) {
+			splitMessages := strings.Split(string(buffer), "\n")
+			for _, m := range splitMessages {
+				if m != "" {
+					messages <- []byte(m)
+				}
+			}
+		}
+	)
+
 	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in f", r)
+		}
+
+		close(done)
 		close(messages)
+		wgDone.Wait()
 		wg.Done()
 		log.Println("[INFO] read stopped")
 	}()
 
-	for {
+	// listen for stop signal
+	wgDone.Add(1)
+	go func() {
+		defer wgDone.Done()
 		select {
 		case <-shutdown:
-			return
-
-		default:
-			var (
-				buffer = make([]byte, MaxMessageSize)
-				n      int
-				err    error
-			)
-			log.Println("reading")
-			n, err = conn.Read(buffer)
-			log.Println("finished reading")
-
-			if n > 0 {
-				splitMessages := strings.Split(string(buffer[:n]), "\n")
-				for _, m := range splitMessages {
-					if m != "" {
-						messages <- []byte(m)
-					}
-				}
+			err := conn.SetDeadline(time.Now().Add(1*time.Millisecond))
+			if err != nil {
+				log.Println("[ERROR] SetDeadline", err)
 			}
-
-			if err == io.EOF {
-				return
-			}
+		case <-done:
 		}
+	}()
+	var n int = -1
+	for {
+		var (
+			buffer = make([]byte, MaxMessageSize)
+			err    error
+		)
+		if n == 0 {
+			return
+		}
+		n, err = conn.Read(buffer)
+		if n > 0 {
+			splitAndInsertMessages(buffer[:n], messages)
+		}
+
+		// received deadline
+		if errors.Is(err, os.ErrDeadlineExceeded){
+			log.Println("[ERROR] Read", err)
+			return
+		}
+
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
 	}
 }
 

@@ -77,30 +77,27 @@ func TestReadConn(t *testing.T) {
 			assert.Fail(t, "failed to start test (sender)")
 		}
 
-		conn, err := ln.Accept()
+		connSender, err := ln.Accept()
 		if err != nil {
 			assert.Fail(t, "failed to start test (sender)")
 		}
 
 		for _, d := range testData {
-			conn.Write([]byte(d))
+			connSender.Write([]byte(d))
 		}
 	}(&wgSender)
-	defer func() {
-		wgSender.Wait()
-	}()
 
-	conn, err := net.Dial(transportProtocol, ":12346")
+	connReader, err := net.Dial(transportProtocol, ":12346")
 	if err != nil {
 		assert.Fail(t, "failed to start test (receiver)")
 	}
 
 	wgReader.Add(1)
-	go read(&wgReader, conn, messages, shutdown)
+	go read(&wgReader, connReader, messages, shutdown)
 
 	defer func() {
 		close(shutdown)
-		conn.Close()
+		wgSender.Wait()
 		wgReader.Wait()
 	}()
 
