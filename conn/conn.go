@@ -222,8 +222,10 @@ func read(wg *sync.WaitGroup, conn net.Conn, messages chan []byte, shutdown chan
 				n      int
 				err    error
 			)
-
+			log.Println("reading")
 			n, err = conn.Read(buffer)
+			log.Println("finished reading")
+
 			if n > 0 {
 				splitMessages := strings.Split(string(buffer[:n]), "\n")
 				for _, m := range splitMessages {

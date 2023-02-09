@@ -117,7 +117,6 @@ func TestReadConn(t *testing.T) {
 		case m := <-messages:
 			assert.Equal(t, strings.TrimSuffix(testData[index], "\n"), string(m), "message differs")
 			index++
-
 			if index == len(testData) {
 				return
 			}
