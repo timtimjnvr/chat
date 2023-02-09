@@ -11,7 +11,6 @@ import (
 
 func TestListenAndServe(t *testing.T) {
 	var (
-		maxTestDuration = 3 * time.Second
 		ip              = ""
 		port            = "12345"
 		wg              = sync.WaitGroup{}
@@ -19,7 +18,7 @@ func TestListenAndServe(t *testing.T) {
 		lock            = sync.Mutex{}
 		isListening     = sync.NewCond(&lock)
 		newConnections  = make(chan net.Conn, MaxSimultaneousConnections)
-		err             error
+		maxTestDuration = 3 * time.Second
 	)
 
 	wg.Add(1)
@@ -30,30 +29,34 @@ func TestListenAndServe(t *testing.T) {
 	var wgTests = sync.WaitGroup{}
 	for i := 0; i < MaxSimultaneousConnections; i++ {
 		wgTests.Add(1)
-		go func(wgTests *sync.WaitGroup) {
-			defer wgTests.Done()
-			_, err = net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
-			if err != nil {
-				assert.Fail(t, "failed to connect to listener")
-				return
-			}
-
-		}(&wgTests)
+		go connect(&wgTests, t, ip, port)
 	}
 	wgTests.Wait()
 
-	timeout := time.Tick(maxTestDuration)
-	received := 0
+	var (
+		timeout             = time.Tick(maxTestDuration)
+		connectionsReceived = 0
+	)
+
 	select {
 	case <-timeout:
 		assert.Fail(t, "test timeout")
 	case <-newConnections:
-		received++
-		if received == MaxSimultaneousConnections {
+		connectionsReceived++
+		if connectionsReceived == MaxSimultaneousConnections {
 			assert.True(t, len(newConnections) == MaxSimultaneousConnections, "failed to create all connections")
 		}
 	}
 
 	close(shutdown)
 	wg.Wait()
+}
+
+func connect(wg *sync.WaitGroup, t *testing.T, ip, port string) {
+	defer wg.Done()
+	_, err := net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
+	if err != nil {
+		assert.Fail(t, "failed to connect to listener")
+		return
+	}
 }
