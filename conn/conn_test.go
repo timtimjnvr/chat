@@ -13,7 +13,7 @@ func TestListenAndServe(t *testing.T) {
 	var (
 		numberOfTest   = 10
 		ip             = ""
-		port           = "8090"
+		port           = "12345"
 		wg             = sync.WaitGroup{}
 		shutdown       = make(chan struct{}, 0)
 		lock           = sync.Mutex{}
@@ -41,10 +41,10 @@ func TestListenAndServe(t *testing.T) {
 	}
 
 	wgTests.Wait()
-
-	log.Println(len(newConnections))
-
 	assert.True(t, len(newConnections) == numberOfTest, "failed to create all connections")
 	close(shutdown)
 	wg.Wait()
+
+	log.Println(len(newConnections))
+	log.Println("TEST END")
 }
