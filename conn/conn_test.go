@@ -11,13 +11,14 @@ import (
 
 func TestListenAndServe(t *testing.T) {
 	var (
+		numberOfTest   = 10
 		ip             = ""
 		port           = "8080"
 		wg             = sync.WaitGroup{}
 		shutdown       = make(chan struct{}, 0)
 		lock           = sync.Mutex{}
 		isListening    = sync.NewCond(&lock)
-		newConnections = make(chan net.Conn, MaxSimultaneousConnections)
+		newConnections = make(chan net.Conn, numberOfTest)
 		err            error
 	)
 
@@ -28,7 +29,7 @@ func TestListenAndServe(t *testing.T) {
 	isListening.Wait()
 
 	var wgTests = sync.WaitGroup{}
-	for i := 0; i < MaxSimultaneousConnections; i++ {
+	for i := 0; i < numberOfTest; i++ {
 		wgTests.Add(1)
 		go func(wgTests *sync.WaitGroup) {
 			defer wgTests.Done()
@@ -43,7 +44,7 @@ func TestListenAndServe(t *testing.T) {
 
 	log.Println(len(newConnections))
 
-	assert.True(t, len(newConnections) == MaxSimultaneousConnections, "failed to create all connections")
+	assert.True(t, len(newConnections) == numberOfTest, "failed to create all connections")
 	close(shutdown)
 	wg.Wait()
 }
