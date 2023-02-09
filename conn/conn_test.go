@@ -3,23 +3,23 @@ package conn
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
-	"log"
 	"net"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestListenAndServe(t *testing.T) {
 	var (
-		numberOfTest   = 10
-		ip             = ""
-		port           = "12345"
-		wg             = sync.WaitGroup{}
-		shutdown       = make(chan struct{}, 0)
-		lock           = sync.Mutex{}
-		isListening    = sync.NewCond(&lock)
-		newConnections = make(chan net.Conn, numberOfTest)
-		err            error
+		maxTestDuration = 3 * time.Second
+		ip              = ""
+		port            = "12345"
+		wg              = sync.WaitGroup{}
+		shutdown        = make(chan struct{}, 0)
+		lock            = sync.Mutex{}
+		isListening     = sync.NewCond(&lock)
+		newConnections  = make(chan net.Conn, MaxSimultaneousConnections)
+		err             error
 	)
 
 	wg.Add(1)
@@ -28,26 +28,32 @@ func TestListenAndServe(t *testing.T) {
 	isListening.Wait()
 
 	var wgTests = sync.WaitGroup{}
-	for i := 0; i < numberOfTest; i++ {
+	for i := 0; i < MaxSimultaneousConnections; i++ {
 		wgTests.Add(1)
 		go func(wgTests *sync.WaitGroup) {
 			defer wgTests.Done()
-			log.Println("connecting")
 			_, err = net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
 			if err != nil {
-				log.Println("ERR", err)
 				assert.Fail(t, "failed to connect to listener")
 				return
 			}
 
 		}(&wgTests)
 	}
-
 	wgTests.Wait()
+
+	timeout := time.Tick(maxTestDuration)
+	received := 0
+	select {
+	case <-timeout:
+		assert.Fail(t, "test timeout")
+	case <-newConnections:
+		received++
+		if received == MaxSimultaneousConnections {
+			assert.True(t, len(newConnections) == MaxSimultaneousConnections, "failed to create all connections")
+		}
+	}
+
 	close(shutdown)
 	wg.Wait()
-
-	assert.True(t, len(newConnections) == numberOfTest, "failed to create all connections")
-	log.Println(len(newConnections))
-	log.Println("TEST END")
 }
