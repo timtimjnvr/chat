@@ -100,6 +100,7 @@ func ListenAndServe(wg *sync.WaitGroup, isListening *sync.Cond, addr, port strin
 	)
 
 	defer func() {
+		close(newConnections)
 		wgClosure.Wait()
 		wg.Done()
 	}()
@@ -110,13 +111,15 @@ func ListenAndServe(wg *sync.WaitGroup, isListening *sync.Cond, addr, port strin
 		return
 	}
 
-	isListening.Signal()
-
 	wgClosure.Add(1)
 	go handleClosure(&wgClosure, shutdown, ln)
+
+	isListening.Signal()
+	
 	for {
 		conn, err = ln.Accept()
 		if err != nil && errors.Is(err, net.ErrClosed) {
+			log.Println("ERR", err)
 			return
 		}
 
@@ -125,7 +128,9 @@ func ListenAndServe(wg *sync.WaitGroup, isListening *sync.Cond, addr, port strin
 			continue
 		}
 
+		log.Println("inserting")
 		newConnections <- conn
+		log.Println("inserted")
 	}
 }
 
@@ -241,6 +246,8 @@ func readConn(wg *sync.WaitGroup, conn net.Conn, messages chan []byte, shutdown 
 
 func handleClosure(wg *sync.WaitGroup, shutdown chan struct{}, ln net.Listener) {
 	<-shutdown
+	log.Println("handle closure shutting down")
+
 	err := ln.Close()
 	if err != nil {
 		log.Fatal(err)
