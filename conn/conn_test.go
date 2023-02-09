@@ -13,7 +13,7 @@ func TestListenAndServe(t *testing.T) {
 	var (
 		numberOfTest   = 10
 		ip             = ""
-		port           = "8080"
+		port           = "8090"
 		wg             = sync.WaitGroup{}
 		shutdown       = make(chan struct{}, 0)
 		lock           = sync.Mutex{}
