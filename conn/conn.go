@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 )
 
@@ -135,6 +136,7 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int
 
 	var (
 		wgReadConn      = sync.WaitGroup{}
+		shutdown        = make(chan struct{}, 0)
 		messageReceived = make(chan []byte, MaxSimultaneousMessages)
 	)
 
@@ -147,7 +149,7 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int
 	}()
 
 	wgReadConn.Add(1)
-	go readConn(&wgReadConn, node.Conn, messageReceived, node.Shutdown)
+	go read(&wgReadConn, node.Conn, messageReceived, shutdown)
 
 	for {
 		select {
@@ -202,38 +204,36 @@ func Send(conn net.Conn, message []byte) error {
 	return nil
 }
 
-func readConn(wg *sync.WaitGroup, conn net.Conn, messages chan []byte, shutdown chan struct{}) {
+func read(wg *sync.WaitGroup, conn net.Conn, messages chan []byte, shutdown chan struct{}) {
 	defer func() {
 		close(messages)
 		wg.Done()
-		log.Println("[INFO] readConn stopped")
+		log.Println("[INFO] read stopped")
 	}()
 
 	for {
 		select {
 		case <-shutdown:
-			log.Println("[ERROR] readConn shutting down")
 			return
 
 		default:
-			log.Println("pass")
 			var (
 				buffer = make([]byte, MaxMessageSize)
 				n      int
 				err    error
 			)
+
 			n, err = conn.Read(buffer)
-			if err == io.EOF {
-				log.Println("EOF")
-				continue
-			}
 			if n > 0 {
-				log.Print("[INFO] readConn :", string(buffer))
-				messages <- buffer[:n]
-				continue
+				splitMessages := strings.Split(string(buffer[:n]), "\n")
+				for _, m := range splitMessages {
+					if m != "" {
+						messages <- []byte(m)
+					}
+				}
 			}
+
 			if err == io.EOF {
-				log.Println(err)
 				return
 			}
 		}
