@@ -35,6 +35,8 @@ func main() {
 		wgListen      = sync.WaitGroup{}
 		wgHandleChats = sync.WaitGroup{}
 		wgHandleStdin = sync.WaitGroup{}
+		lock          = sync.Mutex{}
+		isListening   = sync.NewCond(&lock)
 	)
 
 	defer func() {
@@ -61,7 +63,10 @@ func main() {
 	go conn.HandleNodes(&wgHandleNodes, newConnections, toSend, toExecute, shutdown)
 
 	wgListen.Add(1)
-	go conn.ListenAndServe(&wgListen, *myAddrPtr, *myPortPtr, newConnections, shutdown)
+	isListening.L.Lock()
+	go conn.ListenAndServe(&wgListen, isListening, *myAddrPtr, *myPortPtr, newConnections, shutdown)
+	isListening.Wait()
+
 
 	wgHandleChats.Add(1)
 	go crdt.HandleChats(&wgHandleChats, myInfos, toSend, toExecute, shutdown)
