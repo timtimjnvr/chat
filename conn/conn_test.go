@@ -25,16 +25,21 @@ func TestListenAndServe(t *testing.T) {
 	isListening.L.Lock()
 	go ListenAndServe(&wg, isListening, ip, port, newConnections, shutdown)
 	isListening.Wait()
-  
+
+	var wgTests = sync.WaitGroup{}
 	for i := 0; i < MaxSimultaneousConnections; i++ {
-		_, err = net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
-		if err != nil {
-			assert.Fail(t, "failed to connect to listener")
-		}
+		wgTests.Add(1)
+		go func(wgTests *sync.WaitGroup) {
+			defer wgTests.Done()
+			_, err = net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
+			if err != nil {
+				assert.Fail(t, "failed to connect to listener")
+			}
+		}(&wgTests)
 	}
+	wgTests.Wait()
 
-	assert.True(t, len(newConnections) == MaxSimultaneousConnections, "failed to create a new connection")
-
+	assert.True(t, len(newConnections) == MaxSimultaneousConnections, "failed to create all connections")
 	close(shutdown)
 	wg.Wait()
 }
