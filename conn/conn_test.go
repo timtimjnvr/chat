@@ -3,6 +3,7 @@ package conn
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"net"
 	"sync"
 	"testing"
@@ -37,7 +38,10 @@ func TestListenAndServe(t *testing.T) {
 			}
 		}(&wgTests)
 	}
+
 	wgTests.Wait()
+
+	log.Println(len(newConnections))
 
 	assert.True(t, len(newConnections) == MaxSimultaneousConnections, "failed to create all connections")
 	close(shutdown)
