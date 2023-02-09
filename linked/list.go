@@ -24,8 +24,8 @@ type (
 	List interface {
 		Len() int
 		Add(value interface{}) uuid.UUID
-		GetByIndex(index int) (*element, error)
-		GetById(id uuid.UUID) (*element, error)
+		GetByIndex(index int) (interface{}, error)
+		GetById(id uuid.UUID) (interface{}, error)
 		Delete(key uuid.UUID)
 	}
 
@@ -69,7 +69,7 @@ func (l *list) Add(value interface{}) uuid.UUID {
 	return l.tail.key
 }
 
-func (l *list) GetByIndex(index int) (*element, error) {
+func (l *list) GetByIndex(index int) (interface{}, error) {
 	if index >= l.Len() {
 		return nil, NotFound
 	}
@@ -78,16 +78,16 @@ func (l *list) GetByIndex(index int) (*element, error) {
 		l.head = l.head.next
 	}
 
-	return l.head, nil
+	return l.head.value, nil
 }
 
-func (l *list) GetById(id uuid.UUID) (*element, error) {
+func (l *list) GetById(id uuid.UUID) (interface{}, error) {
 	for l.head != nil && l.head.key != id {
 		l.head = l.head.next
 	}
 
 	if l.head.key == id {
-		return l.head, nil
+		return l.head.value, nil
 	}
 
 	return nil, NotFound

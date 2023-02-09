@@ -100,6 +100,8 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 		chats = linked.NewList()
 	)
 
+	chats.Add(NewChat(myInfos.GetName()))
+
 	for {
 		select {
 		case <-shutdown:
@@ -123,11 +125,11 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 					chatName      = op.GetTargetedChat()
 					numberOfChats = chats.Len()
 				)
-
+				log.Println(chatName)
 				for index := 0; index < numberOfChats; index++ {
 					var chatValue interface{}
 					chatValue, _ = chats.GetByIndex(index)
-					c = chatValue.(Chat)
+					c = chatValue.(*chat)
 
 					if c.GetName() == chatName {
 						break
@@ -155,10 +157,11 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 					continue
 				}
 
-				c = chatValue.(Chat)
+				c = chatValue.(*chat)
 
 			// no targeted chat needed
 			case Quit:
+
 			}
 
 			// execute operation
@@ -180,7 +183,7 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 				}
 
 				var myInfosByte []byte
-				myInfosByte, err = myInfos.ToBytes()
+				myInfosByte = myInfos.ToBytes()
 				if err != nil {
 					log.Println("[ERROR]", err)
 				}

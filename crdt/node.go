@@ -3,6 +3,7 @@ package crdt
 import (
 	"encoding/json"
 	"github.com/google/uuid"
+	"log"
 )
 
 type (
@@ -21,7 +22,7 @@ type (
 		GetPort() string
 		GetName() string
 		SetSlot(slot int)
-		ToBytes() ([]byte, error)
+		ToBytes() []byte
 	}
 )
 
@@ -59,13 +60,14 @@ func (i *infos) SetSlot(slot int) {
 	i.slot = slot
 }
 
-func (i *infos) ToBytes() ([]byte, error) {
+func (i *infos) ToBytes() []byte {
 	bytesMessage, err := json.Marshal(i)
 	if err != nil {
-		return nil, err
+		log.Println("[ERROR] ", err)
+		return nil
 	}
 
-	return bytesMessage, nil
+	return bytesMessage
 }
 
 func DecodeInfos(bytes []byte) (Infos, error) {

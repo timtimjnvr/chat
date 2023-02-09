@@ -32,7 +32,7 @@ func TestGetNodeBytes(t *testing.T) {
 	)
 
 	for i, test := range tests {
-		res, _ := test.infos.ToBytes()
+		res := test.infos.ToBytes()
 		assert.True(t, reflect.DeepEqual(res, test.expectedBytes), fmt.Sprintf("test %d failed on runes returned", i))
 	}
 }

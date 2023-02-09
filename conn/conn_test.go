@@ -21,10 +21,11 @@ func TestListenAndServe(t *testing.T) {
 	)
 
 	wg.Add(1)
+
 	isListening.L.Lock()
 	go ListenAndServe(&wg, isListening, ip, port, newConnections, shutdown)
 	isListening.Wait()
-
+  
 	for i := 0; i < MaxSimultaneousConnections; i++ {
 		_, err = net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
 		if err != nil {

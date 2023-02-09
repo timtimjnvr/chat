@@ -52,7 +52,7 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, operationsToS
 			return
 
 		case newConn := <-newConnections:
-			newNode := NewNode(newConn)
+			newNode := NewNode(newConn, len(nodes))
 			newNode.Wg.Add(1)
 			go handleConnection(newNode, fromConnections, connectionsDone)
 			nodes = append(nodes, newNode)
@@ -61,15 +61,15 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, operationsToS
 			log.Printf("[INFO] slot %d done\n", slot)
 			// TODO
 			/*
-				build and send operation to chat handler to remove node identified by <slot> from all chats
+				build and send operationBytes to chat handler to remove node identified by <slot> from all chats
 			*/
 
-		case operation := <-operationsToSend:
-			slot := operation[0]
-			_ = Send(nodes[slot].Conn, operation[:1])
+		case operationBytes := <-operationsToSend:
+			slot := operationBytes[0]
+			_ = Send(nodes[slot].Conn, operationBytes[:1])
 
-		case message := <-fromConnections:
-			operation := crdt.DecodeOperation(message)
+		case operationBytes := <-fromConnections:
+			operation := crdt.DecodeOperation(operationBytes[1:])
 
 			if operation.GetOperationType() == crdt.AddNode {
 				nodeInfos, _ := crdt.DecodeInfos(operation.GetOperationData())
@@ -81,13 +81,13 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, operationsToS
 					log.Println("[ERROR] ", err)
 				}
 
-				newNode := NewNode(newConn)
+				newNode := NewNode(newConn, len(nodes))
 				nodes = append(nodes, newNode)
 
-				message = crdt.AddSlot(newNode.slot, operation.ToBytes())
+				operationBytes = crdt.AddSlot(newNode.slot, operation.ToBytes())
 			}
 
-			outGoingOperations <- message
+			outGoingOperations <- operationBytes
 		}
 	}
 }
@@ -102,7 +102,6 @@ func ListenAndServe(wg *sync.WaitGroup, isListening *sync.Cond, addr, port strin
 	defer func() {
 		wgClosure.Wait()
 		wg.Done()
-		log.Println("[INFO] listenAndServe stopped")
 	}()
 
 	ln, err := net.Listen(transportProtocol, fmt.Sprintf("%s:%s", addr, port))
@@ -116,7 +115,6 @@ func ListenAndServe(wg *sync.WaitGroup, isListening *sync.Cond, addr, port strin
 	wgClosure.Add(1)
 	go handleClosure(&wgClosure, shutdown, ln)
 	for {
-		log.Println(fmt.Sprintf("[INFO] Accepting connections on port %s", port))
 		conn, err = ln.Accept()
 		if err != nil && errors.Is(err, net.ErrClosed) {
 			return
@@ -161,7 +159,7 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int
 				// conn closed on the other side
 				return
 			}
-
+			log.Println("message received :", string(message))
 			// add slot to message
 			outGoingMessages <- append([]byte{uint8(node.slot)}, message...)
 		}
@@ -181,8 +179,9 @@ func OpenConnection(ip string, port string) (net.Conn, error) {
 	return conn, nil
 }
 
-func NewNode(conn net.Conn) node {
+func NewNode(conn net.Conn, slot int) node {
 	return node{
+		slot:     slot,
 		Conn:     conn,
 		Wg:       &sync.WaitGroup{},
 		Shutdown: make(chan struct{}, 0),
@@ -213,20 +212,28 @@ func readConn(wg *sync.WaitGroup, conn net.Conn, messages chan []byte, shutdown 
 		select {
 		case <-shutdown:
 			log.Println("[ERROR] readConn shutting down")
-
 			return
 
 		default:
-			buffer := make([]byte, MaxMessageSize)
-			n, err := conn.Read(buffer)
+			log.Println("pass")
+			var (
+				buffer = make([]byte, MaxMessageSize)
+				n      int
+				err    error
+			)
+			n, err = conn.Read(buffer)
 			if err == io.EOF {
-				log.Println("[ERROR] ", err)
-				return
+				log.Println("EOF")
+				continue
 			}
-
 			if n > 0 {
 				log.Print("[INFO] readConn :", string(buffer))
 				messages <- buffer[:n]
+				continue
+			}
+			if err == io.EOF {
+				log.Println(err)
+				return
 			}
 		}
 	}
@@ -240,5 +247,4 @@ func handleClosure(wg *sync.WaitGroup, shutdown chan struct{}, ln net.Listener) 
 	}
 
 	wg.Done()
-	log.Println("[INFO] handleClosure stopped")
 }

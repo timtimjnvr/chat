@@ -54,24 +54,25 @@ func main() {
 		syscall.SIGQUIT)
 
 	var (
-		newNodes  = make(chan net.Conn, conn.MaxSimultaneousConnections)
-		toSend    = make(chan []byte, conn.MaxSimultaneousMessages)
-		toExecute = make(chan []byte, conn.MaxSimultaneousMessages)
+		newConnections = make(chan net.Conn, conn.MaxSimultaneousConnections)
+		toSend         = make(chan []byte, conn.MaxSimultaneousMessages)
+		toExecute      = make(chan []byte, conn.MaxSimultaneousMessages)
 	)
 
 	wgHandleNodes.Add(1)
-	go conn.HandleNodes(&wgHandleNodes, newNodes, toSend, toExecute, shutdown)
+	go conn.HandleNodes(&wgHandleNodes, newConnections, toSend, toExecute, shutdown)
 
 	wgListen.Add(1)
 	isListening.L.Lock()
-	go conn.ListenAndServe(&wgListen, isListening, *myAddrPtr, *myPortPtr, newNodes, shutdown)
+	go conn.ListenAndServe(&wgListen, isListening, *myAddrPtr, *myPortPtr, newConnections, shutdown)
 	isListening.Wait()
+
 
 	wgHandleChats.Add(1)
 	go crdt.HandleChats(&wgHandleChats, myInfos, toSend, toExecute, shutdown)
 
 	wgHandleStdin.Add(1)
-	go parsestdin.HandleStdin(&wgHandleStdin, myInfos, newNodes, toExecute, shutdown)
+	go parsestdin.HandleStdin(&wgHandleStdin, myInfos, newConnections, toExecute, shutdown)
 
 	for {
 		select {
