@@ -4,10 +4,12 @@ import (
 	"chat/crdt"
 	"fmt"
 	"github.com/pkg/errors"
-	"io"
 	"log"
 	"net"
+	"os"
+	"strings"
 	"sync"
+	"time"
 )
 
 type (
@@ -135,6 +137,7 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int
 
 	var (
 		wgReadConn      = sync.WaitGroup{}
+		shutdown        = make(chan struct{}, 0)
 		messageReceived = make(chan []byte, MaxSimultaneousMessages)
 	)
 
@@ -147,7 +150,7 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int
 	}()
 
 	wgReadConn.Add(1)
-	go readConn(&wgReadConn, node.Conn, messageReceived, node.Shutdown)
+	go read(&wgReadConn, node.Conn, messageReceived, shutdown)
 
 	for {
 		select {
@@ -202,41 +205,70 @@ func Send(conn net.Conn, message []byte) error {
 	return nil
 }
 
-func readConn(wg *sync.WaitGroup, conn net.Conn, messages chan []byte, shutdown chan struct{}) {
-	defer func() {
-		close(messages)
-		wg.Done()
-		log.Println("[INFO] readConn stopped")
-	}()
-
-	for {
-		select {
-		case <-shutdown:
-			log.Println("[ERROR] readConn shutting down")
-			return
-
-		default:
-			log.Println("pass")
-			var (
-				buffer = make([]byte, MaxMessageSize)
-				n      int
-				err    error
-			)
-			n, err = conn.Read(buffer)
-			if err == io.EOF {
-				log.Println("EOF")
-				continue
-			}
-			if n > 0 {
-				log.Print("[INFO] readConn :", string(buffer))
-				messages <- buffer[:n]
-				continue
-			}
-			if err == io.EOF {
-				log.Println(err)
-				return
+func read(wg *sync.WaitGroup, conn net.Conn, messages chan []byte, shutdown chan struct{}) {
+	var (
+		done                   = make(chan struct{}, 0)
+		wgDone                 = sync.WaitGroup{}
+		splitAndInsertMessages = func(buffer []byte, messages chan []byte) {
+			splitMessages := strings.Split(string(buffer), "\n")
+			for _, m := range splitMessages {
+				if m != "" {
+					messages <- []byte(m)
+				}
 			}
 		}
+	)
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in f", r)
+		}
+
+		close(done)
+		close(messages)
+		wgDone.Wait()
+		wg.Done()
+		log.Println("[INFO] read stopped")
+	}()
+
+	// listen for stop signal
+	wgDone.Add(1)
+	go func() {
+		defer wgDone.Done()
+		select {
+		case <-shutdown:
+			err := conn.SetDeadline(time.Now().Add(1*time.Millisecond))
+			if err != nil {
+				log.Println("[ERROR] SetDeadline", err)
+			}
+		case <-done:
+		}
+	}()
+	var n int = -1
+	for {
+		var (
+			buffer = make([]byte, MaxMessageSize)
+			err    error
+		)
+		if n == 0 {
+			return
+		}
+		n, err = conn.Read(buffer)
+		if n > 0 {
+			splitAndInsertMessages(buffer[:n], messages)
+		}
+
+		// received deadline
+		if errors.Is(err, os.ErrDeadlineExceeded){
+			log.Println("[ERROR] Read", err)
+			return
+		}
+
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
 	}
 }
 
