@@ -4,6 +4,7 @@ import (
 	"chat/crdt"
 	"fmt"
 	"github.com/pkg/errors"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -150,7 +151,7 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int
 	}()
 
 	wgReadConn.Add(1)
-	go read(&wgReadConn, &node.Conn, messageReceived, shutdown)
+	go read(&wgReadConn, node.Conn, messageReceived, shutdown)
 
 	for {
 		select {
@@ -205,7 +206,7 @@ func Send(conn net.Conn, message []byte) error {
 	return nil
 }
 
-func read(wg *sync.WaitGroup, conn *net.Conn, messages chan []byte, shutdown chan struct{}) {
+func read(wg *sync.WaitGroup, conn net.Conn, messages chan []byte, shutdown chan struct{}) {
 	var (
 		done                   = make(chan struct{}, 0)
 		wgDone                 = sync.WaitGroup{}
@@ -237,7 +238,7 @@ func read(wg *sync.WaitGroup, conn *net.Conn, messages chan []byte, shutdown cha
 		defer wgDone.Done()
 		select {
 		case <-shutdown:
-			err := (*conn).SetDeadline(time.Now().Add(1 * time.Millisecond))
+			err := conn.SetDeadline(time.Now().Add(1 * time.Millisecond))
 			if err != nil {
 				log.Println("[ERROR] SetDeadline", err)
 			}
@@ -253,20 +254,24 @@ func read(wg *sync.WaitGroup, conn *net.Conn, messages chan []byte, shutdown cha
 		if n == 0 {
 			return
 		}
-		n, err = (*conn).Read(buffer)
+		n, err = conn.Read(buffer)
 		if n > 0 {
 			splitAndInsertMessages(buffer[:n], messages)
 		}
 
-		// received deadline
 		if errors.Is(err, os.ErrDeadlineExceeded) {
-			log.Println("[ERROR] Read", err)
+			log.Println("[ERROR] ErrDeadlineExceeded", err)
 			return
 		}
 
-		if err != nil {
-			log.Println(err)
+		if errors.Is(err, net.ErrClosed) {
+			log.Println("[ERROR] ErrClosed", err)
 			return
+		}
+
+		if errors.Is(err, io.EOF) {
+			log.Println("[ERROR] Read", err)
+			continue
 		}
 	}
 }

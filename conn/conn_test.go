@@ -70,36 +70,37 @@ func TestReadConn(t *testing.T) {
 
 	// sender
 	wgSender.Add(1)
-	go func(wgSender *sync.WaitGroup) {
+	go func(wgSender *sync.WaitGroup, shutdown chan struct{}) {
 		defer wgSender.Done()
 		ln, err := net.Listen(transportProtocol, ":12346")
 		if err != nil {
-			assert.Fail(t, "failed to start test (sender)")
+			assert.Fail(t, "failed to start test sender (Listen)")
 		}
 
 		connSender, err := ln.Accept()
 		if err != nil {
-			assert.Fail(t, "failed to start test (sender)")
+			assert.Fail(t, "failed to start test sender (Accept)")
 		}
 
 		for _, d := range testData {
 			connSender.Write([]byte(d))
 		}
-	}(&wgSender)
+
+		select {
+		case <-shutdown:
+			connSender.Close()
+			return
+		}
+
+	}(&wgSender, shutdown)
 
 	connReader, err := net.Dial(transportProtocol, ":12346")
 	if err != nil {
-		assert.Fail(t, "failed to start test (receiver)")
+		assert.Fail(t, "failed to start test receiver (Dial)")
 	}
 
 	wgReader.Add(1)
-	go read(&wgReader, &connReader, messages, shutdown)
-
-	defer func() {
-		close(shutdown)
-		wgSender.Wait()
-		wgReader.Wait()
-	}()
+	go read(&wgReader, connReader, messages, shutdown)
 
 	var (
 		timeout = time.Tick(maxTestDuration)
@@ -119,6 +120,10 @@ func TestReadConn(t *testing.T) {
 			}
 		}
 	}
+
+	close(shutdown)
+	wgSender.Wait()
+	wgReader.Wait()
 }
 
 func connect(wg *sync.WaitGroup, t *testing.T, ip, port string) {
