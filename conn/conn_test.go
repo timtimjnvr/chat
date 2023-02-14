@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"chat/reader"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"net"
@@ -58,7 +59,7 @@ func TestReadConn(t *testing.T) {
 		maxTestDuration = 3 * time.Second
 		wgReader        = sync.WaitGroup{}
 		wgSender        = sync.WaitGroup{}
-		messages        = make(chan []byte, MaxMessageSize)
+		messages        = make(chan []byte, reader.MaxMessageSize)
 		shutdown        = make(chan struct{}, 0)
 	)
 
@@ -92,8 +93,10 @@ func TestReadConn(t *testing.T) {
 		assert.Fail(t, "failed to start test (receiver)")
 	}
 
+	var file, _ = connReader.(*net.TCPConn).File()
+
 	wgReader.Add(1)
-	go read(&wgReader, connReader, messages, shutdown)
+	go reader.ReadFile(&wgReader, file, messages, shutdown)
 
 	defer func() {
 		close(shutdown)

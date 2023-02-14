@@ -2,14 +2,12 @@ package conn
 
 import (
 	"chat/crdt"
+	"chat/reader"
 	"fmt"
 	"github.com/pkg/errors"
 	"log"
 	"net"
-	"os"
-	"strings"
 	"sync"
-	"time"
 )
 
 type (
@@ -26,7 +24,6 @@ const (
 	localhostDecimalPointed = "127.0.0.1"
 	transportProtocol       = "tcp"
 
-	MaxMessageSize             = 1000
 	MaxSimultaneousConnections = 100
 	MaxSimultaneousMessages    = 100
 )
@@ -148,9 +145,9 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int
 		done <- node.slot
 		log.Println("[INFO] conn lost for ", node.Conn.LocalAddr())
 	}()
-
+	file, _ := node.Conn.(*net.TCPConn).File()
 	wgReadConn.Add(1)
-	go read(&wgReadConn, node.Conn, messageReceived, shutdown)
+	go reader.ReadFile(&wgReadConn, file, messageReceived, shutdown)
 
 	for {
 		select {
@@ -203,73 +200,6 @@ func Send(conn net.Conn, message []byte) error {
 		return err
 	}
 	return nil
-}
-
-func read(wg *sync.WaitGroup, conn net.Conn, messages chan []byte, shutdown chan struct{}) {
-	var (
-		done                   = make(chan struct{}, 0)
-		wgDone                 = sync.WaitGroup{}
-		splitAndInsertMessages = func(buffer []byte, messages chan []byte) {
-			splitMessages := strings.Split(string(buffer), "\n")
-			for _, m := range splitMessages {
-				if m != "" {
-					messages <- []byte(m)
-				}
-			}
-		}
-	)
-
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Recovered in f", r)
-		}
-
-		close(done)
-		close(messages)
-		wgDone.Wait()
-		wg.Done()
-		log.Println("[INFO] read stopped")
-	}()
-
-	// listen for stop signal
-	wgDone.Add(1)
-	go func() {
-		defer wgDone.Done()
-		select {
-		case <-shutdown:
-			err := conn.SetDeadline(time.Now().Add(1*time.Millisecond))
-			if err != nil {
-				log.Println("[ERROR] SetDeadline", err)
-			}
-		case <-done:
-		}
-	}()
-	var n int = -1
-	for {
-		var (
-			buffer = make([]byte, MaxMessageSize)
-			err    error
-		)
-		if n == 0 {
-			return
-		}
-		n, err = conn.Read(buffer)
-		if n > 0 {
-			splitAndInsertMessages(buffer[:n], messages)
-		}
-
-		// received deadline
-		if errors.Is(err, os.ErrDeadlineExceeded){
-			log.Println("[ERROR] Read", err)
-			return
-		}
-
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-	}
 }
 
 func handleClosure(wg *sync.WaitGroup, shutdown chan struct{}, ln net.Listener) {

@@ -3,9 +3,9 @@ package parsestdin
 import (
 	"chat/conn"
 	"chat/crdt"
+	"chat/reader"
 
 	"fmt"
-	"golang.org/x/sys/unix"
 	"log"
 	"net"
 	"os"
@@ -126,63 +126,6 @@ func parseArgs(line string, command crdt.OperationType) (map[string]string, erro
 	return args, nil
 }
 
-func readStdin(wg *sync.WaitGroup, stdin chan<- []byte, shutdown chan struct{}) {
-	defer func() {
-		close(stdin)
-		wg.Done()
-		log.Println("[INFO] readStdin stopped")
-	}()
-
-	// writeClose is closed in order to signal to stop reading stdin
-	var readClose, writeClose, _ = os.Pipe()
-
-	go func() {
-		select {
-		case <-shutdown:
-			_ = writeClose.Close()
-		}
-	}()
-
-	for {
-		log.Println("[INFO] type a command")
-
-		var (
-			fdSet  = unix.FdSet{}
-			buffer = make([]byte, conn.MaxMessageSize)
-			err    error
-		)
-
-		fdSet.Clear(int(os.Stdin.Fd()))
-		fdSet.Clear(int(readClose.Fd()))
-
-		fdSet.Set(int(os.Stdin.Fd()))
-		fdSet.Set(int(readClose.Fd()))
-
-		// wait and modifies file descriptors in fdSet with first ready to use file descriptors (ie for us stdin or readClose)
-		_, err = unix.Select(int(readClose.Fd()+1), &fdSet, nil, nil, &unix.Timeval{Sec: 60, Usec: 0})
-		if err != nil {
-			log.Fatal("[ERROR] ", err)
-			return
-		}
-
-		// readClose : stop reading stdin
-		if fdSet.IsSet(int(readClose.Fd())) {
-			return
-		}
-
-		// default : read stdin
-		var n int
-		n, err = os.Stdin.Read(buffer)
-		if err != nil {
-			return
-		}
-
-		if n > 0 {
-			stdin <- buffer[0:n]
-		}
-	}
-}
-
 func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.Conn, operationsCreated chan<- []byte, shutdown chan struct{}) {
 	var (
 		wgReadStdin = sync.WaitGroup{}
@@ -196,7 +139,7 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.
 
 	wgReadStdin.Add(1)
 	var stdin = make(chan []byte, maxMessagesStdin)
-	go readStdin(&wgReadStdin, stdin, shutdown)
+	go reader.ReadFile(&wgReadStdin, os.Stdin, stdin, shutdown)
 
 	for {
 		select {
