@@ -43,6 +43,7 @@ func TestListenAndServe(t *testing.T) {
 	select {
 	case <-timeout:
 		assert.Fail(t, "test timeout")
+
 	case <-newConnections:
 		connectionsReceived++
 		if connectionsReceived == MaxSimultaneousConnections {
@@ -73,24 +74,28 @@ func TestReadConn(t *testing.T) {
 	wgSender.Add(1)
 	go func(wgSender *sync.WaitGroup) {
 		defer wgSender.Done()
-		ln, err := net.Listen(transportProtocol, ":12346")
+		ln, err := net.Listen(transportProtocol, ":12348")
 		if err != nil {
-			assert.Fail(t, "failed to start test (sender)")
+			assert.Fail(t, "failed to start test sender (Listen) ", err.Error())
+			return
 		}
 
 		connSender, err := ln.Accept()
 		if err != nil {
-			assert.Fail(t, "failed to start test (sender)")
+			assert.Fail(t, "failed to start test sender (Accept) ", err.Error())
+			return
 		}
 
 		for _, d := range testData {
 			connSender.Write([]byte(d))
 		}
 	}(&wgSender)
+	defer wgSender.Wait()
 
-	connReader, err := net.Dial(transportProtocol, ":12346")
+	connReader, err := net.Dial(transportProtocol, ":12348")
 	if err != nil {
-		assert.Fail(t, "failed to start test (receiver)")
+		assert.Fail(t, "failed to start test receiver (Dial) ", err.Error())
+		return
 	}
 
 	var file, _ = connReader.(*net.TCPConn).File()
@@ -100,7 +105,6 @@ func TestReadConn(t *testing.T) {
 
 	defer func() {
 		close(shutdown)
-		wgSender.Wait()
 		wgReader.Wait()
 	}()
 
@@ -114,6 +118,7 @@ func TestReadConn(t *testing.T) {
 		case <-timeout:
 			assert.Fail(t, "test timeout")
 			return
+
 		case m := <-messages:
 			assert.Equal(t, strings.TrimSuffix(testData[index], "\n"), string(m), "message differs")
 			index++
