@@ -32,4 +32,4 @@ jobs:
       # Run tests
       - name: Run tests
         working-directory: ./
-        run: go test ./...
+        run: go test ./... -race
