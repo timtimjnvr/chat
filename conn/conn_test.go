@@ -93,7 +93,7 @@ func TestReadConn(t *testing.T) {
 	}
 
 	wgReader.Add(1)
-	go read(&wgReader, connReader, messages, shutdown)
+	go read(&wgReader, &connReader, messages, shutdown)
 
 	defer func() {
 		close(shutdown)
