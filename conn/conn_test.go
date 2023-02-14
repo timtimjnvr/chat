@@ -3,7 +3,6 @@ package conn
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
-	"log"
 	"net"
 	"strings"
 	"sync"
@@ -73,9 +72,8 @@ func TestReadConn(t *testing.T) {
 	wgSender.Add(1)
 	go func(wgSender *sync.WaitGroup, shutdown chan struct{}) {
 		defer wgSender.Done()
-		ln, err := net.Listen(transportProtocol, ":12346")
+		ln, err := net.Listen(transportProtocol, ":12348")
 		if err != nil {
-			log.Println(err)
 			assert.Fail(t, "failed to start test sender (Listen) : ", err.Error())
 		}
 
@@ -96,7 +94,7 @@ func TestReadConn(t *testing.T) {
 
 	}(&wgSender, shutdown)
 
-	connReader, err := net.Dial(transportProtocol, ":12346")
+	connReader, err := net.Dial(transportProtocol, ":12348")
 	if err != nil {
 		assert.Fail(t, "failed to start test receiver (Dial) : ", err.Error())
 	}
