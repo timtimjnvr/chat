@@ -1,10 +1,10 @@
 package conn
 
 import (
-	"chat/crdt"
-	"chat/reader"
 	"fmt"
 	"github.com/pkg/errors"
+	"github/timtimjnvr/chat/crdt"
+	"github/timtimjnvr/chat/reader"
 	"log"
 	"net"
 	"sync"

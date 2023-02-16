@@ -1,9 +1,9 @@
 package main
 
 import (
-	"chat/conn"
-	"chat/crdt"
-	"chat/parsestdin"
+	"github/timtimjnvr/chat/conn"
+	"github/timtimjnvr/chat/crdt"
+	"github/timtimjnvr/chat/parsestdin"
 
 	"flag"
 	"github.com/google/uuid"

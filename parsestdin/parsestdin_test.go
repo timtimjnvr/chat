@@ -1,10 +1,10 @@
 package parsestdin
 
 import (
-	"chat/crdt"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github/timtimjnvr/chat/crdt"
 	"reflect"
 	"testing"
 )

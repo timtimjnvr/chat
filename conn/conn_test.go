@@ -1,9 +1,9 @@
 package conn
 
 import (
-	"chat/reader"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github/timtimjnvr/chat/reader"
 	"net"
 	"strings"
 	"sync"

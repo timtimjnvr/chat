@@ -1,9 +1,9 @@
 package parsestdin
 
 import (
-	"chat/conn"
-	"chat/crdt"
-	"chat/reader"
+	"github/timtimjnvr/chat/conn"
+	"github/timtimjnvr/chat/crdt"
+	"github/timtimjnvr/chat/reader"
 
 	"fmt"
 	"log"

@@ -1,9 +1,9 @@
 package crdt
 
 import (
-	"chat/linked"
 	"encoding/json"
 	"github.com/google/uuid"
+	"github/timtimjnvr/chat/linked"
 	"log"
 	"sync"
 )

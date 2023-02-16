@@ -1,4 +1,4 @@
-module chat
+module github/timtimjnvr/chat
 
 go 1.18
 
