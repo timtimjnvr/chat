@@ -12,17 +12,17 @@ import (
 func TestReadFile(t *testing.T) {
 	var (
 		maxTestDuration = 3 * time.Second
-		testData = []string{
+		testData        = []string{
 			"first message\n",
 			"second message\n",
 			"third message\n",
 		}
-		n int
-		err error
+		n              int
+		err            error
 		writer, reader *os.File
-		wgReader        = sync.WaitGroup{}
-		messages = make(chan []byte, MaxMessageSize)
-		shutdown = make(chan struct{}, 0)
+		wgReader       = sync.WaitGroup{}
+		messages       = make(chan []byte, MaxMessageSize)
+		shutdown       = make(chan struct{}, 0)
 	)
 
 	writer, err = os.OpenFile("test.txt", os.O_CREATE|os.O_WRONLY, os.ModePerm)
@@ -50,7 +50,6 @@ func TestReadFile(t *testing.T) {
 		return
 	}
 
-
 	reader, err = os.OpenFile("test.txt", os.O_RDONLY, os.ModePerm)
 	if err != nil {
 		assert.Fail(t, "failed to create reader (OpenFile) ", err.Error())
@@ -59,7 +58,6 @@ func TestReadFile(t *testing.T) {
 
 	wgReader.Add(1)
 	go ReadFile(&wgReader, reader, messages, shutdown)
-
 
 	var (
 		timeout = time.Tick(maxTestDuration)
