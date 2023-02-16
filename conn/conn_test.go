@@ -129,6 +129,7 @@ func TestReadConn(t *testing.T) {
 	}
 }
 
+
 func connect(wg *sync.WaitGroup, t *testing.T, ip, port string) {
 	defer wg.Done()
 	_, err := net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
