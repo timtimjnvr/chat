@@ -14,7 +14,6 @@ func ReadFile(wg *sync.WaitGroup, file *os.File, output chan<- []byte, shutdown 
 	defer func() {
 		close(output)
 		wg.Done()
-		log.Println("[INFO] ReadFile stopped")
 	}()
 
 	// writeClose is closed in order to signal to stop reading output
@@ -28,8 +27,6 @@ func ReadFile(wg *sync.WaitGroup, file *os.File, output chan<- []byte, shutdown 
 	}()
 
 	for {
-		log.Println("[INFO] type a command")
-
 		var (
 			fdSet  = unix.FdSet{}
 			buffer = make([]byte, MaxMessageSize)
