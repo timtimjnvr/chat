@@ -108,7 +108,6 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 			return
 
 		case operationBytes := <-toExecute:
-
 			var (
 				slot = int(operationBytes[0])
 				op   = DecodeOperation(operationBytes[1:])
@@ -118,50 +117,16 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 
 			// get targeted chat
 			switch op.GetOperationType() {
-
 			// by name
 			case JoinChatByName:
-				var (
-					chatName      = op.GetTargetedChat()
-					numberOfChats = chats.Len()
-				)
-				log.Println(chatName)
-				for index := 0; index < numberOfChats; index++ {
-					var chatValue interface{}
-					chatValue, _ = chats.GetByIndex(index)
-					c = chatValue.(*chat)
-
-					if c.GetName() == chatName {
-						break
-					}
-				}
-
-				if err != nil || c == nil {
-					log.Println("[ERROR] not found :", err)
-					continue
-				}
+				c, err = getChat(chats, op.GetTargetedChat(), true)
 
 			// by id
 			default:
-				var id uuid.UUID
-				id, err = uuid.Parse(op.GetTargetedChat())
-				if err != nil {
-					log.Println("[ERROR] not found :", err)
-					continue
-				}
-
-				var chatValue interface{}
-				chatValue, err = chats.GetById(id)
-				if err != nil {
-					log.Println("[ERROR]", err)
-					continue
-				}
-
-				c = chatValue.(*chat)
+				c, err = getChat(chats, op.GetTargetedChat(), false)
 
 			// no targeted chat needed
 			case Quit:
-
 			}
 
 			// execute operation
@@ -223,6 +188,46 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 			}
 		}
 	}
+}
+
+func getChat(chats linked.List, identifier string, byName bool) (Chat, error) {
+	var (
+		numberOfChats = chats.Len()
+		c             Chat
+		err           error
+	)
+
+	if byName {
+		for index := 0; index < numberOfChats; index++ {
+			var chatValue interface{}
+			chatValue, _ = chats.GetByIndex(index)
+			c = chatValue.(*chat)
+
+			if c.GetName() == identifier {
+				return c, nil
+			}
+		}
+
+		if err != nil || c == nil {
+			return nil, linked.NotFound
+		}
+
+	}
+	// by uuid
+	var id uuid.UUID
+	id, err = uuid.Parse(identifier)
+	if err != nil {
+		return nil, linked.InvalidIdentifier
+	}
+
+	var chatValue interface{}
+	chatValue, err = chats.GetById(id)
+
+	if err != nil {
+		return nil, linked.NotFound
+	}
+
+	return chatValue.(*chat), nil
 }
 
 func AddSlot(slot int, operation []byte) []byte {
