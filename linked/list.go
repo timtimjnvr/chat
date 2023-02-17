@@ -6,7 +6,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var NotFound = errors.New("Not found")
+var (
+	NotFound          = errors.New("Not found")
+	InvalidIdentifier = errors.New("Invalid identifier")
+)
 
 type (
 	element struct {

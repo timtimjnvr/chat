@@ -41,6 +41,9 @@ const (
 
 	maxMessagesStdin     = 100
 	noDiscussionSelected = "you must be in a discussion to send a message"
+
+	logFrmt     = "[INFO] %s"
+	typeCommand = "type a command :"
 )
 
 var (
@@ -140,6 +143,8 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.
 	wgReadStdin.Add(1)
 	var stdin = make(chan []byte, maxMessagesStdin)
 	go reader.ReadFile(&wgReadStdin, os.Stdin, stdin, shutdown)
+
+	fmt.Printf(logFrmt, typeCommand)
 
 	for {
 		select {
