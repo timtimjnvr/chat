@@ -62,11 +62,6 @@ func (op operation) ToBytes() []byte {
 }
 
 func DecodeOperation(bytes []byte) Operation {
-	getField := func(offset int, source []byte) (int, []byte) {
-		lenField := int(source[offset])
-		return offset + lenField + 1, source[offset+1 : offset+lenField+1]
-	}
-
 	var (
 		offset             = 0
 		data, targetedChat []byte
@@ -82,4 +77,9 @@ func DecodeOperation(bytes []byte) Operation {
 		targetedChat: string(targetedChat),
 		data:         data,
 	}
+}
+
+func getField(offset int, source []byte) (int, []byte) {
+	lenField := int(source[offset])
+	return offset + lenField + 1, source[offset+1 : offset+lenField+1]
 }
