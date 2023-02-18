@@ -160,7 +160,7 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int
 				// conn closed on the other side
 				return
 			}
-			log.Println("message received :", string(message))
+
 			// add slot to message
 			outGoingMessages <- append([]byte{uint8(node.slot)}, message...)
 		}

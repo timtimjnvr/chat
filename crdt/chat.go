@@ -28,13 +28,15 @@ type (
 	}
 )
 
+const maxNumberOfMessages, maxNumberOfNodes = 100, 100
+
 func NewChat(name string) Chat {
 	id, _ := uuid.NewUUID()
 	return &chat{
 		Id:       id.String(),
 		Name:     name,
-		nodes:    []Infos{},
-		messages: []Message{},
+		nodes:    make([]Infos, 0, maxNumberOfNodes),
+		messages: make([]Message, 0, maxNumberOfMessages),
 	}
 }
 
@@ -136,21 +138,25 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 				newNodeInfos, err = DecodeInfos(op.GetOperationData())
 				if err != nil {
 					log.Println("[ERROR]", err)
+					break
 				}
 
 				newNodeInfos.SetSlot(slot)
+				log.Println(newNodeInfos)
 				c.AddNode(newNodeInfos)
 
 				var chatInfos []byte
 				chatInfos, err = c.ToBytes()
 				if err != nil {
 					log.Println("[ERROR]", err)
+					break
 				}
 
 				var myInfosByte []byte
 				myInfosByte = myInfos.ToBytes()
 				if err != nil {
 					log.Println("[ERROR]", err)
+					break
 				}
 
 				createChatOperation := NewOperation(CreateChat, c.GetId(), chatInfos).ToBytes()
@@ -175,9 +181,11 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 				c.AddNode(newNodeInfos)
 
 			case AddMessage:
-				newMessage, err := DecodeMessage(op.GetOperationData())
+				var newMessage Message
+				newMessage, err = DecodeMessage(op.GetOperationData())
 				if err != nil {
 					log.Println("[ERROR]", err)
+					break
 				}
 				c.AddMessage(newMessage)
 

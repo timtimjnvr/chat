@@ -53,14 +53,11 @@ func (op operation) GetOperationData() []byte {
 
 func (op operation) ToBytes() []byte {
 	var bytes []byte
-
-	bytes = append(bytes, uint8(op.typology))
-
 	bytes = append(bytes, byte(len(op.targetedChat)))
 	bytes = append(bytes, []byte(op.targetedChat)...)
+	bytes = append(bytes, uint8(op.typology))
 	bytes = append(bytes, byte(len(op.data)))
 	bytes = append(bytes, op.data...)
-
 	return bytes
 }
 
@@ -75,9 +72,10 @@ func DecodeOperation(bytes []byte) Operation {
 		data, targetedChat []byte
 	)
 
+	offset, targetedChat = getField(offset, bytes)
 	typology := OperationType(bytes[offset])
-	offset, targetedChat = getField(offset+1, bytes)
-	_, data = getField(offset, bytes)
+
+	_, data = getField(offset+1, bytes)
 
 	return operation{
 		typology:     typology,

@@ -71,7 +71,7 @@ func main() {
 	go crdt.HandleChats(&wgHandleChats, myInfos, toSend, toExecute, shutdown)
 
 	wgHandleStdin.Add(1)
-	go parsestdin.HandleStdin(&wgHandleStdin, myInfos, newConnections, toExecute, shutdown)
+	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, myInfos, newConnections, toExecute, shutdown)
 
 	for {
 		select {
