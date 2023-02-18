@@ -86,6 +86,8 @@ func TestReadConn(t *testing.T) {
 			return
 		}
 
+		defer ln.Close()
+
 		for _, d := range testData {
 			connSender.Write([]byte(d))
 		}
