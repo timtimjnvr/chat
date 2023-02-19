@@ -17,17 +17,20 @@ func TestEncodeDecodeOperation(t *testing.T) {
 
 	var (
 		testOperations = []Operation{
-			operation{
+			&operation{
+				slot:         0,
 				typology:     AddNode,
 				targetedChat: uuidString,
 				data:         []byte("azertyuiopqsdfghjklmwxcvbn"),
 			},
-			operation{
+			&operation{
+				slot:         2,
 				typology:     JoinChatByName,
 				targetedChat: "my-awesome-chat",
 				data:         []byte("azertyuiopqsdfghjklmwxcvbn"),
 			},
-			operation{
+			&operation{
+				slot:         3,
 				typology:     AddMessage,
 				targetedChat: uuidString,
 				data: message{

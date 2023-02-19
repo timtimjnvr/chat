@@ -21,7 +21,7 @@ type (
 		GetId() string
 		GetName() string
 		GetNodesInfos() []Infos
-		getSlots() []int
+		getSlots() []uint8
 		AddNode(infos Infos)
 		AddMessage(message Message)
 		ToBytes() ([]byte, error)
@@ -81,8 +81,8 @@ func (c *chat) ToBytes() ([]byte, error) {
 	return bytesChat, nil
 }
 
-func (c *chat) getSlots() []int {
-	slots := make([]int, 0, len(c.nodes))
+func (c *chat) getSlots() []uint8 {
+	slots := make([]uint8, 0, len(c.nodes))
 	for _, i := range c.nodes {
 		if i.getId() == c.myNodeId {
 			slots = append(slots, i.getSlot())
@@ -111,7 +111,7 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 
 		case operationBytes := <-toExecute:
 			var (
-				slot = int(operationBytes[0])
+				slot = operationBytes[0]
 				op   = DecodeOperation(operationBytes[1:])
 				c    Chat
 				err  error
@@ -159,15 +159,17 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 					break
 				}
 
-				createChatOperation := NewOperation(CreateChat, c.GetId(), chatInfos).ToBytes()
-				toSend <- AddSlot(slot, createChatOperation)
+				createChatOperation := NewOperation(CreateChat, c.GetId(), chatInfos)
+				createChatOperation.SetSlot(slot)
+				toSend <- createChatOperation.ToBytes()
 
-				addNodeOperation := NewOperation(AddNode, c.GetId(), myInfosByte).ToBytes()
+				addNodeOperation := NewOperation(AddNode, c.GetId(), myInfosByte)
 
 				// propagates new node to other chats
 				slots := c.getSlots()
 				for _, s := range slots {
-					toSend <- AddSlot(s, addNodeOperation)
+					addNodeOperation.SetSlot(s)
+					toSend <- addNodeOperation.ToBytes()
 				}
 
 			case AddNode:
@@ -191,7 +193,8 @@ func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExec
 
 				slots := c.getSlots()
 				for _, s := range slots {
-					toSend <- AddSlot(s, operationBytes)
+					op.SetSlot(s)
+					toSend <- op.ToBytes()
 				}
 			}
 		}
