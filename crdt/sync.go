@@ -11,10 +11,11 @@ type (
 	OperationType uint8
 
 	Operation interface {
+		SetSlot(slot uint8)
+		GetSlot() uint8
 		GetOperationType() OperationType
 		GetTargetedChat() string
 		GetOperationData() []byte
-		SetSlot(slot uint8)
 		ToBytes() []byte
 	}
 )
@@ -38,6 +39,14 @@ func NewOperation(typology OperationType, targetedChat string, data []byte) Oper
 	}
 }
 
+func (op *operation) SetSlot(slot uint8) {
+	op.slot = slot
+}
+
+func (op *operation) GetSlot() uint8 {
+	return op.slot
+}
+
 func (op *operation) GetOperationType() OperationType {
 	return op.typology
 }
@@ -48,10 +57,6 @@ func (op *operation) GetTargetedChat() string {
 
 func (op *operation) GetOperationData() []byte {
 	return op.data
-}
-
-func (op *operation) SetSlot(slot uint8) {
-	op.slot = slot
 }
 
 func (op *operation) ToBytes() []byte {

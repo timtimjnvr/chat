@@ -12,7 +12,7 @@ import (
 
 type (
 	node struct {
-		slot     int
+		slot     uint8
 		Conn     net.Conn
 		Wg       *sync.WaitGroup
 		Shutdown chan struct{}
@@ -28,10 +28,10 @@ const (
 	MaxSimultaneousMessages    = 100
 )
 
-func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, operationsToSend <-chan []byte, outGoingOperations chan<- []byte, shutdown chan struct{}) {
+func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan crdt.Operation, toExecute chan<- crdt.Operation, shutdown chan struct{}) {
 	var (
 		nodes           []node
-		connectionsDone = make(chan int, MaxSimultaneousConnections)
+		connectionsDone = make(chan uint8, MaxSimultaneousConnections)
 		fromConnections = make(chan []byte)
 		err             error
 	)
@@ -51,7 +51,7 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, operationsToS
 			return
 
 		case newConn := <-newConnections:
-			newNode := NewNode(newConn, len(nodes))
+			newNode := NewNode(newConn, uint8(len(nodes)+1))
 			newNode.Wg.Add(1)
 			go handleConnection(newNode, fromConnections, connectionsDone)
 			nodes = append(nodes, newNode)
@@ -60,16 +60,16 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, operationsToS
 			log.Printf("[INFO] slot %d done\n", slot)
 			// TODO
 			/*
-				build and send operationBytes to chat handler to remove node identified by <slot> from all chats
+				build and send operation to chat handler to remove node identified by <slot> from all chats
 			*/
 
-		case operationBytes := <-operationsToSend:
-			slot := operationBytes[0]
-			_ = Send(nodes[slot].Conn, operationBytes[:1])
+		case operation := <-toSend:
+			slot := operation.GetSlot()
+			_ = Send(nodes[slot-1].Conn, operation.ToBytes())
 
 		case operationBytes := <-fromConnections:
-			operation := crdt.DecodeOperation(operationBytes[1:])
 
+			operation := crdt.DecodeOperation(operationBytes[1:])
 			if operation.GetOperationType() == crdt.AddNode {
 				nodeInfos, _ := crdt.DecodeInfos(operation.GetOperationData())
 
@@ -80,13 +80,13 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, operationsToS
 					log.Println("[ERROR] ", err)
 				}
 
-				newNode := NewNode(newConn, len(nodes))
+				newNode := NewNode(newConn, uint8(len(nodes)+1))
 				nodes = append(nodes, newNode)
 
-				operationBytes = crdt.AddSlot(newNode.slot, operation.ToBytes())
+				operation.SetSlot(newNode.slot)
 			}
 
-			outGoingOperations <- operationBytes
+			toExecute <- operation
 		}
 	}
 }
@@ -129,7 +129,7 @@ func ListenAndServe(wg *sync.WaitGroup, isListening *sync.Cond, addr, port strin
 	}
 }
 
-func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- int) {
+func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- uint8) {
 	log.Println("[INFO] new conn")
 
 	var (
@@ -180,7 +180,7 @@ func OpenConnection(ip string, port string) (net.Conn, error) {
 	return conn, nil
 }
 
-func NewNode(conn net.Conn, slot int) node {
+func NewNode(conn net.Conn, slot uint8) node {
 	return node{
 		slot:     slot,
 		Conn:     conn,
