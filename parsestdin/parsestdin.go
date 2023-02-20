@@ -42,7 +42,7 @@ const (
 	maxMessagesStdin     = 100
 	noDiscussionSelected = "you must be in a discussion to send a message"
 
-	logFrmt     = "[INFO] %s"
+	logFrmt     = "[INFO] %s\n"
 	typeCommand = "type a command :"
 )
 
@@ -129,7 +129,7 @@ func parseArgs(line string, command crdt.OperationType) (map[string]string, erro
 	return args, nil
 }
 
-func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.Conn, operationsCreated chan<- []byte, shutdown chan struct{}) {
+func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.Infos, connCreated chan<- net.Conn, operationsCreated chan<- crdt.Operation, shutdown chan struct{}) {
 	var (
 		wgReadStdin = sync.WaitGroup{}
 		currentChat = crdt.NewChat(myInfos.GetName())
@@ -142,7 +142,7 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.
 
 	wgReadStdin.Add(1)
 	var stdin = make(chan []byte, maxMessagesStdin)
-	go reader.ReadFile(&wgReadStdin, os.Stdin, stdin, shutdown)
+	go reader.ReadFile(&wgReadStdin, file, stdin, shutdown)
 
 	fmt.Printf(logFrmt, typeCommand)
 
@@ -152,6 +152,8 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.
 			return
 
 		case line := <-stdin:
+			fmt.Printf(logFrmt, typeCommand)
+
 			cmd, err := newCommand(string(line))
 			if err != nil {
 				log.Println("[ERROR] ", err)
@@ -166,12 +168,13 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.
 					chatName  = args[ChatRoomArg]
 					newChat   = crdt.NewChat(chatName)
 				)
+
 				bytesChat, err = newChat.ToBytes()
 				if err != nil {
 					log.Println(err)
 				}
 
-				operationsCreated <- crdt.NewOperation(crdt.CreateChat, newChat.GetId(), bytesChat).ToBytes()
+				operationsCreated <- crdt.NewOperation(crdt.CreateChat, newChat.GetId(), bytesChat)
 
 			case crdt.JoinChatByName:
 				var (
@@ -211,13 +214,13 @@ func HandleStdin(wg *sync.WaitGroup, myInfos crdt.Infos, connCreated chan<- net.
 				/* Add the messageBytes to discussion & sync with other nodes */
 				var messageBytes []byte
 				messageBytes = crdt.NewMessage(myInfos.GetName(), content).ToBytes()
-				operationsCreated <- crdt.NewOperation(crdt.AddMessage, currentChat.GetId(), messageBytes).ToBytes()
+				operationsCreated <- crdt.NewOperation(crdt.AddMessage, currentChat.GetId(), messageBytes)
 
 			case crdt.LeaveChat:
-				operationsCreated <- crdt.NewOperation(crdt.LeaveChat, currentChat.GetId(), myInfos.ToBytes()).ToBytes()
+				operationsCreated <- crdt.NewOperation(crdt.LeaveChat, currentChat.GetId(), myInfos.ToBytes())
 
 			case crdt.Quit:
-				operationsCreated <- crdt.NewOperation(crdt.Quit, "", myInfos.ToBytes()).ToBytes()
+				operationsCreated <- crdt.NewOperation(crdt.Quit, "", myInfos.ToBytes())
 			}
 		}
 	}

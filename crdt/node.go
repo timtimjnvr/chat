@@ -8,7 +8,7 @@ import (
 
 type (
 	infos struct {
-		slot    int
+		slot    uint8
 		Id      uuid.UUID `json:"Id"`
 		Port    string    `json:"port"`
 		Address string    `json:"address"`
@@ -17,18 +17,18 @@ type (
 
 	Infos interface {
 		getId() uuid.UUID
-		getSlot() int
+		getSlot() uint8
 		GetAddr() string
 		GetPort() string
 		GetName() string
-		SetSlot(slot int)
+		SetSlot(slot uint8)
 		ToBytes() []byte
 	}
 )
 
 func NewNodeInfos(id uuid.UUID, addr string, port, name string) Infos {
 	return &infos{
-		slot:    -1,
+		slot:    0,
 		Id:      id,
 		Port:    port,
 		Address: addr,
@@ -44,7 +44,7 @@ func (i *infos) GetName() string {
 	return i.Name
 }
 
-func (i *infos) getSlot() int {
+func (i *infos) getSlot() uint8 {
 	return i.slot
 }
 
@@ -56,7 +56,7 @@ func (i *infos) GetPort() string {
 	return i.Port
 }
 
-func (i *infos) SetSlot(slot int) {
+func (i *infos) SetSlot(slot uint8) {
 	i.slot = slot
 }
 

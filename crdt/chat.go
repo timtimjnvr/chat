@@ -3,9 +3,7 @@ package crdt
 import (
 	"encoding/json"
 	"github.com/google/uuid"
-	"github/timtimjnvr/chat/linked"
 	"log"
-	"sync"
 )
 
 type (
@@ -21,20 +19,22 @@ type (
 		GetId() string
 		GetName() string
 		GetNodesInfos() []Infos
-		getSlots() []int
+		getSlots() []uint8
 		AddNode(infos Infos)
 		AddMessage(message Message)
 		ToBytes() ([]byte, error)
 	}
 )
 
+const maxNumberOfMessages, maxNumberOfNodes = 100, 100
+
 func NewChat(name string) Chat {
 	id, _ := uuid.NewUUID()
 	return &chat{
 		Id:       id.String(),
 		Name:     name,
-		nodes:    []Infos{},
-		messages: []Message{},
+		nodes:    make([]Infos, 0, maxNumberOfNodes),
+		messages: make([]Message, 0, maxNumberOfMessages),
 	}
 }
 
@@ -51,7 +51,8 @@ func (c *chat) GetName() string {
 }
 
 func (c *chat) AddNode(i Infos) {
-	c.nodes = append(c.nodes, i)
+	log.Println(i)
+	// c.nodes = append(c.nodes, i)
 }
 
 func (c *chat) AddMessage(message Message) {
@@ -79,8 +80,8 @@ func (c *chat) ToBytes() ([]byte, error) {
 	return bytesChat, nil
 }
 
-func (c *chat) getSlots() []int {
-	slots := make([]int, 0, len(c.nodes))
+func (c *chat) getSlots() []uint8 {
+	slots := make([]uint8, 0, len(c.nodes))
 	for _, i := range c.nodes {
 		if i.getId() == c.myNodeId {
 			slots = append(slots, i.getSlot())
@@ -88,148 +89,4 @@ func (c *chat) getSlots() []int {
 	}
 
 	return slots
-}
-
-// HandleChats maintains chat infos consistency by executing operation and propagating operations to other nodes if needed
-func HandleChats(wg *sync.WaitGroup, myInfos Infos, toSend chan<- []byte, toExecute <-chan []byte, shutdown <-chan struct{}) {
-	defer func() {
-		wg.Done()
-	}()
-
-	var (
-		chats = linked.NewList()
-	)
-
-	chats.Add(NewChat(myInfos.GetName()))
-
-	for {
-		select {
-		case <-shutdown:
-			return
-
-		case operationBytes := <-toExecute:
-			var (
-				slot = int(operationBytes[0])
-				op   = DecodeOperation(operationBytes[1:])
-				c    Chat
-				err  error
-			)
-
-			// get targeted chat
-			switch op.GetOperationType() {
-			// by name
-			case JoinChatByName:
-				c, err = getChat(chats, op.GetTargetedChat(), true)
-
-			// by id
-			default:
-				c, err = getChat(chats, op.GetTargetedChat(), false)
-
-			// no targeted chat needed
-			case Quit:
-			}
-
-			// execute operation
-			switch op.GetOperationType() {
-			case JoinChatByName:
-				var newNodeInfos Infos
-				newNodeInfos, err = DecodeInfos(op.GetOperationData())
-				if err != nil {
-					log.Println("[ERROR]", err)
-				}
-
-				newNodeInfos.SetSlot(slot)
-				c.AddNode(newNodeInfos)
-
-				var chatInfos []byte
-				chatInfos, err = c.ToBytes()
-				if err != nil {
-					log.Println("[ERROR]", err)
-				}
-
-				var myInfosByte []byte
-				myInfosByte = myInfos.ToBytes()
-				if err != nil {
-					log.Println("[ERROR]", err)
-				}
-
-				createChatOperation := NewOperation(CreateChat, c.GetId(), chatInfos).ToBytes()
-				toSend <- AddSlot(slot, createChatOperation)
-
-				addNodeOperation := NewOperation(AddNode, c.GetId(), myInfosByte).ToBytes()
-
-				// propagates new node to other chats
-				slots := c.getSlots()
-				for _, s := range slots {
-					toSend <- AddSlot(s, addNodeOperation)
-				}
-
-			case AddNode:
-				var newNodeInfos Infos
-				newNodeInfos, err = DecodeInfos(op.GetOperationData())
-				if err != nil {
-					log.Println("[ERROR]", err)
-				}
-
-				newNodeInfos.SetSlot(slot)
-				c.AddNode(newNodeInfos)
-
-			case AddMessage:
-				newMessage, err := DecodeMessage(op.GetOperationData())
-				if err != nil {
-					log.Println("[ERROR]", err)
-				}
-				c.AddMessage(newMessage)
-
-				slots := c.getSlots()
-				for _, s := range slots {
-					toSend <- AddSlot(s, operationBytes)
-				}
-			}
-		}
-	}
-}
-
-func getChat(chats linked.List, identifier string, byName bool) (Chat, error) {
-	var (
-		numberOfChats = chats.Len()
-		c             Chat
-		err           error
-	)
-
-	if byName {
-		for index := 0; index < numberOfChats; index++ {
-			var chatValue interface{}
-			chatValue, _ = chats.GetByIndex(index)
-			c = chatValue.(*chat)
-
-			if c.GetName() == identifier {
-				return c, nil
-			}
-		}
-
-		if err != nil || c == nil {
-			return nil, linked.NotFound
-		}
-
-	}
-	// by uuid
-	var id uuid.UUID
-	id, err = uuid.Parse(identifier)
-	if err != nil {
-		return nil, linked.InvalidIdentifier
-	}
-
-	var chatValue interface{}
-	chatValue, err = chats.GetById(id)
-
-	if err != nil {
-		return nil, linked.NotFound
-	}
-
-	return chatValue.(*chat), nil
-}
-
-func AddSlot(slot int, operation []byte) []byte {
-	return append([]byte{uint8(slot)}, operation...)
 }

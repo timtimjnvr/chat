@@ -20,7 +20,7 @@ func main() {
 	var (
 		myPortPtr = flag.String("p", "8080", "port number used to accept conn")
 		myAddrPtr = flag.String("a", "", "address used to accept conn")
-		myNamePtr = flag.String("u", "Tim", "nickname used in chats")
+		myNamePtr = flag.String("u", "tim", "nickname used in chats")
 	)
 	flag.Parse()
 
@@ -55,8 +55,8 @@ func main() {
 
 	var (
 		newConnections = make(chan net.Conn, conn.MaxSimultaneousConnections)
-		toSend         = make(chan []byte, conn.MaxSimultaneousMessages)
-		toExecute      = make(chan []byte, conn.MaxSimultaneousMessages)
+		toSend         = make(chan crdt.Operation, conn.MaxSimultaneousMessages)
+		toExecute      = make(chan crdt.Operation, conn.MaxSimultaneousMessages)
 	)
 
 	wgHandleNodes.Add(1)
@@ -68,10 +68,11 @@ func main() {
 	isListening.Wait()
 
 	wgHandleChats.Add(1)
-	go crdt.HandleChats(&wgHandleChats, myInfos, toSend, toExecute, shutdown)
+	var orchestrator = crdt.NewOrchestrator(myInfos)
+	go orchestrator.HandleChats(&wgHandleChats, toSend, toExecute, shutdown)
 
 	wgHandleStdin.Add(1)
-	go parsestdin.HandleStdin(&wgHandleStdin, myInfos, newConnections, toExecute, shutdown)
+	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, myInfos, newConnections, toExecute, shutdown)
 
 	for {
 		select {
