@@ -31,12 +31,13 @@ func main() {
 		sigc     = make(chan os.Signal, 1)
 		shutdown = make(chan struct{})
 
-		wgHandleNodes = sync.WaitGroup{}
-		wgListen      = sync.WaitGroup{}
-		wgHandleChats = sync.WaitGroup{}
-		wgHandleStdin = sync.WaitGroup{}
-		lock          = sync.Mutex{}
-		isListening   = sync.NewCond(&lock)
+		wgHandleNodes         = sync.WaitGroup{}
+		wgListen              = sync.WaitGroup{}
+		wgHandleChats         = sync.WaitGroup{}
+		wgHandleStdin         = sync.WaitGroup{}
+		wgInitNodeConnections = sync.WaitGroup{}
+		lock                  = sync.Mutex{}
+		isListening           = sync.NewCond(&lock)
 	)
 
 	defer func() {
@@ -44,6 +45,7 @@ func main() {
 		wgHandleChats.Wait()
 		wgListen.Wait()
 		wgHandleNodes.Wait()
+		wgInitNodeConnections.Wait()
 		log.Println("[INFO] program shutdown")
 	}()
 
@@ -54,25 +56,35 @@ func main() {
 		syscall.SIGQUIT)
 
 	var (
-		newConnections = make(chan net.Conn, conn.MaxSimultaneousConnections)
-		toSend         = make(chan crdt.Operation, conn.MaxSimultaneousMessages)
-		toExecute      = make(chan crdt.Operation, conn.MaxSimultaneousMessages)
+		outGoingCommands = make(chan parsestdin.Command, parsestdin.MaxMessagesStdin)
+		joinChatCommands = make(chan parsestdin.Command, conn.MaxSimultaneousConnections)
+		newConnections   = make(chan net.Conn, conn.MaxSimultaneousConnections)
+		toSend           = make(chan crdt.Operation, conn.MaxSimultaneousMessages)
+		toExecute        = make(chan crdt.Operation, conn.MaxSimultaneousMessages)
 	)
 
+	// listen for new connections
+	wgListen.Add(1)
+	isListening.L.Lock()
+	go conn.Listen(&wgListen, isListening, *myAddrPtr, *myPortPtr, newConnections, shutdown)
+	isListening.Wait()
+
+	// create connections with new nodes
+	wgInitNodeConnections.Add(1)
+	go conn.InitNodeConnections(&wgInitNodeConnections, myInfos, joinChatCommands, newConnections, shutdown)
+
+	// handle new connections from creation to closure
 	wgHandleNodes.Add(1)
 	go conn.HandleNodes(&wgHandleNodes, newConnections, toSend, toExecute, shutdown)
 
-	wgListen.Add(1)
-	isListening.L.Lock()
-	go conn.ListenAndServe(&wgListen, isListening, *myAddrPtr, *myPortPtr, newConnections, shutdown)
-	isListening.Wait()
-
-	wgHandleChats.Add(1)
-	var orchestrator = crdt.NewOrchestrator(myInfos)
-	go orchestrator.HandleChats(&wgHandleChats, toSend, toExecute, shutdown)
-
+	// extract commands from stdin input
 	wgHandleStdin.Add(1)
-	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, myInfos, newConnections, toExecute, shutdown)
+	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, myInfos, outGoingCommands, shutdown)
+
+	// execute and propagates operations to maintain chat data consistency between nodes
+	wgHandleChats.Add(1)
+	var orch = NewOrchestrator(myInfos)
+	go orch.HandleChats(&wgHandleChats, outGoingCommands, toSend, toExecute, shutdown)
 
 	for {
 		select {

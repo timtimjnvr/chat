@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github/timtimjnvr/chat/crdt"
+	"github/timtimjnvr/chat/parsestdin"
 	"github/timtimjnvr/chat/reader"
 	"log"
 	"net"
+	"strconv"
 	"sync"
 )
 
@@ -91,7 +93,7 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan
 	}
 }
 
-func ListenAndServe(wg *sync.WaitGroup, isListening *sync.Cond, addr, port string, newConnections chan net.Conn, shutdown chan struct{}) {
+func Listen(wg *sync.WaitGroup, isListening *sync.Cond, addr, port string, newConnections chan net.Conn, shutdown chan struct{}) {
 	var (
 		conn      net.Conn
 		wgClosure = sync.WaitGroup{}
@@ -99,7 +101,6 @@ func ListenAndServe(wg *sync.WaitGroup, isListening *sync.Cond, addr, port strin
 	)
 
 	defer func() {
-		close(newConnections)
 		wgClosure.Wait()
 		wg.Done()
 	}()
@@ -210,4 +211,43 @@ func handleClosure(wg *sync.WaitGroup, shutdown chan struct{}, ln net.Listener) 
 	}
 
 	wg.Done()
+}
+
+func InitNodeConnections(wg *sync.WaitGroup, myInfos crdt.Infos, newJoinChatCommands <-chan parsestdin.Command, newConnections chan net.Conn, shutdown <-chan struct{}) {
+	defer func() {
+		wg.Done()
+	}()
+
+	for {
+		select {
+		case <-shutdown:
+			return
+		case joinChatCommand := <-newJoinChatCommands:
+			args := joinChatCommand.GetArgs()
+			var (
+				addr     = args[parsestdin.AddrArg]
+				chatRoom = args[parsestdin.ChatRoomArg]
+			)
+
+			// check if port is an int
+			pt, err := strconv.Atoi(args[parsestdin.PortArg])
+			if err != nil {
+				log.Println(err)
+			}
+
+			/* Open connection */
+			var newConn net.Conn
+			newConn, err = OpenConnection(addr, strconv.Itoa(pt))
+			if err != nil {
+				log.Println("[ERROR] ", err)
+				break
+			}
+
+			// init joining process
+			err = Send(newConn, crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos.ToBytes()).ToBytes())
+			if err != nil {
+				log.Println("[ERROR] ", err)
+			}
+		}
+	}
 }

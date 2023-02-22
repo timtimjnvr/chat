@@ -1,15 +1,12 @@
 package parsestdin
 
 import (
-	"github/timtimjnvr/chat/conn"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/reader"
 
 	"fmt"
 	"log"
-	"net"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -20,6 +17,11 @@ type (
 	command struct {
 		typology crdt.OperationType
 		args     map[string]string
+	}
+
+	Command interface {
+		GetTypology() crdt.OperationType
+		GetArgs() map[string]string
 	}
 )
 
@@ -39,7 +41,7 @@ const (
 	joinErrorSyntax    = "command syntax : " + joinChatCommand + " <ip> <port>"
 	newChatErrorSyntax = "command syntax : " + newChatCommand + " <chat_name>"
 
-	maxMessagesStdin     = 100
+	MaxMessagesStdin     = 100
 	noDiscussionSelected = "you must be in a discussion to send a message"
 
 	logFrmt     = "[INFO] %s\n"
@@ -129,11 +131,16 @@ func parseArgs(line string, command crdt.OperationType) (map[string]string, erro
 	return args, nil
 }
 
-func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.Infos, connCreated chan<- net.Conn, operationsCreated chan<- crdt.Operation, shutdown chan struct{}) {
-	var (
-		wgReadStdin = sync.WaitGroup{}
-		currentChat = crdt.NewChat(myInfos.GetName())
-	)
+func (c command) GetTypology() crdt.OperationType {
+	return c.typology
+}
+
+func (c command) GetArgs() map[string]string {
+	return c.args
+}
+
+func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.Infos, outGoingCommands chan<- Command, shutdown chan struct{}) {
+	var wgReadStdin = sync.WaitGroup{}
 
 	defer func() {
 		wgReadStdin.Wait()
@@ -141,7 +148,7 @@ func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.Infos, connCrea
 	}()
 
 	wgReadStdin.Add(1)
-	var stdin = make(chan []byte, maxMessagesStdin)
+	var stdin = make(chan []byte, MaxMessagesStdin)
 	go reader.ReadFile(&wgReadStdin, file, stdin, shutdown)
 
 	fmt.Printf(logFrmt, typeCommand)
@@ -152,75 +159,11 @@ func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.Infos, connCrea
 			return
 
 		case line := <-stdin:
-			fmt.Printf(logFrmt, typeCommand)
-
 			cmd, err := newCommand(string(line))
 			if err != nil {
 				log.Println("[ERROR] ", err)
-			}
-
-			args := cmd.args
-
-			switch cmd.typology {
-			case crdt.CreateChat:
-				var (
-					bytesChat []byte
-					chatName  = args[ChatRoomArg]
-					newChat   = crdt.NewChat(chatName)
-				)
-
-				bytesChat, err = newChat.ToBytes()
-				if err != nil {
-					log.Println(err)
-				}
-
-				operationsCreated <- crdt.NewOperation(crdt.CreateChat, newChat.GetId(), bytesChat)
-
-			case crdt.JoinChatByName:
-				var (
-					addr     = args[AddrArg]
-					chatRoom = args[ChatRoomArg]
-					pt       int
-				)
-
-				// check if port is an int
-				pt, err = strconv.Atoi(args[PortArg])
-				if err != nil {
-					log.Println(err)
-				}
-
-				/* Open connection */
-				var newConn net.Conn
-				newConn, err = conn.OpenConnection(addr, strconv.Itoa(pt))
-				if err != nil {
-					log.Println("[ERROR] ", err)
-					break
-				}
-
-				err = conn.Send(newConn, crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos.ToBytes()).ToBytes())
-				if err != nil {
-					log.Println("[ERROR] ", err)
-				}
-
-				connCreated <- newConn
-
-			case crdt.AddMessage:
-				content := args[MessageArg]
-				if currentChat == nil {
-					log.Println(noDiscussionSelected)
-					continue
-				}
-
-				/* Add the messageBytes to discussion & sync with other nodes */
-				var messageBytes []byte
-				messageBytes = crdt.NewMessage(myInfos.GetName(), content).ToBytes()
-				operationsCreated <- crdt.NewOperation(crdt.AddMessage, currentChat.GetId(), messageBytes)
-
-			case crdt.LeaveChat:
-				operationsCreated <- crdt.NewOperation(crdt.LeaveChat, currentChat.GetId(), myInfos.ToBytes())
-
-			case crdt.Quit:
-				operationsCreated <- crdt.NewOperation(crdt.Quit, "", myInfos.ToBytes())
+			} else {
+				outGoingCommands <- cmd
 			}
 		}
 	}
