@@ -3,7 +3,6 @@ package crdt
 import (
 	"encoding/json"
 	"github.com/google/uuid"
-	"log"
 )
 
 type (
