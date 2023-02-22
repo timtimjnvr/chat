@@ -159,6 +159,8 @@ func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.Infos, outGoing
 			return
 
 		case line := <-stdin:
+			fmt.Printf(logFrmt, typeCommand)
+
 			cmd, err := newCommand(string(line))
 			if err != nil {
 				log.Println("[ERROR] ", err)

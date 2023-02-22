@@ -51,8 +51,7 @@ func (c *ConcreteChat) GetName() string {
 }
 
 func (c *ConcreteChat) AddNode(i Infos) {
-	log.Println(i)
-	// c.nodes = append(c.nodes, i)
+	c.nodes = append(c.nodes, i)
 }
 
 func (c *ConcreteChat) AddMessage(message Message) {
