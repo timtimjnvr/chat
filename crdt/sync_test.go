@@ -26,7 +26,7 @@ func TestEncodeDecodeOperation(t *testing.T) {
 			&operation{
 				slot:         2,
 				typology:     JoinChatByName,
-				targetedChat: "my-awesome-chat",
+				targetedChat: "my-awesome-ConcreteChat",
 				data:         []byte("azertyuiopqsdfghjklmwxcvbn"),
 			},
 			&operation{

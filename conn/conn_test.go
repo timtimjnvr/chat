@@ -25,7 +25,7 @@ func TestListenAndServe(t *testing.T) {
 
 	wg.Add(1)
 	isListening.L.Lock()
-	go ListenAndServe(&wg, isListening, ip, port, newConnections, shutdown)
+	go Listen(&wg, isListening, ip, port, newConnections, shutdown)
 	isListening.Wait()
 
 	var wgTests = sync.WaitGroup{}
@@ -76,7 +76,7 @@ func TestReadConn(t *testing.T) {
 	// sender
 	wgListen.Add(1)
 	isListening.L.Lock()
-	go ListenAndServe(&wgListen, isListening, "", "12348", newConnections, shutdown)
+	go Listen(&wgListen, isListening, "", "12348", newConnections, shutdown)
 	isListening.Wait()
 
 	connReader, err := net.Dial(transportProtocol, ":12348")

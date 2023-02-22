@@ -3,11 +3,10 @@ package crdt
 import (
 	"encoding/json"
 	"github.com/google/uuid"
-	"log"
 )
 
 type (
-	chat struct {
+	ConcreteChat struct {
 		Id       string `json:"Id"`
 		myNodeId uuid.UUID
 		Name     string `json:"name"`
@@ -19,7 +18,7 @@ type (
 		GetId() string
 		GetName() string
 		GetNodesInfos() []Infos
-		getSlots() []uint8
+		GetSlots() []uint8
 		AddNode(infos Infos)
 		AddMessage(message Message)
 		ToBytes() ([]byte, error)
@@ -30,7 +29,7 @@ const maxNumberOfMessages, maxNumberOfNodes = 100, 100
 
 func NewChat(name string) Chat {
 	id, _ := uuid.NewUUID()
-	return &chat{
+	return &ConcreteChat{
 		Id:       id.String(),
 		Name:     name,
 		nodes:    make([]Infos, 0, maxNumberOfNodes),
@@ -38,31 +37,30 @@ func NewChat(name string) Chat {
 	}
 }
 
-func (c *chat) GetNodesInfos() []Infos {
+func (c *ConcreteChat) GetNodesInfos() []Infos {
 	return c.nodes
 }
 
-func (c *chat) GetId() string {
+func (c *ConcreteChat) GetId() string {
 	return c.Id
 }
 
-func (c *chat) GetName() string {
+func (c *ConcreteChat) GetName() string {
 	return c.Name
 }
 
-func (c *chat) AddNode(i Infos) {
-	log.Println(i)
-	// c.nodes = append(c.nodes, i)
+func (c *ConcreteChat) AddNode(i Infos) {
+	c.nodes = append(c.nodes, i)
 }
 
-func (c *chat) AddMessage(message Message) {
+func (c *ConcreteChat) AddMessage(message Message) {
 	if !c.containsMessage(message) {
 		// TODO : insert message in array by comparing dates
 		c.messages = append(c.messages, message)
 	}
 }
 
-func (c *chat) containsMessage(message Message) bool {
+func (c *ConcreteChat) containsMessage(message Message) bool {
 	for _, m := range c.messages {
 		if m.GetId() == message.GetId() {
 			return true
@@ -71,7 +69,7 @@ func (c *chat) containsMessage(message Message) bool {
 	return false
 }
 
-func (c *chat) ToBytes() ([]byte, error) {
+func (c *ConcreteChat) ToBytes() ([]byte, error) {
 	bytesChat, err := json.Marshal(c)
 	if err != nil {
 		return nil, err
@@ -80,7 +78,7 @@ func (c *chat) ToBytes() ([]byte, error) {
 	return bytesChat, nil
 }
 
-func (c *chat) getSlots() []uint8 {
+func (c *ConcreteChat) GetSlots() []uint8 {
 	slots := make([]uint8, 0, len(c.nodes))
 	for _, i := range c.nodes {
 		if i.getId() == c.myNodeId {
