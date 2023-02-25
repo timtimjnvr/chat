@@ -64,7 +64,7 @@ var (
 	ErrorInArguments    = errors.New("problem in arguments")
 )
 
-func newCommand(line string) (command, error) {
+func NewCommand(line string) (Command, error) {
 	typology, err := parseCommandType(line)
 	if err != nil {
 		return command{}, err
@@ -161,7 +161,7 @@ func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.Infos, outGoing
 		case line := <-stdin:
 			fmt.Printf(logFrmt, typeCommand)
 
-			cmd, err := newCommand(string(line))
+			cmd, err := NewCommand(string(line))
 			if err != nil {
 				log.Println("[ERROR] ", err)
 			} else {
