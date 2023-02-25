@@ -31,9 +31,6 @@ type (
 		GetById(id uuid.UUID) (interface{}, error)
 		Delete(key uuid.UUID)
 	}
-
-	Element interface {
-	}
 )
 
 func NewList() List {
@@ -60,15 +57,30 @@ func (l *list) Display() {
 
 // Add insert value at the end of the list and return the key of the inserted value
 func (l *list) Add(value interface{}) uuid.UUID {
-	if l.head == nil {
-		l.head = newElement(value)
-		l.tail = l.head
+	e := newElement(value)
+	if l.length == 0 {
+		l.head = e
+		l.tail = e
 		l.length++
-	} else {
-		l.tail.next = newElement(value)
-		l.tail = newElement(value)
-		l.length++
+
+		return l.tail.key
 	}
+
+	var (
+		ptr    = l.head
+		length = l.length
+	)
+
+	for i := 0; i < length; i++ {
+		if ptr.next == nil {
+			ptr.next = e
+			l.tail = e
+			l.length++
+		}
+
+		ptr = ptr.next
+	}
+
 	return l.tail.key
 }
 
@@ -85,12 +97,13 @@ func (l *list) GetByIndex(index int) (interface{}, error) {
 }
 
 func (l *list) GetById(id uuid.UUID) (interface{}, error) {
-	for l.head != nil && l.head.key != id {
-		l.head = l.head.next
+	first := l.head
+	for first.next != nil && first.key != id {
+		first = first.next
 	}
 
-	if l.head.key == id {
-		return l.head.value, nil
+	if first.key == id {
+		return first.value, nil
 	}
 
 	return nil, NotFound

@@ -6,7 +6,6 @@ import (
 	"github/timtimjnvr/chat/parsestdin"
 
 	"flag"
-	"github.com/google/uuid"
 	"log"
 	"net"
 	"os"
@@ -25,8 +24,7 @@ func main() {
 	flag.Parse()
 
 	var (
-		id, _   = uuid.NewUUID()
-		myInfos = crdt.NewNodeInfos(id, *myAddrPtr, *myPortPtr, *myNamePtr)
+		myInfos = crdt.NewNodeInfos(*myAddrPtr, *myPortPtr, *myNamePtr)
 
 		sigc     = make(chan os.Signal, 1)
 		shutdown = make(chan struct{})
@@ -73,7 +71,7 @@ func main() {
 	wgInitNodeConnections.Add(1)
 	go conn.InitNodeConnections(&wgInitNodeConnections, myInfos, joinChatCommands, newConnections, shutdown)
 
-	// handle new connections from creation to closure
+	// handle new connections until closure
 	wgHandleNodes.Add(1)
 	go conn.HandleNodes(&wgHandleNodes, newConnections, toSend, toExecute, shutdown)
 
@@ -81,10 +79,10 @@ func main() {
 	wgHandleStdin.Add(1)
 	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, myInfos, outGoingCommands, shutdown)
 
-	// execute and propagates operations to maintain chat data consistency between nodes
+	// execute and propagates commands & operations to maintain chat data consistency between nodes
 	wgHandleChats.Add(1)
-	var orch = NewOrchestrator(myInfos)
-	go orch.HandleChats(&wgHandleChats, outGoingCommands, toSend, toExecute, shutdown)
+	var orch = newOrchestrator(myInfos, outGoingCommands, toExecute, toSend)
+	go orch.handleChats(&wgHandleChats, shutdown)
 
 	for {
 		select {

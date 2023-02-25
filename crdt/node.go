@@ -26,7 +26,9 @@ type (
 	}
 )
 
-func NewNodeInfos(id uuid.UUID, addr string, port, name string) Infos {
+func NewNodeInfos(addr string, port, name string) Infos {
+	id, _ := uuid.NewUUID()
+
 	return &infos{
 		slot:    0,
 		Id:      id,

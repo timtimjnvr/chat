@@ -30,69 +30,6 @@ const (
 	MaxSimultaneousMessages    = 100
 )
 
-func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan crdt.Operation, toExecute chan<- crdt.Operation, shutdown chan struct{}) {
-	var (
-		nodes           []node
-		connectionsDone = make(chan uint8, MaxSimultaneousConnections)
-		fromConnections = make(chan []byte)
-		err             error
-	)
-
-	defer func() {
-		for _, n := range nodes {
-			n.Stop()
-		}
-		wg.Done()
-		log.Println("[INFO] HandleNodes stopped")
-	}()
-
-	for {
-		select {
-		case <-shutdown:
-			log.Println(" HandleNodes shutting down")
-			return
-
-		case newConn := <-newConnections:
-			newNode := NewNode(newConn, uint8(len(nodes)+1))
-			newNode.Wg.Add(1)
-			go handleConnection(newNode, fromConnections, connectionsDone)
-			nodes = append(nodes, newNode)
-
-		case slot := <-connectionsDone:
-			log.Printf("[INFO] slot %d done\n", slot)
-			// TODO
-			/*
-				build and send operation to chat handler to remove node identified by <slot> from all chats
-			*/
-
-		case operation := <-toSend:
-			slot := operation.GetSlot()
-			_ = Send(nodes[slot-1].Conn, operation.ToBytes())
-
-		case operationBytes := <-fromConnections:
-
-			operation := crdt.DecodeOperation(operationBytes[1:])
-			if operation.GetOperationType() == crdt.AddNode {
-				nodeInfos, _ := crdt.DecodeInfos(operation.GetOperationData())
-
-				// create and saves the new node
-				var newConn net.Conn
-				newConn, err = OpenConnection(nodeInfos.GetAddr(), nodeInfos.GetPort())
-				if err != nil {
-					log.Println("[ERROR] ", err)
-				}
-
-				newNode := NewNode(newConn, uint8(len(nodes)+1))
-				nodes = append(nodes, newNode)
-
-				operation.SetSlot(newNode.slot)
-			}
-
-			toExecute <- operation
-		}
-	}
-}
-
 func Listen(wg *sync.WaitGroup, isListening *sync.Cond, addr, port string, newConnections chan net.Conn, shutdown chan struct{}) {
 	var (
 		conn      net.Conn
@@ -127,6 +64,109 @@ func Listen(wg *sync.WaitGroup, isListening *sync.Cond, addr, port string, newCo
 		}
 
 		newConnections <- conn
+	}
+}
+
+func InitNodeConnections(wg *sync.WaitGroup, myInfos crdt.Infos, newJoinChatCommands <-chan parsestdin.Command, newConnections chan net.Conn, shutdown <-chan struct{}) {
+	defer func() {
+		wg.Done()
+	}()
+
+	for {
+		select {
+		case <-shutdown:
+			return
+		case joinChatCommand := <-newJoinChatCommands:
+			args := joinChatCommand.GetArgs()
+			var (
+				addr     = args[parsestdin.AddrArg]
+				chatRoom = args[parsestdin.ChatRoomArg]
+			)
+
+			// check if port is an int
+			pt, err := strconv.Atoi(args[parsestdin.PortArg])
+			if err != nil {
+				log.Println(err)
+			}
+
+			/* Open connection */
+			var newConn net.Conn
+			newConn, err = openConnection(addr, strconv.Itoa(pt))
+			if err != nil {
+				log.Println("[ERROR] ", err)
+				break
+			}
+
+			// init joining process
+			err = send(newConn, crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos.ToBytes()).ToBytes())
+			if err != nil {
+				log.Println("[ERROR] ", err)
+			}
+
+			newConnections <-newConn
+		}
+	}
+}
+
+func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan crdt.Operation, toExecute chan<- crdt.Operation, shutdown chan struct{}) {
+	var (
+		nodes           []node
+		connectionsDone = make(chan uint8, MaxSimultaneousConnections)
+		fromConnections = make(chan []byte)
+		err             error
+	)
+
+	defer func() {
+		for _, n := range nodes {
+			n.stop()
+		}
+		wg.Done()
+		log.Println("[INFO] HandleNodes stopped")
+	}()
+
+	for {
+		select {
+		case <-shutdown:
+			log.Println(" HandleNodes shutting down")
+			return
+
+		case newConn := <-newConnections:
+			n := newNode(newConn, uint8(len(nodes)+1))
+			n.Wg.Add(1)
+			go handleConnection(n, fromConnections, connectionsDone)
+			nodes = append(nodes, n)
+
+		case slot := <-connectionsDone:
+			log.Printf("[INFO] slot %d done\n", slot)
+			// TODO
+			/*
+				build and send operation to chat handler to remove node identified by <slot> from all chats
+			*/
+
+		case operation := <-toSend:
+			slot := operation.GetSlot()
+			_ = send(nodes[slot-1].Conn, operation.ToBytes())
+
+		case operationBytes := <-fromConnections:
+			operation := crdt.DecodeOperation(operationBytes[1:])
+			if operation.GetOperationType() == crdt.AddNode {
+				nodeInfos, _ := crdt.DecodeInfos(operation.GetOperationData())
+
+				// create and saves the new node
+				var newConn net.Conn
+				newConn, err = openConnection(nodeInfos.GetAddr(), nodeInfos.GetPort())
+				if err != nil {
+					log.Println("[ERROR] ", err)
+				}
+
+				n := newNode(newConn, uint8(len(nodes)+1))
+				nodes = append(nodes, n)
+
+				operation.SetSlot(n.slot)
+			}
+
+			toExecute <- operation
+		}
 	}
 }
 
@@ -168,7 +208,7 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- uin
 	}
 }
 
-func OpenConnection(ip string, port string) (net.Conn, error) {
+func openConnection(ip string, port string) (net.Conn, error) {
 	if ip == localhost || ip == localhostDecimalPointed {
 		ip = ""
 	}
@@ -181,7 +221,7 @@ func OpenConnection(ip string, port string) (net.Conn, error) {
 	return conn, nil
 }
 
-func NewNode(conn net.Conn, slot uint8) node {
+func newNode(conn net.Conn, slot uint8) node {
 	return node{
 		slot:     slot,
 		Conn:     conn,
@@ -190,12 +230,12 @@ func NewNode(conn net.Conn, slot uint8) node {
 	}
 }
 
-func (n *node) Stop() {
+func (n *node) stop() {
 	close(n.Shutdown)
 	n.Wg.Wait()
 }
 
-func Send(conn net.Conn, message []byte) error {
+func send(conn net.Conn, message []byte) error {
 	_, err := conn.Write(message)
 	if err != nil {
 		return err
@@ -211,43 +251,4 @@ func handleClosure(wg *sync.WaitGroup, shutdown chan struct{}, ln net.Listener) 
 	}
 
 	wg.Done()
-}
-
-func InitNodeConnections(wg *sync.WaitGroup, myInfos crdt.Infos, newJoinChatCommands <-chan parsestdin.Command, newConnections chan net.Conn, shutdown <-chan struct{}) {
-	defer func() {
-		wg.Done()
-	}()
-
-	for {
-		select {
-		case <-shutdown:
-			return
-		case joinChatCommand := <-newJoinChatCommands:
-			args := joinChatCommand.GetArgs()
-			var (
-				addr     = args[parsestdin.AddrArg]
-				chatRoom = args[parsestdin.ChatRoomArg]
-			)
-
-			// check if port is an int
-			pt, err := strconv.Atoi(args[parsestdin.PortArg])
-			if err != nil {
-				log.Println(err)
-			}
-
-			/* Open connection */
-			var newConn net.Conn
-			newConn, err = OpenConnection(addr, strconv.Itoa(pt))
-			if err != nil {
-				log.Println("[ERROR] ", err)
-				break
-			}
-
-			// init joining process
-			err = Send(newConn, crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos.ToBytes()).ToBytes())
-			if err != nil {
-				log.Println("[ERROR] ", err)
-			}
-		}
-	}
 }
