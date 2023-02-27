@@ -1,20 +1,18 @@
 package main
 
 import (
-	"github.com/google/uuid"
 	"github/timtimjnvr/chat/crdt"
-	"github/timtimjnvr/chat/linked"
 	"github/timtimjnvr/chat/parsestdin"
+	"github/timtimjnvr/chat/storage"
 	"log"
 	"sync"
 )
 
 type (
 	orchestrator struct {
-		mode             int
 		myInfos          crdt.Infos
 		currentChat      crdt.Chat
-		chats            linked.List
+		storage          *storage.Storage
 		toExecute        chan crdt.Operation
 		toSend           chan<- crdt.Operation
 		incomingCommands <-chan parsestdin.Command
@@ -25,57 +23,16 @@ func newOrchestrator(myInfos crdt.Infos, incomingCommands <-chan parsestdin.Comm
 	return &orchestrator{
 		myInfos:          myInfos,
 		currentChat:      crdt.NewChat(myInfos.GetName()),
-		chats:            linked.NewList(),
+		storage:          storage.NewStorage(),
 		toExecute:        toExecute,
 		toSend:           toSend,
 		incomingCommands: incomingCommands,
 	}
 }
 
-func (o *orchestrator) getChat(identifier string, byName bool) (crdt.Chat, error) {
-	var (
-		numberOfChats = o.chats.Len()
-		c             crdt.Chat
-		err           error
-	)
-
-	if byName {
-		for index := 0; index < numberOfChats; index++ {
-			var chatValue interface{}
-			chatValue, _ = o.chats.GetByIndex(index)
-			c = chatValue.(*crdt.ConcreteChat)
-
-			if c.GetName() == identifier {
-				return c, nil
-			}
-		}
-
-		if err != nil || c == nil {
-			return nil, linked.NotFound
-		}
-
-	}
-
-	// by uuid
-	var id uuid.UUID
-	id, err = uuid.Parse(identifier)
-	if err != nil {
-		return nil, linked.InvalidIdentifier
-	}
-
-	var chatValue interface{}
-	chatValue, err = o.chats.GetById(id)
-
-	if err != nil {
-		return nil, linked.NotFound
-	}
-
-	return chatValue.(*crdt.ConcreteChat), nil
-}
-
 func (o *orchestrator) getOperationFromCommand(cmd parsestdin.Command) <-chan crdt.Operation {
 	var (
-		op = make (chan crdt.Operation, 1)
+		op   = make(chan crdt.Operation, 1)
 		args = cmd.GetArgs()
 	)
 
@@ -90,7 +47,7 @@ func (o *orchestrator) getOperationFromCommand(cmd parsestdin.Command) <-chan cr
 			)
 
 			newChat.AddNode(o.myInfos)
-			o.chats.Add(newChat)
+			o.storage.SaveChat(newChat)
 
 		case crdt.AddMessage:
 			content := args[parsestdin.MessageArg]
@@ -98,7 +55,7 @@ func (o *orchestrator) getOperationFromCommand(cmd parsestdin.Command) <-chan cr
 			/* Add the messageBytes to discussion & sync with other nodes */
 			var messageBytes []byte
 			messageBytes = crdt.NewMessage(o.myInfos.GetName(), content).ToBytes()
-			op <-crdt.NewOperation(crdt.AddMessage, o.currentChat.GetId(), messageBytes)
+			op <- crdt.NewOperation(crdt.AddMessage, o.currentChat.GetId(), messageBytes)
 
 		case crdt.LeaveChat:
 			op <- crdt.NewOperation(crdt.LeaveChat, o.currentChat.GetId(), o.myInfos.ToBytes())
@@ -124,9 +81,9 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, shutdown <-chan struct{})
 			return
 
 		case cmd := <-o.incomingCommands:
-			op, ok := <- o.getOperationFromCommand(cmd)
+			op, ok := <-o.getOperationFromCommand(cmd)
 			if ok {
-				o.toExecute <-op
+				o.toExecute <- op
 			}
 
 		case op := <-o.toExecute:
@@ -140,13 +97,13 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, shutdown <-chan struct{})
 			switch op.GetOperationType() {
 			// by name
 			case crdt.JoinChatByName:
-				c, err = o.getChat(op.GetTargetedChat(), true)
+				c, err = o.storage.GetChat(op.GetTargetedChat(), true)
 				log.Println("[ERROR]", err)
 				continue
 
 			// by id
 			default:
-				c, err = o.getChat(op.GetTargetedChat(), false)
+				c, err = o.storage.GetChat(op.GetTargetedChat(), false)
 				if err != nil {
 					log.Println("[ERROR]", err)
 					continue
@@ -168,6 +125,7 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, shutdown <-chan struct{})
 
 				newNodeInfos.SetSlot(slot)
 				c.AddNode(newNodeInfos)
+				o.storage.SaveChat(c)
 
 				var chatInfos []byte
 				chatInfos, err = c.ToBytes()
@@ -205,6 +163,7 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, shutdown <-chan struct{})
 
 				newNodeInfos.SetSlot(slot)
 				c.AddNode(newNodeInfos)
+				o.storage.SaveChat(c)
 
 			case crdt.AddMessage:
 				var newMessage crdt.Message
@@ -213,7 +172,9 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, shutdown <-chan struct{})
 					log.Println("[ERROR]", err)
 					break
 				}
+
 				c.AddMessage(newMessage)
+				o.storage.SaveChat(c)
 
 				slots := c.GetSlots()
 				for _, s := range slots {
