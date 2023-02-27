@@ -18,13 +18,15 @@ type (
 		GetId() uuid.UUID
 		GetSender() string
 		GetContent() string
-		GetDate() string
+		GetTime() time.Time
 		ToBytes() []byte
 	}
 )
 
 func NewMessage(sender, content string) Message {
+	id, _ := uuid.NewUUID()
 	return &message{
+		Id:      id,
 		Sender:  sender,
 		Content: content,
 		Date:    time.Now().UTC(),
@@ -43,8 +45,8 @@ func (m message) GetContent() string {
 	return m.Content
 }
 
-func (m message) GetDate() string {
-	return m.Date.Format(time.RFC3339)
+func (m message) GetTime() time.Time {
+	return m.Date
 }
 
 func (m message) ToBytes() []byte {

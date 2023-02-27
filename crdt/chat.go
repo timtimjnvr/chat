@@ -54,9 +54,21 @@ func (c *ConcreteChat) AddNode(i Infos) {
 }
 
 func (c *ConcreteChat) AddMessage(message Message) {
-	if !c.containsMessage(message) {
-		// TODO : insert message in array by comparing dates
+	if len(c.messages) == 0 {
 		c.messages = append(c.messages, message)
+		return
+	}
+
+	if !c.containsMessage(message) {
+		var i int
+		for message.GetTime().Before(c.messages[i].GetTime()) {
+			i++
+		}
+
+		beginning := c.messages[:i-1]
+		end := c.messages[i:]
+		c.messages = append(beginning, message)
+		c.messages = append(c.messages, end...)
 	}
 }
 
@@ -69,15 +81,6 @@ func (c *ConcreteChat) containsMessage(message Message) bool {
 	return false
 }
 
-func (c *ConcreteChat) ToBytes() ([]byte, error) {
-	bytesChat, err := json.Marshal(c)
-	if err != nil {
-		return nil, err
-	}
-
-	return bytesChat, nil
-}
-
 func (c *ConcreteChat) GetSlots() []uint8 {
 	slots := make([]uint8, 0, len(c.nodes))
 	for _, i := range c.nodes {
@@ -87,4 +90,13 @@ func (c *ConcreteChat) GetSlots() []uint8 {
 	}
 
 	return slots
+}
+
+func (c *ConcreteChat) ToBytes() ([]byte, error) {
+	bytesChat, err := json.Marshal(c)
+	if err != nil {
+		return nil, err
+	}
+
+	return bytesChat, nil
 }
