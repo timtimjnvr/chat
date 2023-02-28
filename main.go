@@ -81,8 +81,8 @@ func main() {
 
 	// execute and propagates commands & operations to maintain chat data consistency between nodes
 	wgHandleChats.Add(1)
-	var orch = newOrchestrator(myInfos, outGoingCommands, toExecute, toSend)
-	go orch.handleChats(&wgHandleChats, shutdown)
+	var orch = newOrchestrator(myInfos)
+	go orch.handleChats(&wgHandleChats, outGoingCommands, toExecute, toSend, shutdown)
 
 	for {
 		select {

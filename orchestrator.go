@@ -10,23 +10,17 @@ import (
 
 type (
 	orchestrator struct {
-		myInfos          crdt.Infos
-		currentChat      crdt.Chat
-		storage          *storage.Storage
-		toExecute        chan crdt.Operation
-		toSend           chan<- crdt.Operation
-		incomingCommands <-chan parsestdin.Command
+		myInfos     crdt.Infos
+		currentChat crdt.Chat
+		storage     *storage.Storage
 	}
 )
 
-func newOrchestrator(myInfos crdt.Infos, incomingCommands <-chan parsestdin.Command, toExecute chan crdt.Operation, toSend chan<- crdt.Operation) *orchestrator {
+func newOrchestrator(myInfos crdt.Infos) *orchestrator {
 	return &orchestrator{
-		myInfos:          myInfos,
-		currentChat:      crdt.NewChat(myInfos.GetName()),
-		storage:          storage.NewStorage(),
-		toExecute:        toExecute,
-		toSend:           toSend,
-		incomingCommands: incomingCommands,
+		myInfos:     myInfos,
+		currentChat: crdt.NewChat(myInfos.GetName()),
+		storage:     storage.NewStorage(),
 	}
 }
 
@@ -69,8 +63,91 @@ func (o *orchestrator) getOperationFromCommand(cmd parsestdin.Command) <-chan cr
 	return op
 }
 
+func (o *orchestrator) getPropagationOperations(op crdt.Operation, chat crdt.Chat) <-chan crdt.Operation {
+	var (
+		syncOps = make(chan crdt.Operation, 1)
+		err     error
+	)
+
+	go func(syncOps chan crdt.Operation) {
+		defer close(syncOps)
+
+		switch op.GetOperationType() {
+		case crdt.JoinChatByName:
+			var chatInfos []byte
+			chatInfos, err = chat.ToBytes()
+			if err != nil {
+				log.Println("[ERROR]", err)
+				break
+			}
+
+			var myInfosByte []byte
+			myInfosByte = o.myInfos.ToBytes()
+			if err != nil {
+				log.Println("[ERROR]", err)
+				break
+			}
+
+			slot := op.GetSlot()
+			createChatOperation := crdt.NewOperation(crdt.CreateChat, chat.GetId(), chatInfos)
+			createChatOperation.SetSlot(slot)
+			syncOps <- createChatOperation
+
+			addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.GetId(), myInfosByte)
+			createChatOperation.SetSlot(slot)
+			syncOps <- addNodeOperation
+
+			// propagates new node to other chats
+			slots := chat.GetSlots()
+			for _, s := range slots {
+				addNodeOperation.SetSlot(s)
+				syncOps <- addNodeOperation
+			}
+
+		case crdt.AddMessage:
+			slots := chat.GetSlots()
+			for _, s := range slots {
+				op.SetSlot(s)
+				syncOps <- op
+			}
+		}
+
+	}(syncOps)
+
+	return syncOps
+}
+
+func (o *orchestrator) getChatFromStorage(op crdt.Operation) (crdt.Chat, error) {
+	var (
+		c   crdt.Chat
+		err error
+	)
+
+	// get targeted chat
+	switch op.GetOperationType() {
+	// by name
+	case crdt.JoinChatByName:
+		c, err = o.storage.GetChat(op.GetTargetedChat(), true)
+		log.Println("[ERROR]", err)
+		return c, nil
+
+	// by id
+	default:
+		c, err = o.storage.GetChat(op.GetTargetedChat(), false)
+		if err != nil {
+			log.Println("[ERROR]", err)
+			return nil, err
+		}
+		return c, nil
+
+	// no targeted chat needed
+	case crdt.Quit:
+		return nil, nil
+	}
+}
+
 // HandleChats maintains chat infos consistency by executing operation and building operations to send to other nodes if needed
-func (o *orchestrator) handleChats(wg *sync.WaitGroup, shutdown <-chan struct{}) {
+func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan parsestdin.Command, toExecute chan crdt.Operation, toSend chan<- crdt.Operation, shutdown <-chan struct{}) {
 	defer func() {
 		wg.Done()
 	}()
@@ -80,37 +157,18 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, shutdown <-chan struct{})
 		case <-shutdown:
 			return
 
-		case cmd := <-o.incomingCommands:
+		case cmd := <-incomingCommands:
 			op, ok := <-o.getOperationFromCommand(cmd)
 			if ok {
-				o.toExecute <- op
+				toExecute <- op
 			}
 
-		case op := <-o.toExecute:
-			var (
-				slot = op.GetSlot()
-				c    crdt.Chat
-				err  error
-			)
-
-			// get targeted chat
-			switch op.GetOperationType() {
-			// by name
-			case crdt.JoinChatByName:
-				c, err = o.storage.GetChat(op.GetTargetedChat(), true)
+		case op := <-toExecute:
+			var slot = op.GetSlot()
+			c, err := o.getChatFromStorage(op)
+			if err != nil {
 				log.Println("[ERROR]", err)
 				continue
-
-			// by id
-			default:
-				c, err = o.storage.GetChat(op.GetTargetedChat(), false)
-				if err != nil {
-					log.Println("[ERROR]", err)
-					continue
-				}
-
-			// no targeted chat needed
-			case crdt.Quit:
 			}
 
 			// execute op
@@ -127,31 +185,8 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, shutdown <-chan struct{})
 				c.AddNode(newNodeInfos)
 				o.storage.SaveChat(c)
 
-				var chatInfos []byte
-				chatInfos, err = c.ToBytes()
-				if err != nil {
-					log.Println("[ERROR]", err)
-					break
-				}
-
-				var myInfosByte []byte
-				myInfosByte = o.myInfos.ToBytes()
-				if err != nil {
-					log.Println("[ERROR]", err)
-					break
-				}
-
-				createChatOperation := crdt.NewOperation(crdt.CreateChat, c.GetId(), chatInfos)
-				createChatOperation.SetSlot(slot)
-				o.toSend <- createChatOperation
-
-				addNodeOperation := crdt.NewOperation(crdt.AddNode, c.GetId(), myInfosByte)
-
-				// propagates new node to other chats
-				slots := c.GetSlots()
-				for _, s := range slots {
-					addNodeOperation.SetSlot(s)
-					o.toSend <- addNodeOperation
+				for syncOp := range o.getPropagationOperations(op, c) {
+					toSend <- syncOp
 				}
 
 			case crdt.AddNode:
@@ -176,10 +211,8 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, shutdown <-chan struct{})
 				c.AddMessage(newMessage)
 				o.storage.SaveChat(c)
 
-				slots := c.GetSlots()
-				for _, s := range slots {
-					op.SetSlot(s)
-					o.toSend <- op
+				for syncOp := range o.getPropagationOperations(op, c) {
+					toSend <- syncOp
 				}
 			}
 		}
