@@ -45,23 +45,21 @@ func Listen(wg *sync.WaitGroup, isReady *sync.Cond, addr, port string, newConnec
 
 	ln, err := net.Listen(transportProtocol, fmt.Sprintf("%s:%s", addr, port))
 	if err != nil {
-		log.Println("[ERROR]", err)
-		return
+		log.Fatal("[ERROR]", err)
 	}
 
 	wgClosure.Add(1)
 	go handleClosure(&wgClosure, shutdown, ln)
-
 	isReady.Signal()
 
 	for {
 		conn, err = ln.Accept()
-		if err != nil && errors.Is(err, net.ErrClosed) {
+		if errors.Is(err, net.ErrClosed) {
 			return
 		}
 
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("[ERROR]", err)
 		}
 
 		newConnections <- conn
