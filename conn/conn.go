@@ -103,7 +103,7 @@ func InitNodeConnections(wg *sync.WaitGroup, myInfos crdt.Infos, newJoinChatComm
 				log.Println("[ERROR] ", err)
 			}
 
-			newConnections <-newConn
+			newConnections <- newConn
 		}
 	}
 }
@@ -138,10 +138,7 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan
 
 		case slot := <-connectionsDone:
 			log.Printf("[INFO] slot %d done\n", slot)
-			// TODO
-			/*
-				build and send operation to chat handler to remove node identified by <slot> from all chats
-			*/
+			// TODO build and send operation to chat handler to remove node identified by <slot> from all chats
 
 		case operation := <-toSend:
 			slot := operation.GetSlot()

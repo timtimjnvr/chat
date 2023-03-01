@@ -3,6 +3,8 @@ package conn
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github/timtimjnvr/chat/crdt"
+	"github/timtimjnvr/chat/parsestdin"
 	"github/timtimjnvr/chat/reader"
 	"net"
 	"strings"
@@ -120,6 +122,67 @@ func TestReadConn(t *testing.T) {
 			if index == len(testData) {
 				return
 			}
+		}
+	}
+}
+
+func TestInitNodeConnections(t *testing.T) {
+	var (
+		listenerInfos = crdt.NewNodeInfos("127.0.0.1", "12348", "Listener")
+		joinerInfos   = crdt.NewNodeInfos("127.0.0.1", "12349", "Joiner")
+
+		joinChatCommands  = make(chan parsestdin.Command, 1)
+		wgListen          = sync.WaitGroup{}
+		wgInitConnections = sync.WaitGroup{}
+		shutdown          = make(chan struct{}, 0)
+		lock              = sync.Mutex{}
+		isListening       = sync.NewCond(&lock)
+		newConnections    = make(chan net.Conn, MaxSimultaneousConnections)
+
+		maxTestDuration = 3 * time.Second
+	)
+
+	defer func() {
+		close(shutdown)
+		wgInitConnections.Wait()
+		wgListen.Wait()
+	}()
+
+	// sender
+	wgListen.Add(1)
+	isListening.L.Lock()
+	go Listen(&wgListen, isListening, "", "12348", newConnections, shutdown)
+	isListening.Wait()
+
+	wgInitConnections.Add(1)
+	go InitNodeConnections(&wgInitConnections, joinerInfos, joinChatCommands, newConnections, shutdown)
+
+	joinChatCommand, err := parsestdin.NewCommand(fmt.Sprintf("%s %s %s %s", "/join", listenerInfos.GetAddr(), listenerInfos.GetPort(), listenerInfos.GetName()))
+	if err != nil {
+		assert.Fail(t, "Failed to parse command")
+	}
+
+	joinChatCommands <- joinChatCommand
+	timeout := time.Tick(maxTestDuration)
+
+	for {
+		select {
+		case <-timeout:
+			assert.Fail(t, "test timeout")
+			return
+
+		case newConn := <-newConnections:
+			message := make([]byte, reader.MaxMessageSize)
+			expectedMessage := crdt.NewOperation(crdt.JoinChatByName, "Listener", joinerInfos.ToBytes()).ToBytes()
+
+			var n int
+			n, err = newConn.Read(message)
+			if err != nil {
+				assert.Fail(t, "Failed to read the connection")
+			}
+
+			assert.Equal(t, expectedMessage, message[:n])
+			return
 		}
 	}
 }
