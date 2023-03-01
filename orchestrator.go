@@ -128,16 +128,19 @@ func (o *orchestrator) getChatFromStorage(op crdt.Operation) (crdt.Chat, error) 
 	// by name
 	case crdt.JoinChatByName:
 		c, err = o.storage.GetChat(op.GetTargetedChat(), true)
-		log.Println("[ERROR]", err)
+		if err != nil {
+			return nil, err
+		}
+
 		return c, nil
 
 	// by id
 	default:
 		c, err = o.storage.GetChat(op.GetTargetedChat(), false)
 		if err != nil {
-			log.Println("[ERROR]", err)
 			return nil, err
 		}
+
 		return c, nil
 
 	// no targeted chat needed
@@ -164,7 +167,6 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 			}
 
 		case op := <-toExecute:
-			var slot = op.GetSlot()
 			c, err := o.getChatFromStorage(op)
 			if err != nil {
 				log.Println("[ERROR]", err)
@@ -181,7 +183,7 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 					break
 				}
 
-				newNodeInfos.SetSlot(slot)
+				newNodeInfos.SetSlot(op.GetSlot())
 				c.AddNode(newNodeInfos)
 				o.storage.SaveChat(c)
 
@@ -196,7 +198,7 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 					log.Println("[ERROR]", err)
 				}
 
-				newNodeInfos.SetSlot(slot)
+				newNodeInfos.SetSlot(op.GetSlot())
 				c.AddNode(newNodeInfos)
 				o.storage.SaveChat(c)
 
