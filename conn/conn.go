@@ -30,7 +30,7 @@ const (
 	MaxSimultaneousMessages    = 100
 )
 
-func Listen(wg *sync.WaitGroup, isListening *sync.Cond, addr, port string, newConnections chan net.Conn, shutdown chan struct{}) {
+func Listen(wg *sync.WaitGroup, isReady *sync.Cond, addr, port string, newConnections chan net.Conn, shutdown chan struct{}) {
 	var (
 		conn      net.Conn
 		wgClosure = sync.WaitGroup{}
@@ -38,6 +38,7 @@ func Listen(wg *sync.WaitGroup, isListening *sync.Cond, addr, port string, newCo
 	)
 
 	defer func() {
+		isReady.Signal()
 		wgClosure.Wait()
 		wg.Done()
 	}()
@@ -51,7 +52,7 @@ func Listen(wg *sync.WaitGroup, isListening *sync.Cond, addr, port string, newCo
 	wgClosure.Add(1)
 	go handleClosure(&wgClosure, shutdown, ln)
 
-	isListening.Signal()
+	isReady.Signal()
 
 	for {
 		conn, err = ln.Accept()

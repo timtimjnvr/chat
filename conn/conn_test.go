@@ -160,6 +160,7 @@ func TestInitNodeConnections(t *testing.T) {
 	joinChatCommand, err := parsestdin.NewCommand(fmt.Sprintf("%s %s %s %s", "/join", listenerInfos.GetAddr(), listenerInfos.GetPort(), listenerInfos.GetName()))
 	if err != nil {
 		assert.Fail(t, "Failed to parse command")
+		return
 	}
 
 	joinChatCommands <- joinChatCommand
