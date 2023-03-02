@@ -182,6 +182,7 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- uin
 		done <- node.slot
 		log.Println("[INFO] conn lost for ", node.Conn.LocalAddr())
 	}()
+
 	file, _ := node.Conn.(*net.TCPConn).File()
 	wgReadConn.Add(1)
 	go reader.ReadFile(&wgReadConn, file, messageReceived, shutdown)
@@ -193,13 +194,12 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- uin
 
 		case message, ok := <-messageReceived:
 			if !ok {
-				log.Println("not ok")
-				// conn closed on the other side
+				// conn closed by the remote client
 				return
 			}
 
-			// add slot to message
-			outGoingMessages <- append([]byte{uint8(node.slot)}, message...)
+			// set node slot for message
+			outGoingMessages <- append([]byte{node.slot}, message[1: ]...)
 		}
 	}
 }

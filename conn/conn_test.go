@@ -200,6 +200,12 @@ func TestInitNodeConnections(t *testing.T) {
 	}
 }
 
+func TestHandleConnection(t *testing.T) {
+	// TODO : test message sending (received by receiver)
+	// TODO : test message receiving (content + slot defined)
+	// TODO : test closure (on both side sender & receiver) -> reception of done message
+}
+
 func connect(wg *sync.WaitGroup, t *testing.T, ip, port string) {
 	defer wg.Done()
 	_, err := net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
