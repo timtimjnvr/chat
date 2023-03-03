@@ -17,7 +17,7 @@ func TestListenAndServe(t *testing.T) {
 	var (
 		ip              = ""
 		port            = "8091"
-	 	wgTests = sync.WaitGroup{}
+		wgTests         = sync.WaitGroup{}
 		wg              = sync.WaitGroup{}
 		shutdown        = make(chan struct{}, 0)
 		lock            = sync.Mutex{}
@@ -59,6 +59,74 @@ func TestListenAndServe(t *testing.T) {
 				assert.True(t, connectionsReceived == MaxSimultaneousConnections, "failed to create all connections")
 				return
 			}
+		}
+	}
+}
+
+func TestInitNodeConnections(t *testing.T) {
+	var (
+		listenerInfos = crdt.NewNodeInfos("127.0.0.1", "12348", "Listener")
+		joinerInfos   = crdt.NewNodeInfos("127.0.0.1", "12349", "Joiner")
+
+		wgListen          = sync.WaitGroup{}
+		wgInitConnections = sync.WaitGroup{}
+		shutdown          = make(chan struct{}, 0)
+		lock              = sync.Mutex{}
+		isListening       = sync.NewCond(&lock)
+
+		joinChatCommands = make(chan parsestdin.Command, 1)
+		newConnections   = make(chan net.Conn, 1)
+
+		maxTestDuration = 3 * time.Second
+	)
+
+	defer func() {
+		close(shutdown)
+		wgInitConnections.Wait()
+		wgListen.Wait()
+	}()
+
+	// sender
+	wgListen.Add(1)
+	isListening.L.Lock()
+	go Listen(&wgListen, isListening, "", "12348", newConnections, shutdown)
+	isListening.Wait()
+
+	wgInitConnections.Add(1)
+	go InitNodeConnections(&wgInitConnections, joinerInfos, joinChatCommands, newConnections, shutdown)
+
+	joinChatCommand, err := parsestdin.NewCommand(fmt.Sprintf("%s %s %s %s", "/join", listenerInfos.GetAddr(), listenerInfos.GetPort(), listenerInfos.GetName()))
+	if err != nil {
+		assert.Fail(t, "Failed to parse command")
+		return
+	}
+
+	joinChatCommands <- joinChatCommand
+	timeout := time.Tick(maxTestDuration)
+
+	for {
+		select {
+		case <-timeout:
+			assert.Fail(t, "test timeout")
+			return
+
+		case newConn := <-newConnections:
+			message := make([]byte, reader.MaxMessageSize)
+			expectedMessage := crdt.NewOperation(crdt.JoinChatByName, "Listener", joinerInfos.ToBytes()).ToBytes()
+
+			err = newConn.SetDeadline(time.Now().Add(maxTestDuration))
+			if err != nil {
+				assert.Fail(t, "Failed to set deadline on connection")
+			}
+
+			var n int
+			n, err = newConn.Read(message)
+			if err != nil {
+				assert.Fail(t, "Failed to read the connection")
+			}
+
+			assert.Equal(t, expectedMessage, message[:n])
+			return
 		}
 	}
 }
@@ -132,76 +200,60 @@ func TestReadConn(t *testing.T) {
 	}
 }
 
-func TestInitNodeConnections(t *testing.T) {
-	var (
-		listenerInfos = crdt.NewNodeInfos("127.0.0.1", "12348", "Listener")
-		joinerInfos   = crdt.NewNodeInfos("127.0.0.1", "12349", "Joiner")
-
-		wgListen          = sync.WaitGroup{}
-		wgInitConnections = sync.WaitGroup{}
-		shutdown          = make(chan struct{}, 0)
-		lock              = sync.Mutex{}
-		isListening       = sync.NewCond(&lock)
-
-		joinChatCommands  = make(chan parsestdin.Command, 1)
-		newConnections    = make(chan net.Conn, 1)
-
-		maxTestDuration = 3 * time.Second
-	)
-
-	defer func() {
-		close(shutdown)
-		wgInitConnections.Wait()
-		wgListen.Wait()
-	}()
-
-	// sender
-	wgListen.Add(1)
-	isListening.L.Lock()
-	go Listen(&wgListen, isListening, "", "12348", newConnections, shutdown)
-	isListening.Wait()
-
-	wgInitConnections.Add(1)
-	go InitNodeConnections(&wgInitConnections, joinerInfos, joinChatCommands, newConnections, shutdown)
-
-	joinChatCommand, err := parsestdin.NewCommand(fmt.Sprintf("%s %s %s %s", "/join", listenerInfos.GetAddr(), listenerInfos.GetPort(), listenerInfos.GetName()))
-	if err != nil {
-		assert.Fail(t, "Failed to parse command")
-    	return
-	}
-
-	joinChatCommands <- joinChatCommand
-	timeout := time.Tick(maxTestDuration)
-
-	for {
-		select {
-		case <-timeout:
-			assert.Fail(t, "test timeout")
-			return
-
-		case newConn := <-newConnections:
-			message := make([]byte, reader.MaxMessageSize)
-			expectedMessage := crdt.NewOperation(crdt.JoinChatByName, "Listener", joinerInfos.ToBytes()).ToBytes()
-
-			err = newConn.SetDeadline(time.Now().Add(maxTestDuration))
-			if err != nil {
-				assert.Fail(t, "Failed to set deadline on connection")
-			}
-
-			var n int
-			n, err = newConn.Read(message)
-			if err != nil {
-				assert.Fail(t, "Failed to read the connection")
-			}
-
-			assert.Equal(t, expectedMessage, message[:n])
-			return
-		}
-	}
-}
-
 func TestHandleConnection(t *testing.T) {
 	// TODO : test message sending (received by receiver)
+	var (
+		wgReader       = sync.WaitGroup{}
+		wgSender       = sync.WaitGroup{}
+		wgListen       = sync.WaitGroup{}
+		shutdown       = make(chan struct{}, 0)
+		lock           = sync.Mutex{}
+		isListening    = sync.NewCond(&lock)
+		newConnections = make(chan net.Conn, MaxSimultaneousConnections)
+		output         = make(chan []byte, MaxMessageSize)
+		done           = make(chan uint8, 2)
+	)
+
+	// listener
+	wgListen.Add(1)
+	isListening.L.Lock()
+	go Listen(&wgListen, isListening, "", "12349", newConnections, shutdown)
+	isListening.Wait()
+
+	connReader, err := net.Dial(transportProtocol, ":12349")
+	if err != nil {
+		assert.Fail(t, "failed to start test receiver (Dial) ", err.Error())
+		return
+	}
+
+	connSender := <-newConnections
+
+	close(shutdown)
+	wgListen.Wait()
+
+	wgReader.Add(1)
+	reader := newNode(connReader, 1, output)
+	go handleConnection(reader, done)
+
+	wgSender.Add(1)
+	sender := newNode(connSender, 1, output)
+	go handleConnection(sender, done)
+
+	var (
+		message         = []byte{2, 1, 2, 3, 4, 5} // slot set to node slot sender
+		expectedMessage = []byte{1, 1, 2, 3, 4, 5} // slot set to node slot receiver
+	)
+
+	sender.Input <- message
+
+	timeout := time.Tick(3 * time.Second)
+	select {
+	case <-timeout:
+		assert.Fail(t, "test timeout")
+	case received := <-output:
+		assert.Equal(t, expectedMessage, received, "messages sent and received are not equal")
+	}
+
 	// TODO : test message receiving (content + slot defined)
 	// TODO : test closure (on both side sender & receiver) -> reception of done message
 }

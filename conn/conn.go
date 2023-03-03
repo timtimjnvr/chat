@@ -15,7 +15,9 @@ import (
 type (
 	node struct {
 		slot     uint8
-		Conn     net.Conn
+		conn     net.Conn
+		Input    chan []byte
+		Output   chan []byte
 		Wg       *sync.WaitGroup
 		Shutdown chan struct{}
 	}
@@ -28,7 +30,19 @@ const (
 
 	MaxSimultaneousConnections = 100
 	MaxSimultaneousMessages    = 100
+	MaxMessageSize             = 1000
 )
+
+func newNode(conn net.Conn, slot uint8, output chan []byte) node {
+	return node{
+		slot:     slot,
+		conn:     conn,
+		Input:    make(chan []byte, MaxSimultaneousMessages),
+		Output:   output,
+		Wg:       &sync.WaitGroup{},
+		Shutdown: make(chan struct{}, 0),
+	}
+}
 
 func Listen(wg *sync.WaitGroup, isReady *sync.Cond, addr, port string, newConnections chan net.Conn, shutdown chan struct{}) {
 	var (
@@ -97,7 +111,7 @@ func InitNodeConnections(wg *sync.WaitGroup, myInfos crdt.Infos, newJoinChatComm
 			}
 
 			// init joining process
-			err = send(newConn, crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos.ToBytes()).ToBytes())
+			_, err = newConn.Write(crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos.ToBytes()).ToBytes())
 			if err != nil {
 				log.Println("[ERROR] ", err)
 			}
@@ -109,10 +123,10 @@ func InitNodeConnections(wg *sync.WaitGroup, myInfos crdt.Infos, newJoinChatComm
 
 func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan crdt.Operation, toExecute chan<- crdt.Operation, shutdown chan struct{}) {
 	var (
-		nodes           []node
-		connectionsDone = make(chan uint8, MaxSimultaneousConnections)
-		fromConnections = make(chan []byte)
-		err             error
+		nodes             []node
+		connectionsDone   = make(chan uint8, MaxSimultaneousConnections)
+		outputConnections = make(chan []byte, MaxMessageSize)
+		err               error
 	)
 
 	defer func() {
@@ -130,9 +144,9 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan
 			return
 
 		case newConn := <-newConnections:
-			n := newNode(newConn, uint8(len(nodes)+1))
+			n := newNode(newConn, uint8(len(nodes)+1), outputConnections)
 			n.Wg.Add(1)
-			go handleConnection(n, fromConnections, connectionsDone)
+			go handleConnection(n, connectionsDone)
 			nodes = append(nodes, n)
 
 		case slot := <-connectionsDone:
@@ -141,9 +155,9 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan
 
 		case operation := <-toSend:
 			slot := operation.GetSlot()
-			_ = send(nodes[slot-1].Conn, operation.ToBytes())
+			nodes[slot-1].Input <- operation.ToBytes()
 
-		case operationBytes := <-fromConnections:
+		case operationBytes := <-outputConnections:
 			operation := crdt.DecodeOperation(operationBytes[1:])
 			if operation.GetOperationType() == crdt.AddNode {
 				nodeInfos, _ := crdt.DecodeInfos(operation.GetOperationData())
@@ -155,7 +169,7 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan
 					log.Println("[ERROR] ", err)
 				}
 
-				n := newNode(newConn, uint8(len(nodes)+1))
+				n := newNode(newConn, uint8(len(nodes)+1), outputConnections)
 				nodes = append(nodes, n)
 
 				operation.SetSlot(n.slot)
@@ -166,9 +180,7 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan
 	}
 }
 
-func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- uint8) {
-	log.Println("[INFO] new conn")
-
+func handleConnection(node node, done chan<- uint8) {
 	var (
 		wgReadConn      = sync.WaitGroup{}
 		shutdown        = make(chan struct{}, 0)
@@ -176,14 +188,13 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- uin
 	)
 
 	defer func() {
-		node.Conn.Close()
+		node.conn.Close()
 		wgReadConn.Wait()
 		node.Wg.Done()
 		done <- node.slot
-		log.Println("[INFO] conn lost for ", node.Conn.LocalAddr())
 	}()
 
-	file, _ := node.Conn.(*net.TCPConn).File()
+	file, _ := node.conn.(*net.TCPConn).File()
 	wgReadConn.Add(1)
 	go reader.ReadFile(&wgReadConn, file, messageReceived, shutdown)
 
@@ -192,14 +203,20 @@ func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- uin
 		case <-node.Shutdown:
 			return
 
+		case message := <-node.Input:
+			// hide slot to receiver
+			message[0] = 0
+			node.send(message)
+
 		case message, ok := <-messageReceived:
 			if !ok {
 				// conn closed by the remote client
 				return
 			}
 
-			// set node slot for message
-			outGoingMessages <- append([]byte{node.slot}, message[1: ]...)
+			// set node slot for chat handler
+			message[0] = node.slot
+			node.Output <- message
 		}
 	}
 }
@@ -217,22 +234,13 @@ func openConnection(ip string, port string) (net.Conn, error) {
 	return conn, nil
 }
 
-func newNode(conn net.Conn, slot uint8) node {
-	return node{
-		slot:     slot,
-		Conn:     conn,
-		Wg:       &sync.WaitGroup{},
-		Shutdown: make(chan struct{}, 0),
-	}
-}
-
 func (n *node) stop() {
 	close(n.Shutdown)
 	n.Wg.Wait()
 }
 
-func send(conn net.Conn, message []byte) error {
-	_, err := conn.Write(message)
+func (n *node) send(message []byte) error {
+	_, err := n.conn.Write(message)
 	if err != nil {
 		return err
 	}
