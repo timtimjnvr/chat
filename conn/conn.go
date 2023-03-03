@@ -5,43 +5,53 @@ import (
 	"github.com/pkg/errors"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/parsestdin"
-	"github/timtimjnvr/chat/reader"
 	"log"
 	"net"
+	"os"
 	"strconv"
 	"sync"
-)
-
-type (
-	node struct {
-		slot     uint8
-		conn     net.Conn
-		Input    chan []byte
-		Output   chan []byte
-		Wg       *sync.WaitGroup
-		Shutdown chan struct{}
-	}
 )
 
 const (
 	localhost               = "localhost"
 	localhostDecimalPointed = "127.0.0.1"
-	transportProtocol       = "tcp"
+	TransportProtocol       = "tcp"
 
 	MaxSimultaneousConnections = 100
 	MaxSimultaneousMessages    = 100
 	MaxMessageSize             = 1000
 )
 
-func newNode(conn net.Conn, slot uint8, output chan []byte) node {
-	return node{
-		slot:     slot,
-		conn:     conn,
-		Input:    make(chan []byte, MaxSimultaneousMessages),
-		Output:   output,
-		Wg:       &sync.WaitGroup{},
-		Shutdown: make(chan struct{}, 0),
+type connection struct {
+	file *os.File // needed by reader package to get a file descriptor of the socket
+	conn net.Conn // used to read, write bytes on the socket
+}
+
+func newConnection(conn net.Conn) *connection {
+	file, _ := conn.(*net.TCPConn).File()
+	return &connection{
+		conn: conn,
+		file: file,
 	}
+}
+
+func (c *connection) Fd() uintptr {
+	return c.file.Fd()
+}
+
+func (c *connection) Read(b []byte) (int, error) {
+	return c.conn.Read(b)
+}
+
+func (c *connection) Write(b []byte) (int, error) {
+	return c.conn.Write(b)
+}
+
+func (c *connection) Close() error {
+	// close the connection
+	c.conn.Close()
+	// close the duplicated file
+	return c.file.Close()
 }
 
 func Listen(wg *sync.WaitGroup, isReady *sync.Cond, addr, port string, newConnections chan net.Conn, shutdown chan struct{}) {
@@ -57,7 +67,7 @@ func Listen(wg *sync.WaitGroup, isReady *sync.Cond, addr, port string, newConnec
 		wg.Done()
 	}()
 
-	ln, err := net.Listen(transportProtocol, fmt.Sprintf("%s:%s", addr, port))
+	ln, err := net.Listen(TransportProtocol, fmt.Sprintf("%s:%s", addr, port))
 	if err != nil {
 		log.Fatal("[ERROR]", err)
 	}
@@ -146,7 +156,7 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan
 		case newConn := <-newConnections:
 			n := newNode(newConn, uint8(len(nodes)+1), outputConnections)
 			n.Wg.Add(1)
-			go handleConnection(n, connectionsDone)
+			go n.handleNode(connectionsDone)
 			nodes = append(nodes, n)
 
 		case slot := <-connectionsDone:
@@ -180,71 +190,17 @@ func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan
 	}
 }
 
-func handleConnection(node node, done chan<- uint8) {
-	var (
-		wgReadConn      = sync.WaitGroup{}
-		shutdown        = make(chan struct{}, 0)
-		messageReceived = make(chan []byte, MaxSimultaneousMessages)
-	)
-
-	defer func() {
-		node.conn.Close()
-		wgReadConn.Wait()
-		node.Wg.Done()
-		done <- node.slot
-	}()
-
-	file, _ := node.conn.(*net.TCPConn).File()
-	wgReadConn.Add(1)
-	go reader.ReadFile(&wgReadConn, file, messageReceived, shutdown)
-
-	for {
-		select {
-		case <-node.Shutdown:
-			return
-
-		case message := <-node.Input:
-			// hide slot to receiver
-			message[0] = 0
-			node.send(message)
-
-		case message, ok := <-messageReceived:
-			if !ok {
-				// conn closed by the remote client
-				return
-			}
-
-			// set node slot for chat handler
-			message[0] = node.slot
-			node.Output <- message
-		}
-	}
-}
-
 func openConnection(ip string, port string) (net.Conn, error) {
 	if ip == localhost || ip == localhostDecimalPointed {
 		ip = ""
 	}
 
-	conn, err := net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
+	conn, err := net.Dial(TransportProtocol, fmt.Sprintf("%s:%s", ip, port))
 	if err != nil {
 		return nil, err
 	}
 
 	return conn, nil
-}
-
-func (n *node) stop() {
-	close(n.Shutdown)
-	n.Wg.Wait()
-}
-
-func (n *node) send(message []byte) error {
-	_, err := n.conn.Write(message)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func handleClosure(wg *sync.WaitGroup, shutdown chan struct{}, ln net.Listener) {

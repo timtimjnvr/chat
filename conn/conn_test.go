@@ -16,7 +16,7 @@ import (
 func TestListenAndServe(t *testing.T) {
 	var (
 		ip              = ""
-		port            = "8091"
+		port            = "12340"
 		wgTests         = sync.WaitGroup{}
 		wg              = sync.WaitGroup{}
 		shutdown        = make(chan struct{}, 0)
@@ -65,8 +65,8 @@ func TestListenAndServe(t *testing.T) {
 
 func TestInitNodeConnections(t *testing.T) {
 	var (
-		listenerInfos = crdt.NewNodeInfos("127.0.0.1", "12348", "Listener")
-		joinerInfos   = crdt.NewNodeInfos("127.0.0.1", "12349", "Joiner")
+		listenerInfos = crdt.NewNodeInfos("127.0.0.1", "12343", "Listener")
+		joinerInfos   = crdt.NewNodeInfos("127.0.0.1", "12342", "Joiner")
 
 		wgListen          = sync.WaitGroup{}
 		wgInitConnections = sync.WaitGroup{}
@@ -89,7 +89,7 @@ func TestInitNodeConnections(t *testing.T) {
 	// sender
 	wgListen.Add(1)
 	isListening.L.Lock()
-	go Listen(&wgListen, isListening, "", "12348", newConnections, shutdown)
+	go Listen(&wgListen, isListening, "", "12343", newConnections, shutdown)
 	isListening.Wait()
 
 	wgInitConnections.Add(1)
@@ -152,10 +152,10 @@ func TestReadConn(t *testing.T) {
 	// sender
 	wgListen.Add(1)
 	isListening.L.Lock()
-	go Listen(&wgListen, isListening, "", "12348", newConnections, shutdown)
+	go Listen(&wgListen, isListening, "", "12345", newConnections, shutdown)
 	isListening.Wait()
 
-	connReader, err := net.Dial(transportProtocol, ":12348")
+	connReader, err := net.Dial(TransportProtocol, ":12345")
 	if err != nil {
 		assert.Fail(t, "failed to start test receiver (Dial) ", err.Error())
 		return
@@ -169,10 +169,9 @@ func TestReadConn(t *testing.T) {
 			return
 		}
 	}
-
 	var file, _ = connReader.(*net.TCPConn).File()
 	wgReader.Add(1)
-	go reader.ReadFile(&wgReader, file, messages, shutdown)
+	go reader.Read(&wgReader, file, messages, shutdown)
 
 	defer func() {
 		close(shutdown)
@@ -200,67 +199,9 @@ func TestReadConn(t *testing.T) {
 	}
 }
 
-func TestHandleConnection(t *testing.T) {
-	// TODO : test message sending (received by receiver)
-	var (
-		wgReader       = sync.WaitGroup{}
-		wgSender       = sync.WaitGroup{}
-		wgListen       = sync.WaitGroup{}
-		shutdown       = make(chan struct{}, 0)
-		lock           = sync.Mutex{}
-		isListening    = sync.NewCond(&lock)
-		newConnections = make(chan net.Conn, MaxSimultaneousConnections)
-		output         = make(chan []byte, MaxMessageSize)
-		done           = make(chan uint8, 2)
-	)
-
-	// listener
-	wgListen.Add(1)
-	isListening.L.Lock()
-	go Listen(&wgListen, isListening, "", "12349", newConnections, shutdown)
-	isListening.Wait()
-
-	connReader, err := net.Dial(transportProtocol, ":12349")
-	if err != nil {
-		assert.Fail(t, "failed to start test receiver (Dial) ", err.Error())
-		return
-	}
-
-	connSender := <-newConnections
-
-	close(shutdown)
-	wgListen.Wait()
-
-	wgReader.Add(1)
-	reader := newNode(connReader, 1, output)
-	go handleConnection(reader, done)
-
-	wgSender.Add(1)
-	sender := newNode(connSender, 1, output)
-	go handleConnection(sender, done)
-
-	var (
-		message         = []byte{2, 1, 2, 3, 4, 5} // slot set to node slot sender
-		expectedMessage = []byte{1, 1, 2, 3, 4, 5} // slot set to node slot receiver
-	)
-
-	sender.Input <- message
-
-	timeout := time.Tick(3 * time.Second)
-	select {
-	case <-timeout:
-		assert.Fail(t, "test timeout")
-	case received := <-output:
-		assert.Equal(t, expectedMessage, received, "messages sent and received are not equal")
-	}
-
-	// TODO : test message receiving (content + slot defined)
-	// TODO : test closure (on both side sender & receiver) -> reception of done message
-}
-
 func connect(wg *sync.WaitGroup, t *testing.T, ip, port string) {
 	defer wg.Done()
-	_, err := net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
+	_, err := net.Dial(TransportProtocol, fmt.Sprintf("%s:%s", ip, port))
 	if err != nil {
 		assert.Fail(t, "failed to connect to listener")
 		return
