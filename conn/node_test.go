@@ -39,11 +39,11 @@ func TestHandleConnection(t *testing.T) {
 
 	reader := newNode(connReader, 1, output)
 	reader.Wg.Add(1)
-	go reader.handleNode(done)
+	go reader.start(done)
 
 	sender := newNode(connSender, 1, output)
 	sender.Wg.Add(1)
-	go sender.handleNode(done)
+	go sender.start(done)
 
 	var (
 		message         = []byte{2, 1, 2, 3, 4, 5} // slot set to node slot sender

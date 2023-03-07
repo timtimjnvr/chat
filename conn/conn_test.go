@@ -63,7 +63,7 @@ func TestListenAndServe(t *testing.T) {
 	}
 }
 
-func TestInitNodeConnections(t *testing.T) {
+func TestInitConnections(t *testing.T) {
 	var (
 		listenerInfos = crdt.NewNodeInfos("127.0.0.1", "12343", "Listener")
 		joinerInfos   = crdt.NewNodeInfos("127.0.0.1", "12342", "Joiner")
@@ -74,8 +74,9 @@ func TestInitNodeConnections(t *testing.T) {
 		lock              = sync.Mutex{}
 		isListening       = sync.NewCond(&lock)
 
-		joinChatCommands = make(chan parsestdin.Command, 1)
-		newConnections   = make(chan net.Conn, 1)
+		joinChatCommands       = make(chan parsestdin.Command, 1)
+		newConnectionsListen   = make(chan net.Conn, 1)
+		newConnectionsInitConn = make(chan net.Conn, 1)
 
 		maxTestDuration = 3 * time.Second
 	)
@@ -89,15 +90,15 @@ func TestInitNodeConnections(t *testing.T) {
 	// sender
 	wgListen.Add(1)
 	isListening.L.Lock()
-	go Listen(&wgListen, isListening, "", "12343", newConnections, shutdown)
+	go Listen(&wgListen, isListening, "", listenerInfos.GetPort(), newConnectionsListen, shutdown)
 	isListening.Wait()
 
 	wgInitConnections.Add(1)
-	go InitNodeConnections(&wgInitConnections, joinerInfos, joinChatCommands, newConnections, shutdown)
+	go InitConnections(&wgInitConnections, joinerInfos, joinChatCommands, newConnectionsInitConn, shutdown)
 
 	joinChatCommand, err := parsestdin.NewCommand(fmt.Sprintf("%s %s %s %s", "/join", listenerInfos.GetAddr(), listenerInfos.GetPort(), listenerInfos.GetName()))
 	if err != nil {
-		assert.Fail(t, "Failed to parse command")
+		assert.Fail(t, "Failed to parse command :", err.Error())
 		return
 	}
 
@@ -110,19 +111,19 @@ func TestInitNodeConnections(t *testing.T) {
 			assert.Fail(t, "test timeout")
 			return
 
-		case newConn := <-newConnections:
+		case newConn := <-newConnectionsListen:
 			message := make([]byte, reader.MaxMessageSize)
 			expectedMessage := crdt.NewOperation(crdt.JoinChatByName, "Listener", joinerInfos.ToBytes()).ToBytes()
 
 			err = newConn.SetDeadline(time.Now().Add(maxTestDuration))
 			if err != nil {
-				assert.Fail(t, "Failed to set deadline on connection")
+				assert.Fail(t, "Failed to set deadline on connection : ", err.Error())
 			}
 
 			var n int
 			n, err = newConn.Read(message)
 			if err != nil {
-				assert.Fail(t, "Failed to read the connection")
+				assert.Fail(t, "Failed to read the connection : ", err.Error())
 			}
 
 			assert.Equal(t, expectedMessage, message[:n])
@@ -157,7 +158,7 @@ func TestReadConn(t *testing.T) {
 
 	connReader, err := net.Dial(TransportProtocol, ":12345")
 	if err != nil {
-		assert.Fail(t, "failed to start test receiver (Dial) ", err.Error())
+		assert.Fail(t, "failed to start test receiver (Dial) : ", err.Error())
 		return
 	}
 
@@ -165,7 +166,7 @@ func TestReadConn(t *testing.T) {
 	for _, d := range testData {
 		_, err = connSender.Write([]byte(d))
 		if err != nil {
-			assert.Fail(t, "failed to send bytes sender (Write) ", err.Error())
+			assert.Fail(t, "failed to send bytes sender (Write) : ", err.Error())
 			return
 		}
 	}
@@ -203,7 +204,7 @@ func connect(wg *sync.WaitGroup, t *testing.T, ip, port string) {
 	defer wg.Done()
 	_, err := net.Dial(TransportProtocol, fmt.Sprintf("%s:%s", ip, port))
 	if err != nil {
-		assert.Fail(t, "failed to connect to listener")
+		assert.Fail(t, "failed to connect to listener : ", err.Error())
 		return
 	}
 }
