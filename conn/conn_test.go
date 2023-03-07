@@ -39,7 +39,7 @@ func TestListenAndServe(t *testing.T) {
 
 	for i := 0; i < MaxSimultaneousConnections; i++ {
 		wgTests.Add(1)
-		go connect(&wgTests, t, ip, port)
+		go connectHelper(&wgTests, t, ip, port)
 	}
 
 	var (
@@ -200,11 +200,11 @@ func TestReadConn(t *testing.T) {
 	}
 }
 
-func connect(wg *sync.WaitGroup, t *testing.T, ip, port string) {
+func connectHelper(wg *sync.WaitGroup, t *testing.T, ip, port string) {
 	defer wg.Done()
 	_, err := net.Dial(TransportProtocol, fmt.Sprintf("%s:%s", ip, port))
 	if err != nil {
-		assert.Fail(t, "failed to connect to listener : ", err.Error())
+		assert.Fail(t, "failed to connectHelper to listener : ", err.Error())
 		return
 	}
 }

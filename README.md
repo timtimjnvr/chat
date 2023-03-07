@@ -35,3 +35,8 @@ Default port_number : 8080
 - Node managment : [CRDTs choices](doc/crdt.md)
 - Architecture
 ![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/architecture.png?raw=true)
+
+## Development
+
+- run tests : `go test ./... -race -timeout 30s -coverprofile cover.out`
+- check coverage in browser: `go tool cover -html=cover.out`

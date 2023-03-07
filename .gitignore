@@ -1,2 +1,8 @@
+# IDE
 .idea/
+
+# MacOSX
 .DS_Store
+
+# test coverage
+cover.out
