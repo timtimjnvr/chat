@@ -8,10 +8,17 @@ import (
 	"sync"
 )
 
+type Reader interface {
+	Fd() uintptr
+	Read(b []byte) (n int, err error)
+	Close() error
+}
+
 const MaxMessageSize = 1000
 
-func ReadFile(wg *sync.WaitGroup, file *os.File, output chan<- []byte, shutdown chan struct{}) {
+func Read(wg *sync.WaitGroup, reader Reader, output chan<- []byte, shutdown chan struct{}) {
 	defer func() {
+		reader.Close()
 		close(output)
 		wg.Done()
 	}()
@@ -33,14 +40,14 @@ func ReadFile(wg *sync.WaitGroup, file *os.File, output chan<- []byte, shutdown 
 			err    error
 		)
 
-		fdSet.Clear(int(file.Fd()))
+		fdSet.Clear(int(reader.Fd()))
 		fdSet.Clear(int(readClose.Fd()))
 
-		fdSet.Set(int(file.Fd()))
+		fdSet.Set(int(reader.Fd()))
 		fdSet.Set(int(readClose.Fd()))
 
-		// wait and modifies file descriptors in fdSet with first ready to use file descriptors (ie for us output or readClose)
-		_, err = unix.Select(int(readClose.Fd()+1), &fdSet, nil, nil, &unix.Timeval{Sec: 60, Usec: 0})
+		// wait and modifies reader descriptors in fdSet with first ready to use reader descriptors (ie for us reader or readClose)
+		_, err = unix.Select(int(readClose.Fd()+1), &fdSet, nil, nil, &unix.Timeval{Sec: 3600, Usec: 0})
 		if err != nil {
 			log.Fatal("[ERROR] ", err)
 			return
@@ -50,18 +57,15 @@ func ReadFile(wg *sync.WaitGroup, file *os.File, output chan<- []byte, shutdown 
 		if fdSet.IsSet(int(readClose.Fd())) {
 			return
 		}
-
-		// default : read output
+		// default use reader
 		var n int
-		n, err = file.Read(buffer)
+		n, err = reader.Read(buffer)
 		if err != nil {
 			return
 		}
 
 		if n > 0 {
-			if n > 0 {
-				splitAndInsertMessages(buffer[:n], output)
-			}
+			splitAndInsertMessages(buffer[:n], output)
 		}
 	}
 }

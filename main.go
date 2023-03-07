@@ -69,7 +69,7 @@ func main() {
 
 	// create connections with new nodes
 	wgInitNodeConnections.Add(1)
-	go conn.InitNodeConnections(&wgInitNodeConnections, myInfos, joinChatCommands, newConnections, shutdown)
+	go conn.InitConnections(&wgInitNodeConnections, myInfos, joinChatCommands, newConnections, shutdown)
 
 	// handle new connections until closure
 	wgHandleNodes.Add(1)

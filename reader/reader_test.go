@@ -57,7 +57,7 @@ func TestReadFile(t *testing.T) {
 	}
 
 	wgReader.Add(1)
-	go ReadFile(&wgReader, reader, messages, shutdown)
+	go Read(&wgReader, reader, messages, shutdown)
 
 	var (
 		timeout = time.Tick(maxTestDuration)

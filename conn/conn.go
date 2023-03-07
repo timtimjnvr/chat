@@ -5,30 +5,54 @@ import (
 	"github.com/pkg/errors"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/parsestdin"
-	"github/timtimjnvr/chat/reader"
 	"log"
 	"net"
+	"os"
 	"strconv"
 	"sync"
-)
-
-type (
-	node struct {
-		slot     uint8
-		Conn     net.Conn
-		Wg       *sync.WaitGroup
-		Shutdown chan struct{}
-	}
 )
 
 const (
 	localhost               = "localhost"
 	localhostDecimalPointed = "127.0.0.1"
-	transportProtocol       = "tcp"
+	TransportProtocol       = "tcp"
 
 	MaxSimultaneousConnections = 100
 	MaxSimultaneousMessages    = 100
+	MaxMessageSize             = 1000
 )
+
+type connection struct {
+	file *os.File // needed by reader package to get a file descriptor of the socket
+	conn net.Conn // used to read, write bytes on the socket
+}
+
+func newConnection(conn net.Conn) *connection {
+	file, _ := conn.(*net.TCPConn).File()
+	return &connection{
+		conn: conn,
+		file: file,
+	}
+}
+
+func (c *connection) Fd() uintptr {
+	return c.file.Fd()
+}
+
+func (c *connection) Read(b []byte) (int, error) {
+	return c.conn.Read(b)
+}
+
+func (c *connection) Write(b []byte) (int, error) {
+	return c.conn.Write(b)
+}
+
+func (c *connection) Close() error {
+	// close the connection
+	c.conn.Close()
+	// close the duplicated file
+	return c.file.Close()
+}
 
 func Listen(wg *sync.WaitGroup, isReady *sync.Cond, addr, port string, newConnections chan net.Conn, shutdown chan struct{}) {
 	var (
@@ -43,7 +67,7 @@ func Listen(wg *sync.WaitGroup, isReady *sync.Cond, addr, port string, newConnec
 		wg.Done()
 	}()
 
-	ln, err := net.Listen(transportProtocol, fmt.Sprintf("%s:%s", addr, port))
+	ln, err := net.Listen(TransportProtocol, fmt.Sprintf("%s:%s", addr, port))
 	if err != nil {
 		log.Fatal("[ERROR]", err)
 	}
@@ -66,7 +90,7 @@ func Listen(wg *sync.WaitGroup, isReady *sync.Cond, addr, port string, newConnec
 	}
 }
 
-func InitNodeConnections(wg *sync.WaitGroup, myInfos crdt.Infos, newJoinChatCommands <-chan parsestdin.Command, newConnections chan net.Conn, shutdown <-chan struct{}) {
+func InitConnections(wg *sync.WaitGroup, myInfos crdt.Infos, newJoinChatCommands <-chan parsestdin.Command, newConnections chan net.Conn, shutdown <-chan struct{}) {
 	defer func() {
 		wg.Done()
 	}()
@@ -97,7 +121,7 @@ func InitNodeConnections(wg *sync.WaitGroup, myInfos crdt.Infos, newJoinChatComm
 			}
 
 			// init joining process
-			err = send(newConn, crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos.ToBytes()).ToBytes())
+			_, err = newConn.Write(crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos.ToBytes()).ToBytes())
 			if err != nil {
 				log.Println("[ERROR] ", err)
 			}
@@ -107,136 +131,17 @@ func InitNodeConnections(wg *sync.WaitGroup, myInfos crdt.Infos, newJoinChatComm
 	}
 }
 
-func HandleNodes(wg *sync.WaitGroup, newConnections chan net.Conn, toSend <-chan crdt.Operation, toExecute chan<- crdt.Operation, shutdown chan struct{}) {
-	var (
-		nodes           []node
-		connectionsDone = make(chan uint8, MaxSimultaneousConnections)
-		fromConnections = make(chan []byte)
-		err             error
-	)
-
-	defer func() {
-		for _, n := range nodes {
-			n.stop()
-		}
-		wg.Done()
-		log.Println("[INFO] HandleNodes stopped")
-	}()
-
-	for {
-		select {
-		case <-shutdown:
-			log.Println(" HandleNodes shutting down")
-			return
-
-		case newConn := <-newConnections:
-			n := newNode(newConn, uint8(len(nodes)+1))
-			n.Wg.Add(1)
-			go handleConnection(n, fromConnections, connectionsDone)
-			nodes = append(nodes, n)
-
-		case slot := <-connectionsDone:
-			log.Printf("[INFO] slot %d done\n", slot)
-			// TODO build and send operation to chat handler to remove node identified by <slot> from all chats
-
-		case operation := <-toSend:
-			slot := operation.GetSlot()
-			_ = send(nodes[slot-1].Conn, operation.ToBytes())
-
-		case operationBytes := <-fromConnections:
-			operation := crdt.DecodeOperation(operationBytes[1:])
-			if operation.GetOperationType() == crdt.AddNode {
-				nodeInfos, _ := crdt.DecodeInfos(operation.GetOperationData())
-
-				// create and saves the new node
-				var newConn net.Conn
-				newConn, err = openConnection(nodeInfos.GetAddr(), nodeInfos.GetPort())
-				if err != nil {
-					log.Println("[ERROR] ", err)
-				}
-
-				n := newNode(newConn, uint8(len(nodes)+1))
-				nodes = append(nodes, n)
-
-				operation.SetSlot(n.slot)
-			}
-
-			toExecute <- operation
-		}
-	}
-}
-
-func handleConnection(node node, outGoingMessages chan<- []byte, done chan<- uint8) {
-	log.Println("[INFO] new conn")
-
-	var (
-		wgReadConn      = sync.WaitGroup{}
-		shutdown        = make(chan struct{}, 0)
-		messageReceived = make(chan []byte, MaxSimultaneousMessages)
-	)
-
-	defer func() {
-		node.Conn.Close()
-		wgReadConn.Wait()
-		node.Wg.Done()
-		done <- node.slot
-		log.Println("[INFO] conn lost for ", node.Conn.LocalAddr())
-	}()
-	file, _ := node.Conn.(*net.TCPConn).File()
-	wgReadConn.Add(1)
-	go reader.ReadFile(&wgReadConn, file, messageReceived, shutdown)
-
-	for {
-		select {
-		case <-node.Shutdown:
-			return
-
-		case message, ok := <-messageReceived:
-			if !ok {
-				log.Println("not ok")
-				// conn closed on the other side
-				return
-			}
-
-			// add slot to message
-			outGoingMessages <- append([]byte{uint8(node.slot)}, message...)
-		}
-	}
-}
-
 func openConnection(ip string, port string) (net.Conn, error) {
 	if ip == localhost || ip == localhostDecimalPointed {
 		ip = ""
 	}
 
-	conn, err := net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
+	conn, err := net.Dial(TransportProtocol, fmt.Sprintf("%s:%s", ip, port))
 	if err != nil {
 		return nil, err
 	}
 
 	return conn, nil
-}
-
-func newNode(conn net.Conn, slot uint8) node {
-	return node{
-		slot:     slot,
-		Conn:     conn,
-		Wg:       &sync.WaitGroup{},
-		Shutdown: make(chan struct{}, 0),
-	}
-}
-
-func (n *node) stop() {
-	close(n.Shutdown)
-	n.Wg.Wait()
-}
-
-func send(conn net.Conn, message []byte) error {
-	_, err := conn.Write(message)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func handleClosure(wg *sync.WaitGroup, shutdown chan struct{}, ln net.Listener) {

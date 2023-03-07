@@ -149,7 +149,7 @@ func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.Infos, outGoing
 
 	wgReadStdin.Add(1)
 	var stdin = make(chan []byte, MaxMessagesStdin)
-	go reader.ReadFile(&wgReadStdin, file, stdin, shutdown)
+	go reader.Read(&wgReadStdin, file, stdin, shutdown)
 
 	fmt.Printf(logFrmt, typeCommand)
 
