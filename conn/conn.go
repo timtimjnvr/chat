@@ -27,12 +27,15 @@ type connection struct {
 	conn net.Conn // used to read, write bytes on the socket
 }
 
-func newConnection(conn net.Conn) *connection {
-	file, _ := conn.(*net.TCPConn).File()
+func newConnection(conn net.Conn) (*connection, error) {
+	file, err := conn.(*net.TCPConn).File()
+	if err != nil {
+		return nil, err
+	}
 	return &connection{
 		conn: conn,
 		file: file,
-	}
+	}, nil
 }
 
 func (c *connection) Fd() uintptr {

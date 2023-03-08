@@ -13,17 +13,31 @@ import (
 	"time"
 )
 
+func TestNewConnection(t *testing.T) {
+	conn, _, err := helperGetConnections("12340")
+	if err != nil {
+		assert.Fail(t, "failed to create a connection")
+	}
+
+	_, err = newConnection(conn)
+	assert.NoError(t, err, "newConnection return an unexpected error")
+
+	conn.Close()
+	_, err = newConnection(conn)
+	assert.Error(t, err, "newConnection on closed connection did not return an error")
+}
+
 func TestListenAndServe(t *testing.T) {
 	var (
 		ip              = ""
-		port            = "12340"
+		port            = "12341"
 		wgTests         = sync.WaitGroup{}
 		wg              = sync.WaitGroup{}
 		shutdown        = make(chan struct{}, 0)
 		lock            = sync.Mutex{}
 		isListening     = sync.NewCond(&lock)
 		newConnections  = make(chan net.Conn, MaxSimultaneousConnections)
-		maxTestDuration = 3 * time.Second
+		maxTestDuration = 1 * time.Second
 	)
 
 	defer func() {
@@ -39,7 +53,7 @@ func TestListenAndServe(t *testing.T) {
 
 	for i := 0; i < MaxSimultaneousConnections; i++ {
 		wgTests.Add(1)
-		go connectHelper(&wgTests, t, ip, port)
+		go helperConnect(&wgTests, t, ip, port)
 	}
 
 	var (
@@ -56,7 +70,6 @@ func TestListenAndServe(t *testing.T) {
 		case <-newConnections:
 			connectionsReceived++
 			if connectionsReceived == MaxSimultaneousConnections {
-				assert.True(t, connectionsReceived == MaxSimultaneousConnections, "failed to create all connections")
 				return
 			}
 		}
@@ -74,11 +87,10 @@ func TestInitConnections(t *testing.T) {
 		lock              = sync.Mutex{}
 		isListening       = sync.NewCond(&lock)
 
-		joinChatCommands       = make(chan parsestdin.Command, 1)
-		newConnectionsListen   = make(chan net.Conn, 1)
-		newConnectionsInitConn = make(chan net.Conn, 1)
-
-		maxTestDuration = 3 * time.Second
+		joinChatCommands       = make(chan parsestdin.Command, MaxSimultaneousConnections)
+		newConnectionsListen   = make(chan net.Conn, MaxSimultaneousConnections)
+		newConnectionsInitConn = make(chan net.Conn, MaxSimultaneousConnections)
+		maxTestDuration        = 1 * time.Second
 	)
 
 	defer func() {
@@ -101,9 +113,14 @@ func TestInitConnections(t *testing.T) {
 		assert.Fail(t, "Failed to parse command :", err.Error())
 		return
 	}
+	for i := 0; i < MaxSimultaneousConnections; i++ {
+		joinChatCommands <- joinChatCommand
+	}
 
-	joinChatCommands <- joinChatCommand
-	timeout := time.Tick(maxTestDuration)
+	var (
+		timeout             = time.Tick(maxTestDuration)
+		connectionsReceived int
+	)
 
 	for {
 		select {
@@ -127,42 +144,29 @@ func TestInitConnections(t *testing.T) {
 			}
 
 			assert.Equal(t, expectedMessage, message[:n])
-			return
+			connectionsReceived++
+			if connectionsReceived == MaxSimultaneousConnections {
+				return
+			}
 		}
 	}
 }
 
 func TestReadConn(t *testing.T) {
 	var (
-		maxTestDuration = 3 * time.Second
+		maxTestDuration = 1 * time.Second
 		wgReader        = sync.WaitGroup{}
 		messages        = make(chan []byte, reader.MaxMessageSize)
-		wgListen        = sync.WaitGroup{}
 		shutdown        = make(chan struct{}, 0)
-		lock            = sync.Mutex{}
-		isListening     = sync.NewCond(&lock)
-		newConnections  = make(chan net.Conn, MaxSimultaneousConnections)
+		testData        = []string{
+			"first message\n",
+			"second message\n",
+			"third message\n",
+		}
 	)
 
-	var testData = []string{
-		"first message\n",
-		"second message\n",
-		"third message\n",
-	}
+	connReader, connSender, err := helperGetConnections("12345")
 
-	// sender
-	wgListen.Add(1)
-	isListening.L.Lock()
-	go Listen(&wgListen, isListening, "", "12345", newConnections, shutdown)
-	isListening.Wait()
-
-	connReader, err := net.Dial(TransportProtocol, ":12345")
-	if err != nil {
-		assert.Fail(t, "failed to start test receiver (Dial) : ", err.Error())
-		return
-	}
-
-	connSender := <-newConnections
 	for _, d := range testData {
 		_, err = connSender.Write([]byte(d))
 		if err != nil {
@@ -170,9 +174,10 @@ func TestReadConn(t *testing.T) {
 			return
 		}
 	}
+
 	var file, _ = connReader.(*net.TCPConn).File()
 	wgReader.Add(1)
-	go reader.Read(&wgReader, file, messages, shutdown)
+	go reader.Read(&wgReader, file, messages, reader.Separator, shutdown)
 
 	defer func() {
 		close(shutdown)
@@ -200,11 +205,36 @@ func TestReadConn(t *testing.T) {
 	}
 }
 
-func connectHelper(wg *sync.WaitGroup, t *testing.T, ip, port string) {
+// test helper used to retrieve two linked TCP net.Conn
+func helperGetConnections(port string) (net.Conn, net.Conn, error) {
+	var (
+		wgListen       = sync.WaitGroup{}
+		shutdown       = make(chan struct{}, 0)
+		lock           = sync.Mutex{}
+		isListening    = sync.NewCond(&lock)
+		newConnections = make(chan net.Conn, MaxSimultaneousConnections)
+	)
+
+	wgListen.Add(1)
+	isListening.L.Lock()
+	go Listen(&wgListen, isListening, "", port, newConnections, shutdown)
+	isListening.Wait()
+
+	conn1, err := net.Dial(TransportProtocol, fmt.Sprintf(":%s", port))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	conn2 := <-newConnections
+
+	return conn1, conn2, nil
+}
+
+func helperConnect(wg *sync.WaitGroup, t *testing.T, ip, port string) {
 	defer wg.Done()
 	_, err := net.Dial(TransportProtocol, fmt.Sprintf("%s:%s", ip, port))
 	if err != nil {
-		assert.Fail(t, "failed to connectHelper to listener : ", err.Error())
+		assert.Fail(t, "failed to connect to listener : ", err.Error())
 		return
 	}
 }

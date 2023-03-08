@@ -20,9 +20,10 @@ type (
 )
 
 func newNode(conn net.Conn, slot uint8, output chan []byte) node {
+	c, _ := newConnection(conn)
 	return node{
 		slot:       slot,
-		connection: newConnection(conn),
+		connection: c,
 		Input:      make(chan []byte, MaxSimultaneousMessages),
 		Output:     output,
 		Wg:         &sync.WaitGroup{},
@@ -43,7 +44,7 @@ func (n *node) start(done chan<- uint8) {
 	}()
 
 	wgReadConn.Add(1)
-	go reader.Read(&wgReadConn, n.connection, messageReceived, n.Shutdown)
+	go reader.Read(&wgReadConn, n.connection, messageReceived, reader.Separator, n.Shutdown)
 
 	for {
 		select {

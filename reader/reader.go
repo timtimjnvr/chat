@@ -1,10 +1,10 @@
 package reader
 
 import (
+	"bytes"
 	"golang.org/x/sys/unix"
 	"log"
 	"os"
-	"strings"
 	"sync"
 )
 
@@ -14,9 +14,11 @@ type Reader interface {
 	Close() error
 }
 
+var Separator = []byte("\n")
+
 const MaxMessageSize = 1000
 
-func Read(wg *sync.WaitGroup, reader Reader, output chan<- []byte, shutdown chan struct{}) {
+func Read(wg *sync.WaitGroup, reader Reader, output chan<- []byte, separator []byte, shutdown chan struct{}) {
 	defer func() {
 		reader.Close()
 		close(output)
@@ -63,18 +65,18 @@ func Read(wg *sync.WaitGroup, reader Reader, output chan<- []byte, shutdown chan
 		if err != nil {
 			return
 		}
-
-		if n > 0 {
-			splitAndInsertMessages(buffer[:n], output)
+		if n == 0 {
+			continue
 		}
-	}
-}
 
-func splitAndInsertMessages(buffer []byte, messages chan<- []byte) {
-	splitMessages := strings.Split(string(buffer), "\n")
-	for _, m := range splitMessages {
-		if m != "" {
-			messages <- []byte(m)
+		// split content into elements and output them
+		elements := bytes.Split(buffer[:n], separator)
+		for _, element := range elements {
+			if len(element) == 0 {
+				continue
+			}
+
+			output <- element
 		}
 	}
 }

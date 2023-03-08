@@ -9,7 +9,9 @@ import (
 	"time"
 )
 
-func TestReadFile(t *testing.T) {
+var separator = []byte("\n")
+
+func TestRead(t *testing.T) {
 	var (
 		maxTestDuration = 3 * time.Second
 		testData        = []string{
@@ -17,47 +19,47 @@ func TestReadFile(t *testing.T) {
 			"second message\n",
 			"third message\n",
 		}
-		n              int
-		err            error
-		writer, reader *os.File
-		wgReader       = sync.WaitGroup{}
-		messages       = make(chan []byte, MaxMessageSize)
-		shutdown       = make(chan struct{}, 0)
+		n        int
+		err      error
+		w, r     *os.File
+		wgReader = sync.WaitGroup{}
+		messages = make(chan []byte, MaxMessageSize)
+		shutdown = make(chan struct{}, 0)
 	)
 
-	writer, err = os.OpenFile("test.txt", os.O_CREATE|os.O_WRONLY, os.ModePerm)
+	w, err = os.OpenFile("test.txt", os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		assert.Fail(t, "failed to create writer (OpenFile) ", err.Error())
 		return
 	}
 
 	for _, m := range testData {
-		n, err = writer.Write([]byte(m))
+		n, err = w.Write([]byte(m))
 		if err != nil {
-			assert.Fail(t, "failed to start test writer (Write) ", err.Error())
+			assert.Fail(t, "failed to write ", err.Error())
 			return
 		}
 
 		if n != len(m) {
-			assert.Fail(t, "failed to write all the message (Write) ", err.Error())
+			assert.Fail(t, "failed to write all the messages (Write) ", err.Error())
 			return
 		}
 	}
 
-	err = writer.Sync()
+	err = w.Sync()
 	if err != nil {
 		assert.Fail(t, "failed to sync writer (Sync) ", err.Error())
 		return
 	}
 
-	reader, err = os.OpenFile("test.txt", os.O_RDONLY, os.ModePerm)
+	r, err = os.OpenFile("test.txt", os.O_RDONLY, os.ModePerm)
 	if err != nil {
 		assert.Fail(t, "failed to create reader (OpenFile) ", err.Error())
 		return
 	}
 
 	wgReader.Add(1)
-	go Read(&wgReader, reader, messages, shutdown)
+	go Read(&wgReader, r, messages, Separator, shutdown)
 
 	var (
 		timeout = time.Tick(maxTestDuration)
