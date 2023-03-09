@@ -16,7 +16,7 @@ import (
 func TestNewConnection(t *testing.T) {
 	conn, _, err := helperGetConnections("12340")
 	if err != nil {
-		assert.Fail(t, "failed to create a connection")
+		assert.Fail(t, "failed to create a connections")
 	}
 
 	_, err = newConnection(conn)
@@ -226,6 +226,9 @@ func helperGetConnections(port string) (net.Conn, net.Conn, error) {
 	}
 
 	conn2 := <-newConnections
+
+	close(shutdown)
+	wgListen.Wait()
 
 	return conn1, conn2, nil
 }
