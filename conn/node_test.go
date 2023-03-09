@@ -2,47 +2,34 @@ package conn
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github/timtimjnvr/chat/crdt"
 	"net"
-	"sync"
 	"testing"
 	"time"
 )
 
-func TestHandleConnection(t *testing.T) {
-	// TODO : test message sending (received by receiver)
+func TestNode_StartAndStop(t *testing.T) {
 	var (
-		wgListen       = sync.WaitGroup{}
-		shutdown       = make(chan struct{}, 0)
-		lock           = sync.Mutex{}
-		isListening    = sync.NewCond(&lock)
-		newConnections = make(chan net.Conn, MaxSimultaneousConnections)
-		output         = make(chan []byte, MaxMessageSize)
-		done           = make(chan uint8, 2)
+		output          = make(chan []byte, MaxMessageSize)
+		done            = make(chan slot, 2)
+		maxTestDuration = 1 * time.Second
 	)
 
-	// listener
-	wgListen.Add(1)
-	isListening.L.Lock()
-	go Listen(&wgListen, isListening, "", "12349", newConnections, shutdown)
-	isListening.Wait()
-
-	connReader, err := net.Dial(TransportProtocol, ":12349")
+	connReader, connSender, err := helperGetConnections("12349")
 	if err != nil {
-		assert.Fail(t, "failed to start test receiver (Dial) ", err.Error())
-		return
+		assert.Fail(t, "failed to create a connection")
 	}
 
-	connSender := <-newConnections
-
-	close(shutdown)
-	wgListen.Wait()
-
-	reader := newNode(connReader, 1, output)
-	reader.Wg.Add(1)
+	reader, err := newNode(connReader, 1, output)
+	if err != nil {
+		assert.Fail(t, "failed to create node")
+	}
 	go reader.start(done)
 
-	sender := newNode(connSender, 1, output)
-	sender.Wg.Add(1)
+	sender, err := newNode(connSender, 1, output)
+	if err != nil {
+		assert.Fail(t, "failed to create node")
+	}
 	go sender.start(done)
 
 	var (
@@ -52,7 +39,7 @@ func TestHandleConnection(t *testing.T) {
 
 	sender.Input <- message
 
-	timeout := time.Tick(5 * time.Second)
+	timeout := time.Tick(maxTestDuration)
 	select {
 	case <-timeout:
 		assert.Fail(t, "test timeout")
@@ -60,14 +47,14 @@ func TestHandleConnection(t *testing.T) {
 		assert.Equal(t, expectedMessage, received, "messages sent and received are not equal")
 	}
 
-	// TODO : test closure (on both side sender & receiver) -> reception of done message
+	// test closure (on both side sender & receiver) -> reception of done message
 	sender.stop()
 	defer func() {
 		sender.Wg.Wait()
 		reader.Wg.Wait()
 	}()
 
-	timeout = time.Tick(3 * time.Second)
+	timeout = time.Tick(maxTestDuration)
 	numberOfDone := 0
 
 	for {
@@ -81,5 +68,49 @@ func TestHandleConnection(t *testing.T) {
 				return
 			}
 		}
+	}
+}
+
+func TestNodeHandler_StartStopNodeAndSendQuit(t *testing.T) {
+	var (
+		maxTestDuration = 2 * time.Second
+		shutdown        = make(chan struct{}, 0)
+		nh              = NewNodeHandler(shutdown)
+		newConnections  = make(chan net.Conn, MaxSimultaneousConnections)
+		toSend          = make(chan crdt.Operation, MaxSimultaneousMessages)
+		toExecute       = make(chan crdt.Operation, MaxSimultaneousMessages)
+	)
+
+	defer func() {
+		close(shutdown)
+		nh.Wg.Wait()
+	}()
+
+	go nh.Start(newConnections, toSend, toExecute)
+
+	conn1, conn2, err := helperGetConnections("12346")
+	if err != nil {
+		assert.Fail(t, "failed to create a connection")
+	}
+
+	newConnections <- conn1
+
+	// wait for conn1 to be handled and saved
+	<-time.Tick(10 * time.Millisecond)
+
+	// killing conn1 by closing conn2
+	conn2.Close()
+
+	timeout := time.Tick(maxTestDuration)
+	quitOperation := crdt.NewOperation(crdt.Quit, "", []byte{})
+	quitOperation.SetSlot(1)
+	expectedMessage := quitOperation.ToBytes()
+
+	select {
+	case <-timeout:
+		assert.Fail(t, "test timeout")
+		return
+	case op := <-toExecute:
+		assert.Equal(t, op.ToBytes(), expectedMessage, "did not received expected quit operation")
 	}
 }

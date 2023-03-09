@@ -29,7 +29,9 @@ func main() {
 		sigc     = make(chan os.Signal, 1)
 		shutdown = make(chan struct{})
 
-		wgHandleNodes         = sync.WaitGroup{}
+		orch        = newOrchestrator(myInfos)
+		nodeHandler = conn.NewNodeHandler(shutdown)
+
 		wgListen              = sync.WaitGroup{}
 		wgHandleChats         = sync.WaitGroup{}
 		wgHandleStdin         = sync.WaitGroup{}
@@ -42,7 +44,7 @@ func main() {
 		wgHandleStdin.Wait()
 		wgHandleChats.Wait()
 		wgListen.Wait()
-		wgHandleNodes.Wait()
+		nodeHandler.Wg.Wait()
 		wgInitNodeConnections.Wait()
 		log.Println("[INFO] program shutdown")
 	}()
@@ -72,17 +74,16 @@ func main() {
 	go conn.InitConnections(&wgInitNodeConnections, myInfos, joinChatCommands, newConnections, shutdown)
 
 	// handle new connections until closure
-	wgHandleNodes.Add(1)
-	go conn.HandleNodes(&wgHandleNodes, newConnections, toSend, toExecute, shutdown)
+	go nodeHandler.Start(newConnections, toSend, toExecute)
+	defer nodeHandler.Wg.Wait()
+
+	// execute and propagates commands & operations to maintain chat data consistency between nodes
+	wgHandleChats.Add(1)
+	go orch.handleChats(&wgHandleChats, outGoingCommands, toExecute, toSend, shutdown)
 
 	// extract commands from stdin input
 	wgHandleStdin.Add(1)
 	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, myInfos, outGoingCommands, shutdown)
-
-	// execute and propagates commands & operations to maintain chat data consistency between nodes
-	wgHandleChats.Add(1)
-	var orch = newOrchestrator(myInfos)
-	go orch.handleChats(&wgHandleChats, outGoingCommands, toExecute, toSend, shutdown)
 
 	for {
 		select {
