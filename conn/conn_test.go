@@ -36,7 +36,7 @@ func TestListenAndServe(t *testing.T) {
 		shutdown        = make(chan struct{}, 0)
 		lock            = sync.Mutex{}
 		isListening     = sync.NewCond(&lock)
-		newConnections  = make(chan net.Conn, MaxSimultaneousConnections)
+		newConnections  = make(chan net.Conn)
 		maxTestDuration = 1 * time.Second
 	)
 
@@ -87,9 +87,9 @@ func TestInitConnections(t *testing.T) {
 		lock              = sync.Mutex{}
 		isListening       = sync.NewCond(&lock)
 
-		joinChatCommands       = make(chan parsestdin.Command, MaxSimultaneousConnections)
-		newConnectionsListen   = make(chan net.Conn, MaxSimultaneousConnections)
-		newConnectionsInitConn = make(chan net.Conn, MaxSimultaneousConnections)
+		joinChatCommands       = make(chan parsestdin.Command)
+		newConnectionsListen   = make(chan net.Conn)
+		newConnectionsInitConn = make(chan net.Conn)
 		maxTestDuration        = 1 * time.Second
 	)
 
@@ -115,6 +115,7 @@ func TestInitConnections(t *testing.T) {
 	}
 	for i := 0; i < MaxSimultaneousConnections; i++ {
 		joinChatCommands <- joinChatCommand
+		<-newConnectionsInitConn
 	}
 
 	var (
@@ -156,7 +157,7 @@ func TestReadConn(t *testing.T) {
 	var (
 		maxTestDuration = 1 * time.Second
 		wgReader        = sync.WaitGroup{}
-		messages        = make(chan []byte, reader.MaxMessageSize)
+		messages        = make(chan []byte)
 		shutdown        = make(chan struct{}, 0)
 		testData        = []string{
 			"first message\n",
@@ -212,7 +213,7 @@ func helperGetConnections(port string) (net.Conn, net.Conn, error) {
 		shutdown       = make(chan struct{}, 0)
 		lock           = sync.Mutex{}
 		isListening    = sync.NewCond(&lock)
-		newConnections = make(chan net.Conn, MaxSimultaneousConnections)
+		newConnections = make(chan net.Conn)
 	)
 
 	wgListen.Add(1)

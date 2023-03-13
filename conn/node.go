@@ -43,7 +43,6 @@ func newNode(conn net.Conn, slot slot, output chan []byte) (node, error) {
 }
 
 func (n *node) start(done chan<- slot) {
-	n.Wg.Add(1)
 	var (
 		wgReadConn       = sync.WaitGroup{}
 		outputConnection = make(chan []byte, MaxSimultaneousMessages)
@@ -132,6 +131,7 @@ func (nh *nodeHandler) Start(newConnections chan net.Conn, toSend <-chan crdt.Op
 			n.stop()
 		}
 
+		log.Println("donning")
 		nh.Wg.Done()
 		log.Println("[INFO] nodeHandler stopped")
 	}()
@@ -139,10 +139,10 @@ func (nh *nodeHandler) Start(newConnections chan net.Conn, toSend <-chan crdt.Op
 	for {
 		select {
 		case <-nh.Shutdown:
-			log.Println("[INFO] nodeHandler shutting down")
 			return
 
 		case newConn := <-newConnections:
+			log.Println(newConn)
 			s := nh.getNextSlot()
 			var n node
 			n, err = newNode(newConn, nh.getNextSlot(), outputNodes)
@@ -150,7 +150,8 @@ func (nh *nodeHandler) Start(newConnections chan net.Conn, toSend <-chan crdt.Op
 				log.Println("[ERROR] ", err)
 				continue
 			}
-
+			
+			n.Wg.Add(1)
 			go n.start(done)
 			nh.nodes[s] = &n
 
@@ -159,6 +160,7 @@ func (nh *nodeHandler) Start(newConnections chan net.Conn, toSend <-chan crdt.Op
 			quitOperation := crdt.NewOperation(crdt.Quit, "", []byte{})
 			quitOperation.SetSlot(uint8(s))
 			toExecute <- quitOperation
+			log.Println("node done")
 			nh.nodes[s] = nil
 
 		case operation := <-toSend:
@@ -168,7 +170,7 @@ func (nh *nodeHandler) Start(newConnections chan net.Conn, toSend <-chan crdt.Op
 			}
 
 		case operationBytes := <-outputNodes:
-			operation := crdt.DecodeOperation(operationBytes[1:])
+			operation := crdt.DecodeOperation(operationBytes)
 
 			if operation.GetOperationType() == crdt.AddNode {
 				nodeInfos, _ := crdt.DecodeInfos(operation.GetOperationData())
@@ -179,18 +181,22 @@ func (nh *nodeHandler) Start(newConnections chan net.Conn, toSend <-chan crdt.Op
 				if err != nil {
 					log.Println("[ERROR] ", err)
 				}
+
 				s := nh.getNextSlot()
-				n, err := newNode(newConn, s, outputNodes)
+				var n node
+				n, err = newNode(newConn, s, outputNodes)
 				if err != nil {
 					log.Println("[ERROR] ", err)
 					continue
 				}
 
+				n.Wg.Add(1)
+				go n.start(done)
 				nh.nodes[s] = &n
-
 				operation.SetSlot(uint8(s))
 			}
 
+			log.Println("to execute")
 			toExecute <- operation
 		}
 	}
