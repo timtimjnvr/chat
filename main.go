@@ -56,11 +56,11 @@ func main() {
 		syscall.SIGQUIT)
 
 	var (
-		outGoingCommands = make(chan parsestdin.Command, parsestdin.MaxMessagesStdin)
-		joinChatCommands = make(chan parsestdin.Command, conn.MaxSimultaneousConnections)
-		newConnections   = make(chan net.Conn, conn.MaxSimultaneousConnections)
-		toSend           = make(chan crdt.Operation, conn.MaxSimultaneousMessages)
-		toExecute        = make(chan crdt.Operation, conn.MaxSimultaneousMessages)
+		outGoingCommands = make(chan parsestdin.Command)
+		joinChatCommands = make(chan parsestdin.Command)
+		newConnections   = make(chan net.Conn)
+		toSend           = make(chan crdt.Operation)
+		toExecute        = make(chan crdt.Operation)
 	)
 
 	// listen for new connections
