@@ -18,7 +18,7 @@ var Separator = []byte("\n")
 
 const MaxMessageSize = 1000
 
-func Read(wg *sync.WaitGroup, reader Reader, output chan<- []byte, separator []byte, shutdown chan struct{}) {
+func Read(wg *sync.WaitGroup, reader Reader, output chan<- []byte, separator []byte, shutdown <-chan struct{}) {
 	defer func() {
 		reader.Close()
 		close(output)

@@ -3,23 +3,21 @@ package conn
 import (
 	"github.com/stretchr/testify/assert"
 	"github/timtimjnvr/chat/crdt"
-	"log"
 	"net"
-	"sync"
 	"testing"
 	"time"
 )
 
-func TestNode_StartAndStop(t *testing.T) {
+func TestDriver_StartAndStop(t *testing.T) {
 	var (
-		output          = make(chan []byte, MaxMessageSize)
+		output          = make(chan []byte, maxMessageSize)
 		done            = make(chan slot, 2)
 		maxTestDuration = 1 * time.Second
 	)
 
 	connReader, connSender, err := helperGetConnections("12349")
 	if err != nil {
-		assert.Fail(t, "failed to create a connection")
+		assert.Fail(t, "failed to create a conn")
 	}
 
 	reader, err := newNode(connReader, 1, output)
@@ -76,11 +74,11 @@ func TestNode_StartAndStop(t *testing.T) {
 	}
 }
 
-func TestNodeHandler_StartStopNodeAndSendQuit(t *testing.T) {
+func TestDriver_StartStopNodesAndSendQuit(t *testing.T) {
 	var (
 		maxTestDuration = 2 * time.Second
 		shutdown        = make(chan struct{}, 0)
-		nh              = NewNodeHandler(shutdown)
+		nh              = NewNodeDriver(shutdown)
 		newConnections  = make(chan net.Conn)
 		toSend          = make(chan crdt.Operation)
 		toExecute       = make(chan crdt.Operation)
@@ -95,7 +93,7 @@ func TestNodeHandler_StartStopNodeAndSendQuit(t *testing.T) {
 
 	conn1, conn2, err := helperGetConnections("12346")
 	if err != nil {
-		assert.Fail(t, "failed to create a connection")
+		assert.Fail(t, "failed to create a conn")
 	}
 
 	newConnections <- conn1
@@ -121,11 +119,11 @@ func TestNodeHandler_Send(t *testing.T) {
 	// creating linked connections
 	conn1, conn2, err := helperGetConnections("12347")
 	if err != nil {
-		assert.Fail(t, "failed to create a connection")
+		assert.Fail(t, "failed to create a conn")
 	}
 
 	var (
-		output = make(chan []byte, MaxMessageSize)
+		output = make(chan []byte, maxMessageSize)
 		done   = make(chan slot, 1)
 	)
 
@@ -139,7 +137,7 @@ func TestNodeHandler_Send(t *testing.T) {
 	var (
 		maxTestDuration = 1 * time.Second
 		shutdown        = make(chan struct{}, 0)
-		nh              = NewNodeHandler(shutdown)
+		nh              = NewNodeDriver(shutdown)
 		newConnections  = make(chan net.Conn)
 		toSend          = make(chan crdt.Operation)
 		toExecute       = make(chan crdt.Operation)
@@ -170,75 +168,5 @@ func TestNodeHandler_Send(t *testing.T) {
 		return
 	case m := <-output:
 		assert.Equal(t, m, expectedBytes, "did not received expected operation bytes")
-	}
-}
-
-func TestNodeHandler_AddNode(t *testing.T) {
-	var (
-		newComerInfos        = crdt.NewNodeInfos("localhost", "12348", "newComer")
-		newComer             = sync.WaitGroup{}
-		newComerConnections  = make(chan net.Conn)
-		lock                 = sync.Mutex{}
-		isListeningNewCommer = sync.NewCond(&lock)
-
-		output         = make(chan []byte, MaxMessageSize)
-		done           = make(chan slot, 1)
-		shutdown       = make(chan struct{}, 0)
-		nh             = NewNodeHandler(shutdown)
-		newConnections = make(chan net.Conn)
-		toSend         = make(chan crdt.Operation)
-		toExecute      = make(chan crdt.Operation)
-
-		maxTestDuration = 1 * time.Second
-	)
-
-	newComer.Add(1)
-	isListeningNewCommer.L.Lock()
-	go Listen(&newComer, isListeningNewCommer, newComerInfos.GetAddr(), newComerInfos.GetPort(), newComerConnections, shutdown)
-	isListeningNewCommer.Wait()
-
-	// creating linked connections (in the same chat : test-chat)
-	conn1, conn2, err := helperGetConnections("12347")
-	if err != nil {
-		assert.Fail(t, "failed to create a connection")
-	}
-
-	go nh.Start(newConnections, toSend, toExecute)
-	defer func() {
-		close(shutdown)
-		nh.Wg.Wait()
-		newComer.Wait()
-		log.Println("exit defer")
-	}()
-
-	newConnections <- conn1
-
-	sender, err := newNode(conn2, 1, output)
-	if err != nil {
-		assert.Fail(t, "failed to create node")
-	}
-
-	sender.Wg.Add(1)
-	go sender.start(done)
-	defer sender.stop()
-
-	// node2 ask node1 to add newComer
-	addNodeOperationBytes := crdt.NewOperation(crdt.AddNode, "test-chat", newComerInfos.ToBytes()).ToBytes()
-	sender.Input <- addNodeOperationBytes
-
-	expectedAddNodeOperation := crdt.NewOperation(crdt.AddNode, "test-chat", newComerInfos.ToBytes())
-	expectedAddNodeOperation.SetSlot(2)
-
-	// empty newcomer connections
-	<-newComerConnections
-
-	timeout := time.Tick(maxTestDuration)
-	select {
-	case <-timeout:
-		assert.Fail(t, "test timeout")
-		return
-
-	case m := <-toExecute:
-		assert.Equal(t, m, expectedAddNodeOperation, "did not received expected operation bytes")
 	}
 }

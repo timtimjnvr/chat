@@ -1,10 +1,9 @@
 package parsestdin
 
 import (
+	"fmt"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/reader"
-
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -139,7 +138,7 @@ func (c command) GetArgs() map[string]string {
 	return c.args
 }
 
-func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.Infos, outGoingCommands chan<- Command, shutdown chan struct{}) {
+func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.Infos, outGoingCommands chan<- Command, joinChatCommands chan<- Command, shutdown chan struct{}) {
 	var wgReadStdin = sync.WaitGroup{}
 
 	defer func() {
@@ -151,22 +150,27 @@ func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.Infos, outGoing
 	var stdin = make(chan []byte, MaxMessagesStdin)
 	go reader.Read(&wgReadStdin, file, stdin, reader.Separator, shutdown)
 
-	fmt.Printf(logFrmt, typeCommand)
-
 	for {
+		fmt.Printf(logFrmt, typeCommand)
+
 		select {
 		case <-shutdown:
 			return
 
 		case line := <-stdin:
-			fmt.Printf(logFrmt, typeCommand)
-
 			cmd, err := NewCommand(string(line))
 			if err != nil {
 				log.Println("[ERROR] ", err)
-			} else {
+				continue
+			}
+
+			switch cmd.GetTypology() {
+			case crdt.JoinChatByName:
+				joinChatCommands <- cmd
+			default:
 				outGoingCommands <- cmd
 			}
 		}
 	}
+
 }
