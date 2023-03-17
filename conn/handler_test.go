@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github/timtimjnvr/chat/crdt"
 	"net"
@@ -89,6 +90,7 @@ func TestDriver_StartStopNodesAndSendQuit(t *testing.T) {
 		nh.Wg.Wait()
 	}()
 
+	nh.Wg.Add(1)
 	go nh.Start(newConnections, toSend, toExecute)
 
 	conn1, conn2, err := helperGetConnections("12346")
@@ -149,6 +151,7 @@ func TestNodeHandler_Send(t *testing.T) {
 		nodeReader.stop()
 	}()
 
+	nh.Wg.Add(1)
 	go nh.Start(newConnections, toSend, toExecute)
 
 	newConnections <- conn1
@@ -168,5 +171,51 @@ func TestNodeHandler_Send(t *testing.T) {
 		return
 	case m := <-output:
 		assert.Equal(t, m, expectedBytes, "did not received expected operation bytes")
+	}
+}
+
+func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
+	var (
+		maxTestDuration = 3 * time.Second
+		shutdown        = make(chan struct{}, 0)
+		nh              = NewNodeDriver(shutdown)
+		newConnections  = make(chan net.Conn)
+		toSend          = make(chan crdt.Operation)
+		toExecute       = make(chan crdt.Operation)
+
+		firstPort  = 1235
+		maxNode    = 99
+		connSaving = make(map[int]net.Conn, maxNode)
+	)
+	nh.Wg.Add(1)
+	go nh.Start(newConnections, toSend, toExecute)
+
+	for i := 0; i < maxNode; i++ {
+		conn1, conn2, err := helperGetConnections(fmt.Sprintf("%d", firstPort))
+		if err != nil {
+			assert.Fail(t, "failed to create a conn")
+		}
+
+		connSaving[i] = conn2
+		newConnections <- conn1
+		firstPort++
+	}
+
+	expectedQuitOperation := crdt.NewOperation(crdt.Quit, "", []byte{})
+
+	// killing all conns and checking messages
+	for i := 0; i < maxNode; i++ {
+		timeout := time.Tick(maxTestDuration)
+		connSaving[i].Close()
+		expectedQuitOperation.SetSlot(uint8(i + 1))
+		expectedBytes := expectedQuitOperation.ToBytes()
+
+		select {
+		case <-timeout:
+			assert.Fail(t, "test timeout")
+			return
+		case op := <-toExecute:
+			assert.Equal(t, op.ToBytes(), expectedBytes, "did not received expected quit operation")
+		}
 	}
 }

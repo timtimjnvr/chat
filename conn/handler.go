@@ -22,7 +22,7 @@ type (
 		Shutdown chan struct{}
 	}
 
-	driver struct {
+	nodeHandler struct {
 		nodes map[slot]*node
 
 		Wg       *sync.WaitGroup
@@ -77,7 +77,7 @@ func (n *node) start(done chan<- slot) {
 				return
 			}
 
-			// set node slot for chat driver
+			// set node slot for chat nodeHandler
 			n.setSlot(message)
 			n.Output <- message
 		}
@@ -98,7 +98,7 @@ func (n *node) stop() {
 	n.Wg.Wait()
 }
 
-func (d *driver) getNextSlot() slot {
+func (d *nodeHandler) getNextSlot() slot {
 	length := len(d.nodes)
 	for s, n := range d.nodes {
 		if n == nil {
@@ -109,16 +109,15 @@ func (d *driver) getNextSlot() slot {
 	return slot(length + 1)
 }
 
-func NewNodeDriver(shutdown chan struct{}) *driver {
-	return &driver{
+func NewNodeDriver(shutdown chan struct{}) *nodeHandler {
+	return &nodeHandler{
 		nodes:    make(map[slot]*node),
 		Wg:       &sync.WaitGroup{},
 		Shutdown: shutdown,
 	}
 }
 
-func (d *driver) Start(newConnections <-chan net.Conn, toSend <-chan crdt.Operation, toExecute chan<- crdt.Operation) {
-	d.Wg.Add(1)
+func (d *nodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan crdt.Operation, toExecute chan<- crdt.Operation) {
 
 	var (
 		done        = make(chan slot)
