@@ -10,6 +10,8 @@ import (
 )
 
 func TestParseCommandType(t *testing.T) {
+	t.Parallel()
+
 	ass := assert.New(t)
 
 	var tests = []struct {
@@ -68,6 +70,8 @@ func TestParseCommandType(t *testing.T) {
 }
 
 func TestGetArgs(t *testing.T) {
+	t.Parallel()
+
 	ass := assert.New(t)
 
 	var tests = []struct {

@@ -74,6 +74,7 @@ func main() {
 	go conn.InitConnections(&wgInitNodeConnections, myInfos, joinChatCommands, newConnections, shutdown)
 
 	// handle new connections until closure
+	nodeHandler.Wg.Add(1)
 	go nodeHandler.Start(newConnections, toSend, toExecute)
 	defer nodeHandler.Wg.Wait()
 
@@ -83,7 +84,7 @@ func main() {
 
 	// extract commands from stdin input
 	wgHandleStdin.Add(1)
-	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, myInfos, outGoingCommands, shutdown)
+	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, myInfos, outGoingCommands, joinChatCommands, shutdown)
 
 	for {
 		select {
