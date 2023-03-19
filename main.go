@@ -74,6 +74,7 @@ func main() {
 	go conn.InitConnections(&wgInitNodeConnections, myInfos, joinChatCommands, newConnections, shutdown)
 
 	// handle new connections until closure
+	nodeHandler.Wg.Add(1)
 	go nodeHandler.Start(newConnections, toSend, toExecute)
 	defer nodeHandler.Wg.Wait()
 

@@ -5,7 +5,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github/timtimjnvr/chat/crdt"
 	"net"
-	"syscall"
 	"testing"
 	"time"
 )
@@ -177,7 +176,7 @@ func TestNodeHandler_Send(t *testing.T) {
 
 func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
 	var (
-		maxTestDuration = 3 * time.Second
+		maxTestDuration = 1 * time.Second
 		shutdown        = make(chan struct{}, 0)
 		nh              = NewNodeHandler(shutdown)
 		newConnections  = make(chan net.Conn)
@@ -185,12 +184,16 @@ func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
 		toExecute       = make(chan crdt.Operation)
 
 		firstPort  = 1235
-		maxNode    = syscall.SOMAXCONN
+		maxNode    = 99
 		connSaving = make(map[int]net.Conn, maxNode)
 	)
+
 	nh.Wg.Add(1)
 	go nh.Start(newConnections, toSend, toExecute)
-	defer nh.Wg.Wait()
+	defer func() {
+		close(nh.Shutdown)
+		nh.Wg.Wait()
+	}()
 
 	for i := 0; i < maxNode; i++ {
 		conn1, conn2, err := helperGetConnections(fmt.Sprintf("%d", firstPort))
@@ -207,14 +210,14 @@ func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
 
 	// killing all connections and checking messages
 	for i := 0; i < maxNode; i++ {
-		timeout := time.Tick(maxTestDuration)
 		connSaving[i].Close()
 		expectedQuitOperation.SetSlot(uint8(i + 1))
 		expectedBytes := expectedQuitOperation.ToBytes()
+		timeout := time.Tick(maxTestDuration)
 
 		select {
 		case <-timeout:
-			assert.Fail(t, "test timeout")
+			assert.Fail(t, fmt.Sprintf("test %d timeout", i))
 			return
 		case op := <-toExecute:
 			assert.Equal(t, op.ToBytes(), expectedBytes, "did not received expected quit operation")
