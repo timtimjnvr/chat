@@ -5,13 +5,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github/timtimjnvr/chat/crdt"
 	"net"
+	"syscall"
 	"testing"
 	"time"
 )
 
 func TestDriver_StartAndStop(t *testing.T) {
-	t.Parallel()
-
 	var (
 		output          = make(chan []byte, maxMessageSize)
 		done            = make(chan slot, 2)
@@ -78,8 +77,6 @@ func TestDriver_StartAndStop(t *testing.T) {
 }
 
 func TestDriver_StartStopNodesAndSendQuit(t *testing.T) {
-	t.Parallel()
-
 	var (
 		maxTestDuration = 2 * time.Second
 		shutdown        = make(chan struct{}, 0)
@@ -122,8 +119,6 @@ func TestDriver_StartStopNodesAndSendQuit(t *testing.T) {
 }
 
 func TestNodeHandler_Send(t *testing.T) {
-	t.Parallel()
-
 	// creating linked connections
 	conn1, conn2, err := helperGetConnections("12347")
 	if err != nil {
@@ -181,8 +176,6 @@ func TestNodeHandler_Send(t *testing.T) {
 }
 
 func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
-	t.Parallel()
-
 	var (
 		maxTestDuration = 3 * time.Second
 		shutdown        = make(chan struct{}, 0)
@@ -192,11 +185,12 @@ func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
 		toExecute       = make(chan crdt.Operation)
 
 		firstPort  = 1235
-		maxNode    = 99
+		maxNode    = syscall.SOMAXCONN
 		connSaving = make(map[int]net.Conn, maxNode)
 	)
 	nh.Wg.Add(1)
 	go nh.Start(newConnections, toSend, toExecute)
+	defer nh.Wg.Wait()
 
 	for i := 0; i < maxNode; i++ {
 		conn1, conn2, err := helperGetConnections(fmt.Sprintf("%d", firstPort))

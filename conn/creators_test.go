@@ -15,8 +15,6 @@ import (
 )
 
 func TestListenAndServe(t *testing.T) {
-	t.Parallel()
-
 	var (
 		ip              = ""
 		port            = "12341"
@@ -66,8 +64,6 @@ func TestListenAndServe(t *testing.T) {
 }
 
 func TestInitConnections(t *testing.T) {
-	t.Parallel()
-
 	var (
 		listenerInfos = crdt.NewNodeInfos("127.0.0.1", "12343", "Listener")
 		joinerInfos   = crdt.NewNodeInfos("127.0.0.1", "12342", "Joiner")
@@ -145,8 +141,6 @@ func TestInitConnections(t *testing.T) {
 }
 
 func TestReadConn(t *testing.T) {
-	t.Parallel()
-
 	var (
 		maxTestDuration = 1 * time.Second
 		wgReader        = sync.WaitGroup{}
