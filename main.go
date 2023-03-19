@@ -30,7 +30,7 @@ func main() {
 		shutdown = make(chan struct{})
 
 		orch        = newOrchestrator(myInfos)
-		nodeHandler = conn.NewNodeDriver(shutdown)
+		nodeHandler = conn.NewNodeHandler(shutdown)
 
 		wgListen              = sync.WaitGroup{}
 		wgHandleChats         = sync.WaitGroup{}

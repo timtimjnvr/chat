@@ -109,7 +109,7 @@ func (d *nodeHandler) getNextSlot() slot {
 	return slot(length + 1)
 }
 
-func NewNodeDriver(shutdown chan struct{}) *nodeHandler {
+func NewNodeHandler(shutdown chan struct{}) *nodeHandler {
 	return &nodeHandler{
 		nodes:    make(map[slot]*node),
 		Wg:       &sync.WaitGroup{},

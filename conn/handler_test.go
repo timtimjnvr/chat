@@ -10,6 +10,8 @@ import (
 )
 
 func TestDriver_StartAndStop(t *testing.T) {
+	t.Parallel()
+
 	var (
 		output          = make(chan []byte, maxMessageSize)
 		done            = make(chan slot, 2)
@@ -76,10 +78,12 @@ func TestDriver_StartAndStop(t *testing.T) {
 }
 
 func TestDriver_StartStopNodesAndSendQuit(t *testing.T) {
+	t.Parallel()
+
 	var (
 		maxTestDuration = 2 * time.Second
 		shutdown        = make(chan struct{}, 0)
-		nh              = NewNodeDriver(shutdown)
+		nh              = NewNodeHandler(shutdown)
 		newConnections  = make(chan net.Conn)
 		toSend          = make(chan crdt.Operation)
 		toExecute       = make(chan crdt.Operation)
@@ -118,6 +122,8 @@ func TestDriver_StartStopNodesAndSendQuit(t *testing.T) {
 }
 
 func TestNodeHandler_Send(t *testing.T) {
+	t.Parallel()
+
 	// creating linked connections
 	conn1, conn2, err := helperGetConnections("12347")
 	if err != nil {
@@ -139,7 +145,7 @@ func TestNodeHandler_Send(t *testing.T) {
 	var (
 		maxTestDuration = 1 * time.Second
 		shutdown        = make(chan struct{}, 0)
-		nh              = NewNodeDriver(shutdown)
+		nh              = NewNodeHandler(shutdown)
 		newConnections  = make(chan net.Conn)
 		toSend          = make(chan crdt.Operation)
 		toExecute       = make(chan crdt.Operation)
@@ -175,10 +181,12 @@ func TestNodeHandler_Send(t *testing.T) {
 }
 
 func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
+	t.Parallel()
+
 	var (
 		maxTestDuration = 3 * time.Second
 		shutdown        = make(chan struct{}, 0)
-		nh              = NewNodeDriver(shutdown)
+		nh              = NewNodeHandler(shutdown)
 		newConnections  = make(chan net.Conn)
 		toSend          = make(chan crdt.Operation)
 		toExecute       = make(chan crdt.Operation)
@@ -203,7 +211,7 @@ func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
 
 	expectedQuitOperation := crdt.NewOperation(crdt.Quit, "", []byte{})
 
-	// killing all conns and checking messages
+	// killing all connections and checking messages
 	for i := 0; i < maxNode; i++ {
 		timeout := time.Tick(maxTestDuration)
 		connSaving[i].Close()

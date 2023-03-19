@@ -6,6 +6,8 @@ import (
 )
 
 func TestNewConn(t *testing.T) {
+	t.Parallel()
+
 	c, _, err := helperGetConnections("12340")
 	if err != nil {
 		assert.Fail(t, "failed to create a connections")
