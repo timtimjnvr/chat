@@ -54,7 +54,7 @@ func TestListenAndServe(t *testing.T) {
 			assert.Fail(t, "test timeout")
 			return
 
-		case c :=<-newConnections:
+		case c := <-newConnections:
 			connectionsReceived++
 			c.Close()
 			if connectionsReceived == syscall.SOMAXCONN {
@@ -103,7 +103,8 @@ func TestInitConnections(t *testing.T) {
 
 	for i := 0; i < syscall.SOMAXCONN; i++ {
 		joinChatCommands <- joinChatCommand
-		<-newConnectionsInitConn
+		c := <-newConnectionsInitConn
+		c.Close()
 	}
 
 	var (
@@ -157,6 +158,9 @@ func TestReadConn(t *testing.T) {
 	)
 
 	connReader, connSender, err := helperGetConnections("12345")
+	defer func() {
+		connSender.Close()
+	}()
 
 	for _, d := range testData {
 		_, err = connSender.Write([]byte(d))
@@ -171,6 +175,7 @@ func TestReadConn(t *testing.T) {
 		assert.Fail(t, "failed to create connection reader : ", err.Error())
 		return
 	}
+
 	wgReader.Add(1)
 	go reader.Read(&wgReader, c, messages, reader.Separator, shutdown)
 
@@ -229,8 +234,14 @@ func helperGetConnections(port string) (net.Conn, net.Conn, error) {
 }
 
 func helperConnect(wg *sync.WaitGroup, t *testing.T, ip, port string) {
-	defer wg.Done()
-	_, err := net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
+	var c net.Conn
+
+	defer func() {
+		wg.Done()
+		c.Close()
+	}()
+
+	c, err := net.Dial(transportProtocol, fmt.Sprintf("%s:%s", ip, port))
 	if err != nil {
 		assert.Fail(t, "failed to connect to listener : ", err.Error())
 		return

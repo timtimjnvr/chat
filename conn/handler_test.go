@@ -26,6 +26,7 @@ func TestDriver_StartAndStop(t *testing.T) {
 	if err != nil {
 		assert.Fail(t, "failed to create node")
 	}
+
 	reader.Wg.Add(1)
 	go reader.start(done)
 
@@ -78,7 +79,7 @@ func TestDriver_StartAndStop(t *testing.T) {
 
 func TestDriver_StartStopNodesAndSendQuit(t *testing.T) {
 	var (
-		maxTestDuration = 2 * time.Second
+		maxTestDuration = 1 * time.Second
 		shutdown        = make(chan struct{}, 0)
 		nh              = NewNodeHandler(shutdown)
 		newConnections  = make(chan net.Conn)
@@ -134,8 +135,10 @@ func TestNodeHandler_Send(t *testing.T) {
 	if err != nil {
 		assert.Fail(t, "failed to create node")
 	}
+
 	nodeReader.Wg.Add(1)
 	go nodeReader.start(done)
+	defer nodeReader.stop()
 
 	var (
 		maxTestDuration = 1 * time.Second
@@ -146,14 +149,12 @@ func TestNodeHandler_Send(t *testing.T) {
 		toExecute       = make(chan crdt.Operation)
 	)
 
+	nh.Wg.Add(1)
+	go nh.Start(newConnections, toSend, toExecute)
 	defer func() {
 		close(shutdown)
 		nh.Wg.Wait()
-		nodeReader.stop()
 	}()
-
-	nh.Wg.Add(1)
-	go nh.Start(newConnections, toSend, toExecute)
 
 	newConnections <- conn1
 	messageOperation := crdt.NewOperation(crdt.AddMessage, "test-chat", []byte("I love Unit Testing"))
@@ -177,7 +178,7 @@ func TestNodeHandler_Send(t *testing.T) {
 
 func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
 	var (
-		maxTestDuration = 3 * time.Second
+		maxTestDuration = 1 * time.Second
 		shutdown        = make(chan struct{}, 0)
 		nh              = NewNodeHandler(shutdown)
 		newConnections  = make(chan net.Conn)
