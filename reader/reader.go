@@ -42,9 +42,8 @@ func Read(wg *sync.WaitGroup, reader Reader, output chan<- []byte, separator []b
 			err    error
 		)
 
-		fdSet.Clear(int(reader.Fd()))
-		fdSet.Clear(int(readClose.Fd()))
-
+		// clear fdSet
+		fdSet.Zero()
 		fdSet.Set(int(reader.Fd()))
 		fdSet.Set(int(readClose.Fd()))
 

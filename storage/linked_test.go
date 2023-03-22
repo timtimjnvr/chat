@@ -7,15 +7,13 @@ import (
 )
 
 func TestLen(t *testing.T) {
-	t.Parallel()
-
 	ass := assert.New(t)
 	l := NewList()
 	ass.True(l.Len() == 0, "failed on computing list length")
 }
 
 func TestAdd(t *testing.T) {
-	t.Parallel()
+
 
 	ass := assert.New(t)
 	l := NewList()
@@ -27,7 +25,7 @@ func TestAdd(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	t.Parallel()
+
 
 	var (
 		ass    = assert.New(t)
@@ -48,7 +46,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestList_GetById(t *testing.T) {
-	t.Parallel()
+
 
 	var (
 		ass       = assert.New(t)

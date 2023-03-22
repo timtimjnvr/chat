@@ -14,7 +14,7 @@ import (
 var separator = []byte("\n")
 
 func TestRead(t *testing.T) {
-	t.Parallel()
+
 
 	var (
 		maxTestDuration = 3 * time.Second
