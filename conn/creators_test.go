@@ -54,8 +54,9 @@ func TestListenAndServe(t *testing.T) {
 			assert.Fail(t, "test timeout")
 			return
 
-		case <-newConnections:
+		case c :=<-newConnections:
 			connectionsReceived++
+			c.Close()
 			if connectionsReceived == syscall.SOMAXCONN {
 				return
 			}
@@ -133,6 +134,8 @@ func TestInitConnections(t *testing.T) {
 
 			assert.Equal(t, expectedMessage, message[:n])
 			connectionsReceived++
+
+			c.Close()
 			if connectionsReceived == syscall.SOMAXCONN {
 				return
 			}
