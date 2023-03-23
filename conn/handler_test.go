@@ -5,7 +5,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github/timtimjnvr/chat/crdt"
 	"net"
-	"syscall"
 	"testing"
 	"time"
 )
@@ -176,7 +175,7 @@ func TestNodeHandler_Send(t *testing.T) {
 	}
 }
 
-func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
+func TestNodeHandler_50NodesStartAndStop(t *testing.T) {
 	var (
 		maxTestDuration = 1 * time.Second
 		shutdown        = make(chan struct{}, 0)
@@ -186,7 +185,7 @@ func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
 		toExecute       = make(chan crdt.Operation)
 
 		firstPort  = 1235
-		maxNode    = syscall.SOMAXCONN
+		maxNode    = 50
 		connSaving = make(map[int]net.Conn, maxNode)
 	)
 
