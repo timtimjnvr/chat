@@ -17,50 +17,15 @@ type (
 )
 
 func newOrchestrator(myInfos crdt.Infos) *orchestrator {
+	currentChat := crdt.NewChat(myInfos.GetName())
+	storage := storage.NewStorage()
+	storage.SaveChat(currentChat)
+
 	return &orchestrator{
 		myInfos:     myInfos,
-		currentChat: crdt.NewChat(myInfos.GetName()),
-		storage:     storage.NewStorage(),
+		currentChat: currentChat,
+		storage:     storage,
 	}
-}
-
-func (o *orchestrator) getOperationFromCommand(cmd parsestdin.Command) <-chan crdt.Operation {
-	var (
-		op   = make(chan crdt.Operation, 1)
-		args = cmd.GetArgs()
-	)
-
-	go func(op chan crdt.Operation) {
-		defer close(op)
-
-		switch cmd.GetTypology() {
-		case crdt.CreateChat:
-			var (
-				chatName = args[parsestdin.ChatRoomArg]
-				newChat  = crdt.NewChat(chatName)
-			)
-
-			newChat.AddNode(o.myInfos)
-			o.storage.SaveChat(newChat)
-
-		case crdt.AddMessage:
-			content := args[parsestdin.MessageArg]
-
-			/* Add the messageBytes to discussion & sync with other nodes */
-			var messageBytes []byte
-			messageBytes = crdt.NewMessage(o.myInfos.GetName(), content).ToBytes()
-			op <- crdt.NewOperation(crdt.AddMessage, o.currentChat.GetId(), messageBytes)
-
-		case crdt.LeaveChat:
-			op <- crdt.NewOperation(crdt.LeaveChat, o.currentChat.GetId(), o.myInfos.ToBytes())
-
-		case crdt.Quit:
-			op <- crdt.NewOperation(crdt.Quit, "", o.myInfos.ToBytes())
-		}
-
-	}(op)
-
-	return op
 }
 
 func (o *orchestrator) getPropagationOperations(op crdt.Operation, chat crdt.Chat) <-chan crdt.Operation {
@@ -161,9 +126,33 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 			return
 
 		case cmd := <-incomingCommands:
-			op, ok := <-o.getOperationFromCommand(cmd)
-			if ok {
-				toExecute <- op
+			args := cmd.GetArgs()
+
+			switch cmd.GetTypology() {
+			case crdt.CreateChat:
+				var (
+					chatName = args[parsestdin.ChatRoomArg]
+					newChat  = crdt.NewChat(chatName)
+				)
+
+				newChat.AddNode(o.myInfos)
+				o.storage.SaveChat(newChat)
+
+			case crdt.AddMessage:
+				content := args[parsestdin.MessageArg]
+
+				/* Add the messageBytes to discussion & sync with other nodes */
+				var messageBytes []byte
+				messageBytes = crdt.NewMessage(o.myInfos.GetName(), content).ToBytes()
+				toExecute <- crdt.NewOperation(crdt.AddMessage, o.currentChat.GetId(), messageBytes)
+			case crdt.ListChatsCommand:
+				o.storage.DisplayChats()
+
+			case crdt.LeaveChat:
+				toExecute <- crdt.NewOperation(crdt.LeaveChat, o.currentChat.GetId(), o.myInfos.ToBytes())
+
+			case crdt.Quit:
+				toExecute <- crdt.NewOperation(crdt.Quit, "", o.myInfos.ToBytes())
 			}
 
 		case op := <-toExecute:

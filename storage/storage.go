@@ -3,11 +3,23 @@ package storage
 import (
 	"github.com/google/uuid"
 	"github/timtimjnvr/chat/crdt"
+	"log"
 )
 
 type (
 	Storage struct {
 		chats List
+	}
+
+	List interface {
+		Len() int
+		Add(value interface{}) uuid.UUID
+		Contains(id uuid.UUID) bool
+		Update(id uuid.UUID, value interface{})
+		GetByIndex(index int) (interface{}, error)
+		GetById(id uuid.UUID) (interface{}, error)
+		Delete(key uuid.UUID)
+		Display()
 	}
 )
 
@@ -18,6 +30,7 @@ func NewStorage() *Storage {
 }
 
 func (s *Storage) GetChat(identifier string, byName bool) (crdt.Chat, error) {
+	log.Println(identifier)
 	var (
 		numberOfChats = s.chats.Len()
 		c             crdt.Chat
@@ -59,5 +72,15 @@ func (s *Storage) GetChat(identifier string, byName bool) (crdt.Chat, error) {
 }
 
 func (s *Storage) SaveChat(c crdt.Chat) {
-	// TODO : save chat into chained list
+	id, _ := uuid.Parse(c.GetId())
+	if !s.chats.Contains(id) {
+		s.chats.Add(c)
+		return
+	}
+
+	s.chats.Update(id, c)
+}
+
+func (s *Storage) DisplayChats() {
+	s.chats.Display()
 }

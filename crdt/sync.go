@@ -21,13 +21,14 @@ type (
 )
 
 const (
-	CreateChat     OperationType = iota
-	JoinChatByName OperationType = iota
-	AddNode        OperationType = iota
-	AddMessage     OperationType = iota
-	LeaveChat      OperationType = iota
-	ListUsers      OperationType = iota
-	Quit           OperationType = iota
+	CreateChat OperationType = iota
+	JoinChatByName
+	AddNode
+	AddMessage
+	LeaveChat
+	ListUsers
+	ListChatsCommand
+	Quit
 )
 
 func NewOperation(typology OperationType, targetedChat string, data []byte) Operation {
