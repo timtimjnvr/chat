@@ -23,17 +23,9 @@ type (
 		head   *element
 		tail   *element
 	}
-
-	List interface {
-		Len() int
-		Add(value interface{}) uuid.UUID
-		GetByIndex(index int) (interface{}, error)
-		GetById(id uuid.UUID) (interface{}, error)
-		Delete(key uuid.UUID)
-	}
 )
 
-func NewList() List {
+func NewList() *list {
 	return &list{}
 }
 
@@ -49,9 +41,12 @@ func (l *list) Len() int {
 }
 
 func (l *list) Display() {
-	for l.head != nil {
-		fmt.Printf("%v->", l.head.value)
-		l.head = l.head.next
+	fmt.Printf("%d elements\n", l.length)
+
+	tmp := l.head
+	for tmp != nil {
+		fmt.Printf("%s ->", tmp.value)
+		tmp = tmp.next
 	}
 }
 
@@ -82,6 +77,30 @@ func (l *list) Add(value interface{}) uuid.UUID {
 	}
 
 	return l.tail.key
+}
+
+func (l *list) Contains(id uuid.UUID) bool {
+	first := l.head
+	for first.next != nil && first.key != id {
+		first = first.next
+	}
+
+	if first.key == id {
+		return true
+	}
+
+	return false
+}
+
+func (l *list) Update(id uuid.UUID, value interface{}) {
+	first := l.head
+	for first.next != nil && first.key != id {
+		first = first.next
+	}
+
+	if first.key == id {
+		first.value = value
+	}
 }
 
 func (l *list) GetByIndex(index int) (interface{}, error) {

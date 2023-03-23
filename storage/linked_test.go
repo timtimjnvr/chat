@@ -6,15 +6,13 @@ import (
 	"testing"
 )
 
-func TestLen(t *testing.T) {
+func TestList_Len(t *testing.T) {
 	ass := assert.New(t)
 	l := NewList()
 	ass.True(l.Len() == 0, "failed on computing list length")
 }
 
-func TestAdd(t *testing.T) {
-
-
+func TestList_Add(t *testing.T) {
 	ass := assert.New(t)
 	l := NewList()
 	l.Add(1)
@@ -24,9 +22,32 @@ func TestAdd(t *testing.T) {
 	ass.Equal(3, l.Len(), "failed on Adding elements")
 }
 
-func TestDelete(t *testing.T) {
+func TestList_Contains(t *testing.T) {
+	l := NewList()
+	id1 := l.Add(1)
+	id2 := l.Add(2)
+	id3 := l.Add(3)
 
+	errMessage := "failed on finding element"
+	assert.True(t, l.Contains(id1), errMessage)
+	assert.True(t, l.Contains(id2), errMessage)
+	assert.True(t, l.Contains(id3), errMessage)
 
+	id4, _ := uuid.NewUUID()
+	assert.False(t, l.Contains(id4), "found non existing element")
+}
+
+func TestList_Update(t *testing.T) {
+
+	l := NewList()
+	id1 := l.Add(1)
+	l.Update(id1, 3)
+	v, _ := l.GetById(id1)
+
+	assert.Equal(t, 3, v.(int), "failed to update value")
+}
+
+func TestList_Delete(t *testing.T) {
 	var (
 		ass    = assert.New(t)
 		l      = NewList()
@@ -46,7 +67,6 @@ func TestDelete(t *testing.T) {
 }
 
 func TestList_GetById(t *testing.T) {
-
 
 	var (
 		ass       = assert.New(t)

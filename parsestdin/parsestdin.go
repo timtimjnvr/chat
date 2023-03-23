@@ -30,6 +30,7 @@ const (
 	joinChatCommand  = "/join"
 	leaveChatCommand = "/close"
 	listUsersCommand = "/list"
+	listChatsCommand = "/list_chats"
 	quitCommand      = "/quit"
 
 	MessageArg  = "messageArgument"
@@ -54,6 +55,7 @@ var (
 		joinChatCommand:  crdt.JoinChatByName,
 		leaveChatCommand: crdt.LeaveChat,
 		listUsersCommand: crdt.ListUsers,
+		listChatsCommand: crdt.ListChatsCommand,
 		quitCommand:      crdt.Quit,
 	}
 

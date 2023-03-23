@@ -21,6 +21,7 @@ Decentralized P2P chat built in golang.
 /msg hello, friend ! : send "hello, friend" in the current chat room.
 /close : exit the current chat room.
 /list : display user(s) in the room.
+/list_chats : display enterred chats.
 /quit kills the program
 ```
 
