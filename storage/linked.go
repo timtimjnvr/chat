@@ -81,6 +81,10 @@ func (l *list) Add(value interface{}) uuid.UUID {
 
 func (l *list) Contains(id uuid.UUID) bool {
 	first := l.head
+	if l.length == 0 {
+		return false
+	}
+
 	for first.next != nil && first.key != id {
 		first = first.next
 	}

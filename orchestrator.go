@@ -156,10 +156,26 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 			}
 
 		case op := <-toExecute:
-			c, err := o.getChatFromStorage(op)
-			if err != nil {
-				log.Println("[ERROR]", err)
+			var (
+				c   crdt.Chat
+				err error
+			)
+
+			switch op.GetOperationType() {
+			case crdt.CreateChat:
+				var chatName = op.GetTargetedChat()
+
+				c = crdt.NewChat(chatName)
+				c.AddNode(o.myInfos)
+				o.storage.SaveChat(c)
 				continue
+
+			default:
+				c, err = o.getChatFromStorage(op)
+				if err != nil {
+					log.Println("[ERROR]", err)
+					continue
+				}
 			}
 
 			// execute op
