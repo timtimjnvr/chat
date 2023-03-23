@@ -25,7 +25,7 @@ const (
 	JoinChatByName
 	AddNode
 	AddMessage
-	LeaveChat
+	RemoveNode
 	ListUsers
 	ListChatsCommand
 	Quit

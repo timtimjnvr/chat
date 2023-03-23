@@ -34,7 +34,7 @@ func TestParseCommandType(t *testing.T) {
 		},
 		{
 			line:             "/close ***********!\n\n",
-			expectedTypology: crdt.LeaveChat,
+			expectedTypology: crdt.RemoveNode,
 			expectedErr:      nil,
 		},
 		{
@@ -68,7 +68,6 @@ func TestParseCommandType(t *testing.T) {
 }
 
 func TestGetArgs(t *testing.T) {
-
 
 	ass := assert.New(t)
 
@@ -110,7 +109,7 @@ func TestGetArgs(t *testing.T) {
 		},
 		{
 			text:         "/close\n",
-			typology:     crdt.LeaveChat,
+			typology:     crdt.RemoveNode,
 			expectedArgs: make(map[string]string),
 			expectedErr:  nil,
 		},

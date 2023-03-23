@@ -129,47 +129,44 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 			args := cmd.GetArgs()
 
 			switch cmd.GetTypology() {
+
 			case crdt.CreateChat:
 				var (
 					chatName = args[parsestdin.ChatRoomArg]
 					newChat  = crdt.NewChat(chatName)
 				)
-
-				newChat.AddNode(o.myInfos)
-				o.storage.SaveChat(newChat)
+				chatInfos, _ := newChat.ToBytes()
+				toExecute <- crdt.NewOperation(crdt.CreateChat, args[parsestdin.ChatRoomArg], chatInfos)
 
 			case crdt.AddMessage:
 				content := args[parsestdin.MessageArg]
 
-				/* Add the messageBytes to discussion & sync with other nodes */
 				var messageBytes []byte
 				messageBytes = crdt.NewMessage(o.myInfos.GetName(), content).ToBytes()
 				toExecute <- crdt.NewOperation(crdt.AddMessage, o.currentChat.GetId(), messageBytes)
+
+			// will only need to be displayed
+			case crdt.ListUsers:
+				o.currentChat.DisplayUser()
+
 			case crdt.ListChatsCommand:
 				o.storage.DisplayChats()
-
-			case crdt.LeaveChat:
-				toExecute <- crdt.NewOperation(crdt.LeaveChat, o.currentChat.GetId(), o.myInfos.ToBytes())
-
-			case crdt.Quit:
-				toExecute <- crdt.NewOperation(crdt.Quit, "", o.myInfos.ToBytes())
 			}
 
 		case op := <-toExecute:
+
 			var (
 				c   crdt.Chat
 				err error
 			)
 
 			switch op.GetOperationType() {
+			// execute
 			case crdt.CreateChat:
-				var chatName = op.GetTargetedChat()
-
-				c = crdt.NewChat(chatName)
-				c.AddNode(o.myInfos)
+				c = crdt.NewChat(op.GetTargetedChat())
 				o.storage.SaveChat(c)
-				continue
 
+			// get chat from storage
 			default:
 				c, err = o.getChatFromStorage(op)
 				if err != nil {
@@ -178,7 +175,7 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 				}
 			}
 
-			// execute op
+			// execute operation
 			switch op.GetOperationType() {
 			case crdt.JoinChatByName:
 				var newNodeInfos crdt.Infos

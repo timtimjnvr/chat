@@ -53,7 +53,7 @@ var (
 		newChatCommand:   crdt.CreateChat,
 		msgCommand:       crdt.AddMessage,
 		joinChatCommand:  crdt.JoinChatByName,
-		leaveChatCommand: crdt.LeaveChat,
+		leaveChatCommand: crdt.RemoveNode,
 		listUsersCommand: crdt.ListUsers,
 		listChatsCommand: crdt.ListChatsCommand,
 		quitCommand:      crdt.Quit,

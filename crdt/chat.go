@@ -2,7 +2,9 @@ package crdt
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
+	"log"
 )
 
 type (
@@ -21,6 +23,7 @@ type (
 		GetSlots() []uint8
 		AddNode(infos Infos)
 		AddMessage(message Message)
+		DisplayUser()
 		ToBytes() ([]byte, error)
 	}
 )
@@ -69,6 +72,13 @@ func (c *ConcreteChat) AddMessage(message Message) {
 		end := c.messages[i:]
 		c.messages = append(beginning, message)
 		c.messages = append(c.messages, end...)
+	}
+}
+
+func (c *ConcreteChat) DisplayUser() {
+	log.Println(fmt.Sprintf("%s users :", c.Name))
+	for _, n := range c.nodes {
+		log.Println(n.GetName())
 	}
 }
 
