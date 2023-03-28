@@ -69,7 +69,6 @@ func TestParseCommandType(t *testing.T) {
 
 func TestGetArgs(t *testing.T) {
 
-
 	ass := assert.New(t)
 
 	var tests = []struct {

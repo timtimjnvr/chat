@@ -7,25 +7,17 @@ import (
 )
 
 type (
-	message struct {
+	Message struct {
 		Id      uuid.UUID `json:"Id"`
 		Sender  string    `json:"sender"`
 		Content string    `json:"content"`
 		Date    time.Time `json:"date"`
 	}
-
-	Message interface {
-		GetId() uuid.UUID
-		GetSender() string
-		GetContent() string
-		GetTime() time.Time
-		ToBytes() []byte
-	}
 )
 
-func NewMessage(sender, content string) Message {
+func NewMessage(sender, content string) *Message {
 	id, _ := uuid.NewUUID()
-	return &message{
+	return &Message{
 		Id:      id,
 		Sender:  sender,
 		Content: content,
@@ -33,33 +25,23 @@ func NewMessage(sender, content string) Message {
 	}
 }
 
-func (m message) GetId() uuid.UUID {
+func (m *Message) GetId() uuid.UUID {
 	return m.Id
 }
 
-func (m message) GetSender() string {
+func (m *Message) GetSender() string {
 	return m.Sender
 }
 
-func (m message) GetContent() string {
+func (m *Message) GetContent() string {
 	return m.Content
 }
 
-func (m message) GetTime() time.Time {
+func (m *Message) GetTime() time.Time {
 	return m.Date
 }
 
-func (m message) ToBytes() []byte {
+func (m *Message) ToBytes() []byte {
 	bytesMessage, _ := json.Marshal(m)
 	return bytesMessage
-}
-
-func DecodeMessage(bytes []byte) (Message, error) {
-	var m message
-	err := json.Unmarshal(bytes, &m)
-	if err != nil {
-		return nil, err
-	}
-
-	return m, nil
 }

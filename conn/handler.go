@@ -153,19 +153,19 @@ func (d *nodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan crdt.O
 
 		case s := <-done:
 			quitOperation := crdt.NewOperation(crdt.Quit, "", []byte{})
-			quitOperation.SetSlot(uint8(s))
-			toExecute <- quitOperation
+			quitOperation.Slot = uint8(s)
+			toExecute <- *quitOperation
 			d.nodes[s] = nil
 
 		case operation := <-toSend:
-			s := slot(operation.GetSlot())
+			s := slot(operation.Slot)
 			if n, exist := d.nodes[s]; exist {
 				n.Input <- operation.ToBytes()
 			}
 
 		case operationBytes := <-outputNodes:
 			operation := crdt.DecodeOperation(operationBytes)
-			toExecute <- operation
+			toExecute <- *operation
 		}
 	}
 }

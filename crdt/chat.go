@@ -1,59 +1,44 @@
 package crdt
 
 import (
-	"encoding/json"
 	"github.com/google/uuid"
 )
 
 type (
-	ConcreteChat struct {
-		Id       string `json:"Id"`
-		myNodeId uuid.UUID
-		Name     string `json:"name"`
-		nodes    []Infos
-		messages []Message
-	}
-
-	Chat interface {
-		GetId() string
-		GetName() string
-		GetNodesInfos() []Infos
-		GetSlots() []uint8
-		AddNode(infos Infos)
-		AddMessage(message Message)
-		ToBytes() ([]byte, error)
+	Chat struct {
+		Id         string
+		Name       string
+		nodesInfos []*NodeInfos
+		messages   []*Message
 	}
 )
 
 const maxNumberOfMessages, maxNumberOfNodes = 100, 100
 
-func NewChat(name string) Chat {
+func NewChat(name string) *Chat {
 	id, _ := uuid.NewUUID()
-	return &ConcreteChat{
-		Id:       id.String(),
-		Name:     name,
-		nodes:    make([]Infos, 0, maxNumberOfNodes),
-		messages: make([]Message, 0, maxNumberOfMessages),
+	return &Chat{
+		Id:         id.String(),
+		Name:       name,
+		nodesInfos: make([]*NodeInfos, 0, maxNumberOfNodes),
+		messages:   make([]*Message, 0, maxNumberOfMessages),
 	}
 }
 
-func (c *ConcreteChat) GetNodesInfos() []Infos {
-	return c.nodes
+func (c *Chat) SaveNode(nodeInfo *NodeInfos) {
+	// update if found
+	for i, n := range c.nodesInfos {
+		if n.Id == nodeInfo.Id {
+			c.nodesInfos[i] = nodeInfo
+			return
+		}
+	}
+
+	// append if not found
+	c.nodesInfos = append(c.nodesInfos, nodeInfo)
 }
 
-func (c *ConcreteChat) GetId() string {
-	return c.Id
-}
-
-func (c *ConcreteChat) GetName() string {
-	return c.Name
-}
-
-func (c *ConcreteChat) AddNode(i Infos) {
-	c.nodes = append(c.nodes, i)
-}
-
-func (c *ConcreteChat) AddMessage(message Message) {
+func (c *Chat) SaveMessage(message *Message) {
 	if len(c.messages) == 0 {
 		c.messages = append(c.messages, message)
 		return
@@ -72,7 +57,18 @@ func (c *ConcreteChat) AddMessage(message Message) {
 	}
 }
 
-func (c *ConcreteChat) containsMessage(message Message) bool {
+func (c *Chat) GetSlots(myId uuid.UUID) []uint8 {
+	slots := make([]uint8, 0, len(c.nodesInfos))
+	for _, i := range c.nodesInfos {
+		if i.Id != myId {
+			slots = append(slots, i.Slot)
+		}
+	}
+
+	return slots
+}
+
+func (c *Chat) containsMessage(message *Message) bool {
 	for _, m := range c.messages {
 		if m.GetId() == message.GetId() {
 			return true
@@ -81,22 +77,12 @@ func (c *ConcreteChat) containsMessage(message Message) bool {
 	return false
 }
 
-func (c *ConcreteChat) GetSlots() []uint8 {
-	slots := make([]uint8, 0, len(c.nodes))
-	for _, i := range c.nodes {
-		if i.getId() == c.myNodeId {
-			slots = append(slots, i.getSlot())
+func (c *Chat) containsNode(node *NodeInfos) bool {
+	for _, n := range c.nodesInfos {
+		if n.Id == node.Id {
+			return true
 		}
 	}
 
-	return slots
-}
-
-func (c *ConcreteChat) ToBytes() ([]byte, error) {
-	bytesChat, err := json.Marshal(c)
-	if err != nil {
-		return nil, err
-	}
-
-	return bytesChat, nil
+	return false
 }

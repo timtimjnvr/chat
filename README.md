@@ -36,4 +36,7 @@ Decentralized P2P chat built in golang.
 ![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/architecture.png?raw=true)
 
 ## TODO
-- test node handler under stress : many newNodes / node done / messages to send
+- choose a way to store chats : linked list of chats 
+- expose clear functions in storage
+- refacto crdt lib
+- 

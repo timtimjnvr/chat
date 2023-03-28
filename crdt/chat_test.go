@@ -7,13 +7,13 @@ import (
 
 func TestContainsMessage(t *testing.T) {
 	var (
-		chatMessages = []Message{
+		chatMessages = []*Message{
 			NewMessage("James", "Hello Bob!"),
 			NewMessage("Bob", "Hello James!"),
 			NewMessage("Peter", "Hello James!"),
 		}
 
-		chat = ConcreteChat{
+		chat = Chat{
 			messages: chatMessages,
 		}
 	)

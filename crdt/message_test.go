@@ -22,7 +22,7 @@ func TestEncodeDecodeMessage(t *testing.T) {
 			expectedError error
 		}{
 			{
-				message: message{
+				message: Message{
 					Id:      id,
 					Sender:  "James",
 					Content: "Hello my friend!",

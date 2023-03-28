@@ -16,36 +16,41 @@ func TestEncodeDecodeOperation(t *testing.T) {
 	)
 
 	var (
-		testOperations = []Operation{
-			&operation{
-				slot:         0,
-				typology:     AddNode,
-				targetedChat: uuidString,
-				data:         []byte("azertyuiopqsdfghjklmwxcvbn"),
+		testOperations = []*Operation{
+			{
+				Slot:         0,
+				Typology:     AddNode,
+				TargetedChat: uuidString,
+				Data: &NodeInfos{
+					Slot:    0,
+					Port:    "8080",
+					Address: "localhost",
+					Name:    "James",
+				},
 			},
-			&operation{
-				slot:         2,
-				typology:     JoinChatByName,
-				targetedChat: "my-awesome-ConcreteChat",
-				data:         []byte("azertyuiopqsdfghjklmwxcvbn"),
+			{
+				Slot:         2,
+				Typology:     JoinChatByName,
+				TargetedChat: "my-awesome-Chat",
+				Data:         nil,
 			},
-			&operation{
-				slot:         3,
-				typology:     AddMessage,
-				targetedChat: uuidString,
-				data: message{
+			{
+				Slot:         3,
+				Typology:     AddMessage,
+				TargetedChat: uuidString,
+				Data: &Message{
 					Id:      id,
 					Sender:  "James",
 					Date:    time.Now(),
 					Content: "Hello my Dear friend",
-				}.ToBytes(),
+				},
 			},
 		}
 	)
 
 	for i, op := range testOperations {
 		bytes := op.ToBytes()
-		res := DecodeOperation(bytes)
+		res, _ := DecodeOperation(bytes)
 		assert.True(t, reflect.DeepEqual(res, op), fmt.Sprintf("test %d failed to encode/decode struct", i))
 	}
 }

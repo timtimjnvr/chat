@@ -29,7 +29,7 @@ func main() {
 		sigc     = make(chan os.Signal, 1)
 		shutdown = make(chan struct{})
 
-		orch        = newOrchestrator(myInfos)
+		orch        = newOrchestrator(*myInfos)
 		nodeHandler = conn.NewNodeHandler(shutdown)
 
 		wgListen              = sync.WaitGroup{}
@@ -84,7 +84,7 @@ func main() {
 
 	// extract commands from stdin input
 	wgHandleStdin.Add(1)
-	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, myInfos, outGoingCommands, joinChatCommands, shutdown)
+	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, *myInfos, outGoingCommands, joinChatCommands, shutdown)
 
 	for {
 		select {

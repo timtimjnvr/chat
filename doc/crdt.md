@@ -13,7 +13,3 @@ Synchronisation happens when :
 - a message is sent.
 - a new node arrives in the chat.
 - a node leaves the chat.
-
-### operation structure
-
-![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/operation.png?raw=true)

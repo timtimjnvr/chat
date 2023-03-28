@@ -37,7 +37,7 @@ func (o *orchestrator) getPropagationOperations(op crdt.Operation, chat crdt.Cha
 	go func(syncOps chan crdt.Operation) {
 		defer close(syncOps)
 
-		switch op.GetOperationType() {
+		switch op.Typology {
 		case crdt.JoinChatByName:
 			var chatInfos []byte
 			chatInfos, err = chat.ToBytes()
@@ -53,26 +53,26 @@ func (o *orchestrator) getPropagationOperations(op crdt.Operation, chat crdt.Cha
 				break
 			}
 
-			slot := op.GetSlot()
+			slot := op.Slot
 			createChatOperation := crdt.NewOperation(crdt.CreateChat, chat.GetId(), chatInfos)
-			createChatOperation.SetSlot(slot)
-			syncOps <- createChatOperation
+			createChatOperation.Slot = slot
+			syncOps <- *createChatOperation
 
 			addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.GetId(), myInfosByte)
-			createChatOperation.SetSlot(slot)
-			syncOps <- addNodeOperation
+			createChatOperation.Slot = slot
+			syncOps <- *addNodeOperation
 
 			// propagates new node to other chats
 			slots := chat.GetSlots()
 			for _, s := range slots {
-				addNodeOperation.SetSlot(s)
-				syncOps <- addNodeOperation
+				addNodeOperation.Slot = s
+				syncOps <- *addNodeOperation
 			}
 
 		case crdt.AddMessage:
 			slots := chat.GetSlots()
 			for _, s := range slots {
-				op.SetSlot(s)
+				op.Slot = s
 				syncOps <- op
 			}
 		}
@@ -89,10 +89,10 @@ func (o *orchestrator) getChatFromStorage(op crdt.Operation) (crdt.Chat, error) 
 	)
 
 	// get targeted chat
-	switch op.GetOperationType() {
+	switch op.Typology {
 	// by name
 	case crdt.JoinChatByName:
-		c, err = o.storage.GetChat(op.GetTargetedChat(), true)
+		c, err = o.storage.GetChat(op.TargetedChat, true)
 		if err != nil {
 			return nil, err
 		}
@@ -101,7 +101,7 @@ func (o *orchestrator) getChatFromStorage(op crdt.Operation) (crdt.Chat, error) 
 
 	// by id
 	default:
-		c, err = o.storage.GetChat(op.GetTargetedChat(), false)
+		c, err = o.storage.GetChat(op.TargetedChat, false)
 		if err != nil {
 			return nil, err
 		}
@@ -144,15 +144,15 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 				/* Add the messageBytes to discussion & sync with other nodes */
 				var messageBytes []byte
 				messageBytes = crdt.NewMessage(o.myInfos.GetName(), content).ToBytes()
-				toExecute <- crdt.NewOperation(crdt.AddMessage, o.currentChat.GetId(), messageBytes)
+				toExecute <- *(crdt.NewOperation(crdt.AddMessage, o.currentChat.GetId(), messageBytes))
 			case crdt.ListChatsCommand:
 				o.storage.DisplayChats()
 
 			case crdt.LeaveChat:
-				toExecute <- crdt.NewOperation(crdt.LeaveChat, o.currentChat.GetId(), o.myInfos.ToBytes())
+				toExecute <- *(crdt.NewOperation(crdt.LeaveChat, o.currentChat.GetId(), o.myInfos.ToBytes()))
 
 			case crdt.Quit:
-				toExecute <- crdt.NewOperation(crdt.Quit, "", o.myInfos.ToBytes())
+				toExecute <- *(crdt.NewOperation(crdt.Quit, "", o.myInfos.ToBytes()))
 			}
 
 		case op := <-toExecute:
@@ -163,17 +163,17 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 			}
 
 			// execute op
-			switch op.GetOperationType() {
+			switch op.Typology {
 			case crdt.JoinChatByName:
-				var newNodeInfos crdt.Infos
-				newNodeInfos, err = crdt.DecodeInfos(op.GetOperationData())
+				var newNodeInfos *crdt.Infos
+				newNodeInfos, err = crdt.DecodeInfos(op.Data)
 				if err != nil {
 					log.Println("[ERROR]", err)
 					break
 				}
 
-				newNodeInfos.SetSlot(op.GetSlot())
-				c.AddNode(newNodeInfos)
+				newNodeInfos.Slot = op.Slot
+				c.AddNode(*newNodeInfos)
 				o.storage.SaveChat(c)
 
 				for syncOp := range o.getPropagationOperations(op, c) {
@@ -181,19 +181,20 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 				}
 
 			case crdt.AddNode:
-				var newNodeInfos crdt.Infos
-				newNodeInfos, err = crdt.DecodeInfos(op.GetOperationData())
+				var newNodeInfos *crdt.Infos
+				newNodeInfos, err = crdt.DecodeInfos(op.Data)
 				if err != nil {
 					log.Println("[ERROR]", err)
 				}
 
-				newNodeInfos.SetSlot(op.GetSlot())
-				c.AddNode(newNodeInfos)
+				newNodeInfos.Slot = op.Slot
+				newNodeInfos.SetSlot(op.Slot)
+				c.AddNode(*newNodeInfos)
 				o.storage.SaveChat(c)
 
 			case crdt.AddMessage:
 				var newMessage crdt.Message
-				newMessage, err = crdt.DecodeMessage(op.GetOperationData())
+				newMessage, err = crdt.DecodeMessage(op.Data)
 				if err != nil {
 					log.Println("[ERROR]", err)
 					break

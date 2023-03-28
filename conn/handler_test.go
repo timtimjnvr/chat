@@ -105,7 +105,7 @@ func TestDriver_StartStopNodesAndSendQuit(t *testing.T) {
 	conn2.Close()
 
 	expectedQuitOperation := crdt.NewOperation(crdt.Quit, "", []byte{})
-	expectedQuitOperation.SetSlot(1)
+	expectedQuitOperation.Slot = 1
 	expectedBytes := expectedQuitOperation.ToBytes()
 
 	timeout := time.Tick(maxTestDuration)
@@ -157,13 +157,13 @@ func TestNodeHandler_Send(t *testing.T) {
 
 	newConnections <- conn1
 	messageOperation := crdt.NewOperation(crdt.AddMessage, "test-chat", []byte("I love Unit Testing"))
-	messageOperation.SetSlot(1)
+	messageOperation.Slot = 1
 
 	expectedMessageOperation := crdt.NewOperation(crdt.AddMessage, "test-chat", []byte("I love Unit Testing"))
-	expectedMessageOperation.SetSlot(0)
+	expectedMessageOperation.Slot = 0
 	expectedBytes := expectedMessageOperation.ToBytes()
 
-	toSend <- messageOperation
+	toSend <- *messageOperation
 
 	timeout := time.Tick(maxTestDuration)
 	select {
@@ -212,7 +212,7 @@ func TestNodeHandler_50NodesStartAndStop(t *testing.T) {
 	// killing all connections and checking messages
 	for i := 0; i < maxNode; i++ {
 		connSaving[i].Close()
-		expectedQuitOperation.SetSlot(uint8(i + 1))
+		expectedQuitOperation.Slot = uint8(i + 1)
 		expectedBytes := expectedQuitOperation.ToBytes()
 		timeout := time.Tick(maxTestDuration)
 
