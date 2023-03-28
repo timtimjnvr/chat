@@ -46,7 +46,7 @@ func (c *Chat) SaveMessage(message *Message) {
 
 	if !c.containsMessage(message) {
 		var i int
-		for message.GetTime().Before(c.messages[i].GetTime()) {
+		for message.Date.Before(c.messages[i].Date) {
 			i++
 		}
 
@@ -70,7 +70,7 @@ func (c *Chat) GetSlots(myId uuid.UUID) []uint8 {
 
 func (c *Chat) containsMessage(message *Message) bool {
 	for _, m := range c.messages {
-		if m.GetId() == message.GetId() {
+		if m.Id == message.Id {
 			return true
 		}
 	}

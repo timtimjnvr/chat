@@ -25,22 +25,6 @@ func NewMessage(sender, content string) *Message {
 	}
 }
 
-func (m *Message) GetId() uuid.UUID {
-	return m.Id
-}
-
-func (m *Message) GetSender() string {
-	return m.Sender
-}
-
-func (m *Message) GetContent() string {
-	return m.Content
-}
-
-func (m *Message) GetTime() time.Time {
-	return m.Date
-}
-
 func (m *Message) ToBytes() []byte {
 	bytesMessage, _ := json.Marshal(m)
 	return bytesMessage
