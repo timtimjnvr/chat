@@ -82,8 +82,8 @@ func TestDriver_StartStopNodesAndSendQuit(t *testing.T) {
 		shutdown        = make(chan struct{}, 0)
 		nh              = NewNodeHandler(shutdown)
 		newConnections  = make(chan net.Conn)
-		toSend          = make(chan crdt.Operation)
-		toExecute       = make(chan crdt.Operation)
+		toSend          = make(chan *crdt.Operation)
+		toExecute       = make(chan *crdt.Operation)
 	)
 
 	defer func() {
@@ -104,7 +104,7 @@ func TestDriver_StartStopNodesAndSendQuit(t *testing.T) {
 	// killing conn1 by closing conn2
 	conn2.Close()
 
-	expectedQuitOperation := crdt.NewOperation(crdt.Quit, "", []byte{})
+	expectedQuitOperation := crdt.NewOperation(crdt.Quit, "", nil)
 	expectedQuitOperation.Slot = 1
 	expectedBytes := expectedQuitOperation.ToBytes()
 
@@ -144,8 +144,8 @@ func TestNodeHandler_Send(t *testing.T) {
 		shutdown        = make(chan struct{}, 0)
 		nh              = NewNodeHandler(shutdown)
 		newConnections  = make(chan net.Conn)
-		toSend          = make(chan crdt.Operation)
-		toExecute       = make(chan crdt.Operation)
+		toSend          = make(chan *crdt.Operation)
+		toExecute       = make(chan *crdt.Operation)
 	)
 
 	nh.Wg.Add(1)
@@ -156,14 +156,14 @@ func TestNodeHandler_Send(t *testing.T) {
 	}()
 
 	newConnections <- conn1
-	messageOperation := crdt.NewOperation(crdt.AddMessage, "test-chat", []byte("I love Unit Testing"))
+	messageOperation := crdt.NewOperation(crdt.AddMessage, "test-chat", &crdt.Message{Content: "I love Unit Testing"})
 	messageOperation.Slot = 1
 
-	expectedMessageOperation := crdt.NewOperation(crdt.AddMessage, "test-chat", []byte("I love Unit Testing"))
+	expectedMessageOperation := crdt.NewOperation(crdt.AddMessage, "test-chat", &crdt.Message{Content: "I love Unit Testing"})
 	expectedMessageOperation.Slot = 0
 	expectedBytes := expectedMessageOperation.ToBytes()
 
-	toSend <- *messageOperation
+	toSend <- messageOperation
 
 	timeout := time.Tick(maxTestDuration)
 	select {
@@ -181,8 +181,8 @@ func TestNodeHandler_50NodesStartAndStop(t *testing.T) {
 		shutdown        = make(chan struct{}, 0)
 		nh              = NewNodeHandler(shutdown)
 		newConnections  = make(chan net.Conn)
-		toSend          = make(chan crdt.Operation)
-		toExecute       = make(chan crdt.Operation)
+		toSend          = make(chan *crdt.Operation)
+		toExecute       = make(chan *crdt.Operation)
 
 		firstPort  = 1235
 		maxNode    = 50
@@ -207,7 +207,7 @@ func TestNodeHandler_50NodesStartAndStop(t *testing.T) {
 		firstPort++
 	}
 
-	expectedQuitOperation := crdt.NewOperation(crdt.Quit, "", []byte{})
+	expectedQuitOperation := crdt.NewOperation(crdt.Quit, "", nil)
 
 	// killing all connections and checking messages
 	for i := 0; i < maxNode; i++ {

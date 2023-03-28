@@ -51,9 +51,15 @@ func (op *Operation) ToBytes() []byte {
 	bytes = append(bytes, uint8(len(op.TargetedChat)))
 	bytes = append(bytes, []byte(op.TargetedChat)...)
 	bytes = append(bytes, uint8(op.Typology))
-	dataBytes := op.Data.ToBytes()
+	var dataBytes = []byte{}
+	if  op.Data != nil {
+		dataBytes = op.Data.ToBytes()
+
+	}
+
 	bytes = append(bytes, uint8(len(dataBytes)))
 	bytes = append(bytes, dataBytes...)
+
 	return bytes
 }
 
@@ -70,13 +76,9 @@ func DecodeOperation(bytes []byte) (*Operation, error) {
 		Data:         nil,
 	}
 
-	if len(dataBytes) == 0 || op.Typology == CreateChat {
-		return op, nil
-	}
-
 	// decode data into concrete type
 	switch typology {
-	case AddNode, LeaveChat:
+	case AddNode, LeaveChat, JoinChatByName:
 		var result *NodeInfos
 		err := DecodeData(dataBytes, result)
 		if err != nil {
@@ -93,6 +95,7 @@ func DecodeOperation(bytes []byte) (*Operation, error) {
 		}
 
 		op.Data = result
+	default:
 	}
 
 	return op, nil

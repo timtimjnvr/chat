@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"reflect"
 	"testing"
 	"time"
@@ -32,7 +33,7 @@ func TestEncodeDecodeOperation(t *testing.T) {
 				Slot:         2,
 				Typology:     JoinChatByName,
 				TargetedChat: "my-awesome-Chat",
-				Data:         nil,
+				Data:         &NodeInfos{Name: "Bob"},
 			},
 			{
 				Slot:         3,
@@ -50,8 +51,15 @@ func TestEncodeDecodeOperation(t *testing.T) {
 
 	for i, op := range testOperations {
 		bytes := op.ToBytes()
-		res, _ := DecodeOperation(bytes)
-		assert.True(t, reflect.DeepEqual(res, op), fmt.Sprintf("test %d failed to encode/decode struct", i))
+		decodedOp, err := DecodeOperation(bytes)
+		if err != nil {
+			log.Println(err)
+		}
+
+		log.Println(decodedOp)
+		log.Println(op)
+
+		assert.True(t, reflect.DeepEqual(decodedOp, op), fmt.Sprintf("test %d failed to encode/decode struct", i))
 	}
 }
 

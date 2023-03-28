@@ -22,7 +22,7 @@ type (
 		Shutdown chan struct{}
 	}
 
-	nodeHandler struct {
+	NodeHandler struct {
 		nodes map[slot]*node
 
 		Wg       *sync.WaitGroup
@@ -77,7 +77,7 @@ func (n *node) start(done chan<- slot) {
 				return
 			}
 
-			// set node slot for chat nodeHandler
+			// set node slot for chat NodeHandler
 			n.setSlot(message)
 			n.Output <- message
 		}
@@ -98,7 +98,7 @@ func (n *node) stop() {
 	n.Wg.Wait()
 }
 
-func (d *nodeHandler) getNextSlot() slot {
+func (d *NodeHandler) getNextSlot() slot {
 	length := len(d.nodes)
 	for s, n := range d.nodes {
 		if n == nil {
@@ -109,20 +109,19 @@ func (d *nodeHandler) getNextSlot() slot {
 	return slot(length + 1)
 }
 
-func NewNodeHandler(shutdown chan struct{}) *nodeHandler {
-	return &nodeHandler{
+func NewNodeHandler(shutdown chan struct{}) *NodeHandler {
+	return &NodeHandler{
 		nodes:    make(map[slot]*node),
 		Wg:       &sync.WaitGroup{},
 		Shutdown: shutdown,
 	}
 }
 
-func (d *nodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan crdt.Operation, toExecute chan<- crdt.Operation) {
+func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.Operation, toExecute chan<- *crdt.Operation) {
 
 	var (
 		done        = make(chan slot)
 		outputNodes = make(chan []byte)
-		err         error
 	)
 
 	defer func() {
@@ -140,8 +139,7 @@ func (d *nodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan crdt.O
 
 		case c := <-newConnections:
 			s := d.getNextSlot()
-			var n *node
-			n, err = newNode(c, d.getNextSlot(), outputNodes)
+			n, err := newNode(c, d.getNextSlot(), outputNodes)
 			if err != nil {
 				log.Println("[ERROR] ", err)
 				continue
@@ -152,9 +150,9 @@ func (d *nodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan crdt.O
 			d.nodes[s] = n
 
 		case s := <-done:
-			quitOperation := crdt.NewOperation(crdt.Quit, "", []byte{})
+			quitOperation := crdt.NewOperation(crdt.Quit, "", nil)
 			quitOperation.Slot = uint8(s)
-			toExecute <- *quitOperation
+			toExecute <- quitOperation
 			d.nodes[s] = nil
 
 		case operation := <-toSend:
@@ -164,8 +162,11 @@ func (d *nodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan crdt.O
 			}
 
 		case operationBytes := <-outputNodes:
-			operation := crdt.DecodeOperation(operationBytes)
-			toExecute <- *operation
+			operation, err := crdt.DecodeOperation(operationBytes)
+			if err != nil {
+				continue
+			}
+			toExecute <- operation
 		}
 	}
 }

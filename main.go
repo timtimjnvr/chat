@@ -29,7 +29,7 @@ func main() {
 		sigc     = make(chan os.Signal, 1)
 		shutdown = make(chan struct{})
 
-		orch        = newOrchestrator(*myInfos)
+		orch        = newOrchestrator(myInfos)
 		nodeHandler = conn.NewNodeHandler(shutdown)
 
 		wgListen              = sync.WaitGroup{}
@@ -59,8 +59,8 @@ func main() {
 		outGoingCommands = make(chan parsestdin.Command)
 		joinChatCommands = make(chan parsestdin.Command)
 		newConnections   = make(chan net.Conn)
-		toSend           = make(chan crdt.Operation)
-		toExecute        = make(chan crdt.Operation)
+		toSend           = make(chan *crdt.Operation)
+		toExecute        = make(chan *crdt.Operation)
 	)
 
 	// listen for new connections

@@ -3,7 +3,6 @@ package storage
 import (
 	"github.com/google/uuid"
 	"github/timtimjnvr/chat/crdt"
-	"log"
 )
 
 type (
@@ -13,11 +12,11 @@ type (
 
 	List interface {
 		Len() int
-		Add(value interface{}) uuid.UUID
+		Add(chat *crdt.Chat) uuid.UUID
 		Contains(id uuid.UUID) bool
-		Update(id uuid.UUID, value interface{})
-		GetByIndex(index int) (interface{}, error)
-		GetById(id uuid.UUID) (interface{}, error)
+		Update(id uuid.UUID, chat *crdt.Chat)
+		GetByIndex(index int) (*crdt.Chat, error)
+		GetById(id uuid.UUID) (*crdt.Chat, error)
 		Delete(key uuid.UUID)
 		Display()
 	}
@@ -29,21 +28,20 @@ func NewStorage() *Storage {
 	}
 }
 
-func (s *Storage) GetChat(identifier string, byName bool) (crdt.Chat, error) {
-	log.Println(identifier)
+func (s *Storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
 	var (
 		numberOfChats = s.chats.Len()
-		c             crdt.Chat
+		c             *crdt.Chat
 		err           error
 	)
 
+
+
+
 	if byName {
 		for index := 0; index < numberOfChats; index++ {
-			var chatValue interface{}
-			chatValue, _ = s.chats.GetByIndex(index)
-			c = chatValue.(*crdt.ConcreteChat)
-
-			if c.GetName() == identifier {
+			c, _ = s.chats.GetByIndex(index)
+			if c.Name == identifier {
 				return c, nil
 			}
 		}
@@ -61,18 +59,17 @@ func (s *Storage) GetChat(identifier string, byName bool) (crdt.Chat, error) {
 		return nil, InvalidIdentifier
 	}
 
-	var chatValue interface{}
-	chatValue, err = s.chats.GetById(id)
+	c, err = s.chats.GetById(id)
 
 	if err != nil {
 		return nil, NotFound
 	}
 
-	return chatValue.(*crdt.ConcreteChat), nil
+	return c, nil
 }
 
-func (s *Storage) SaveChat(c crdt.Chat) {
-	id, _ := uuid.Parse(c.GetId())
+func (s *Storage) SaveChat(c *crdt.Chat) {
+	id, _ := uuid.Parse(c.Id)
 	if !s.chats.Contains(id) {
 		s.chats.Add(c)
 		return
