@@ -35,7 +35,7 @@ func TestListenAndServe(t *testing.T) {
 
 	wg.Add(1)
 	isListening.L.Lock()
-	go Listen(&wg, isListening, ip, port, newConnections, shutdown)
+	go CreateConnections(&wg, isListening, &crdt.NodeInfos{Address: ip, Port: port}, make(chan parsestdin.Command), newConnections, shutdown)
 	isListening.Wait()
 
 	for i := 0; i < syscall.SOMAXCONN; i++ {
@@ -89,11 +89,11 @@ func TestInitConnections(t *testing.T) {
 
 	wgListen.Add(1)
 	isListening.L.Lock()
-	go Listen(&wgListen, isListening, "", listenerInfos.Port, newConnectionsListen, shutdown)
+	go CreateConnections(&wgListen, isListening, &crdt.NodeInfos{Address: "", Port: listenerInfos.Port}, make(chan parsestdin.Command), newConnectionsListen, shutdown)
 	isListening.Wait()
 
 	wgInitConnections.Add(1)
-	go InitConnections(&wgInitConnections, joinerInfos, joinChatCommands, newConnectionsInitConn, shutdown)
+	go Connect(&wgInitConnections, joinerInfos, joinChatCommands, newConnectionsInitConn, shutdown)
 
 	joinChatCommand, err := parsestdin.NewCommand(fmt.Sprintf("%s %s %s %s", "/join", listenerInfos.Address, listenerInfos.Port, listenerInfos.Name))
 	if err != nil {
@@ -217,7 +217,7 @@ func helperGetConnections(port string) (net.Conn, net.Conn, error) {
 
 	wgListen.Add(1)
 	isListening.L.Lock()
-	go Listen(&wgListen, isListening, "", port, newConnections, shutdown)
+	go CreateConnections(&wgListen, isListening, &crdt.NodeInfos{Address: "", Port: port}, make(chan parsestdin.Command), newConnections, shutdown)
 	isListening.Wait()
 
 	conn1, err := net.Dial(transportProtocol, fmt.Sprintf(":%s", port))

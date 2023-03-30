@@ -19,20 +19,26 @@ const (
 	maxMessageSize = 1000
 )
 
-func Listen(wg *sync.WaitGroup, isReady *sync.Cond, addr, port string, newConnections chan net.Conn, shutdown <-chan struct{}) {
+func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.NodeInfos, joinChatCommands chan parsestdin.Command, newConnections chan net.Conn, shutdown <-chan struct{}) {
 	var (
-		c         net.Conn
-		wgClosure = sync.WaitGroup{}
-		err       error
+		c                     net.Conn
+		wgInitNodeConnections = sync.WaitGroup{}
+		wgClosure             = sync.WaitGroup{}
+		err                   error
 	)
 
+	wgInitNodeConnections.Add(1)
+	go Connect(&wgInitNodeConnections, myInfos, joinChatCommands, newConnections, shutdown)
+
 	defer func() {
+		close(newConnections)
 		isReady.Signal()
 		wgClosure.Wait()
+		wgInitNodeConnections.Wait()
 		wg.Done()
 	}()
 
-	ln, err := net.Listen(transportProtocol, fmt.Sprintf("%s:%s", addr, port))
+	ln, err := net.Listen(transportProtocol, fmt.Sprintf("%s:%s", myInfos.Address, myInfos.Port))
 	if err != nil {
 		log.Fatal("[ERROR]", err)
 	}
@@ -66,7 +72,7 @@ func handleClosure(wg *sync.WaitGroup, ln net.Listener, shutdown <-chan struct{}
 	wg.Done()
 }
 
-func InitConnections(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, newJoinChatCommands <-chan parsestdin.Command, newConnections chan<- net.Conn, shutdown <-chan struct{}) {
+func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, newJoinChatCommands <-chan parsestdin.Command, newConnections chan<- net.Conn, shutdown <-chan struct{}) {
 	defer func() {
 		wg.Done()
 	}()

@@ -71,11 +71,11 @@ func (o *orchestrator) getChatFromStorage(op crdt.Operation) (*crdt.Chat, error)
 		err error
 	)
 
-	if op.Typology == crdt.Quit{
+	if op.Typology == crdt.Quit {
 		return nil, nil
 	}
 
-	c, err = o.storage.GetChat(op.TargetedChat, op.Typology==crdt.JoinChatByName)
+	c, err = o.storage.GetChat(op.TargetedChat, op.Typology == crdt.JoinChatByName)
 	if err != nil {
 		return nil, err
 	}
@@ -98,6 +98,8 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 			args := cmd.GetArgs()
 
 			switch cmd.GetTypology() {
+			case crdt.JoinChatByName:
+
 			case crdt.CreateChat:
 				var (
 					chatName = args[parsestdin.ChatRoomArg]
@@ -111,8 +113,8 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 
 				/* Add the messageBytes to discussion & sync with other nodes */
 				toExecute <- crdt.NewOperation(crdt.AddMessage,
-												o.currentChat.Id,
-												crdt.NewMessage(o.myInfos.Name, args[parsestdin.MessageArg]))
+					o.currentChat.Id,
+					crdt.NewMessage(o.myInfos.Name, args[parsestdin.MessageArg]))
 			case crdt.ListChatsCommand:
 				o.storage.DisplayChats()
 

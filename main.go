@@ -4,10 +4,10 @@ import (
 	"github/timtimjnvr/chat/conn"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/parsestdin"
+	"net"
 
 	"flag"
 	"log"
-	"net"
 	"os"
 	"os/signal"
 	"sync"
@@ -26,18 +26,22 @@ func main() {
 	var (
 		myInfos = crdt.NewNodeInfos(*myAddrPtr, *myPortPtr, *myNamePtr)
 
-		sigc     = make(chan os.Signal, 1)
-		shutdown = make(chan struct{})
+		sigc             = make(chan os.Signal, 1)
+		shutdown         = make(chan struct{})
+		outGoingCommands = make(chan parsestdin.Command)
+		joinChatCommands = make(chan parsestdin.Command)
+		newConnections   = make(chan net.Conn)
+		toSend           = make(chan *crdt.Operation)
+		toExecute        = make(chan *crdt.Operation)
+
+		wgListen      = sync.WaitGroup{}
+		wgHandleChats = sync.WaitGroup{}
+		wgHandleStdin = sync.WaitGroup{}
+		lock          = sync.Mutex{}
+		isReady       = sync.NewCond(&lock)
 
 		orch        = newOrchestrator(myInfos)
 		nodeHandler = conn.NewNodeHandler(shutdown)
-
-		wgListen              = sync.WaitGroup{}
-		wgHandleChats         = sync.WaitGroup{}
-		wgHandleStdin         = sync.WaitGroup{}
-		wgInitNodeConnections = sync.WaitGroup{}
-		lock                  = sync.Mutex{}
-		isListening           = sync.NewCond(&lock)
 	)
 
 	defer func() {
@@ -45,7 +49,6 @@ func main() {
 		wgHandleChats.Wait()
 		wgListen.Wait()
 		nodeHandler.Wg.Wait()
-		wgInitNodeConnections.Wait()
 		log.Println("[INFO] program shutdown")
 	}()
 
@@ -55,34 +58,22 @@ func main() {
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 
-	var (
-		outGoingCommands = make(chan parsestdin.Command)
-		joinChatCommands = make(chan parsestdin.Command)
-		newConnections   = make(chan net.Conn)
-		toSend           = make(chan *crdt.Operation)
-		toExecute        = make(chan *crdt.Operation)
-	)
-
-	// listen for new connections
+	// create connections : tcp connect for joinChatCommands & listen for incoming connections
 	wgListen.Add(1)
-	isListening.L.Lock()
-	go conn.Listen(&wgListen, isListening, *myAddrPtr, *myPortPtr, newConnections, shutdown)
-	isListening.Wait()
+	isReady.L.Lock()
+	go conn.CreateConnections(&wgListen, isReady, myInfos, joinChatCommands, newConnections, shutdown)
+	isReady.Wait()
 
-	// create connections with new nodes
-	wgInitNodeConnections.Add(1)
-	go conn.InitConnections(&wgInitNodeConnections, myInfos, joinChatCommands, newConnections, shutdown)
-
-	// handle new connections until closure
+	// handle created connections until closure
 	nodeHandler.Wg.Add(1)
 	go nodeHandler.Start(newConnections, toSend, toExecute)
 	defer nodeHandler.Wg.Wait()
 
-	// execute and propagates commands & operations to maintain chat data consistency between nodes
+	// maintain chat infos
 	wgHandleChats.Add(1)
 	go orch.handleChats(&wgHandleChats, outGoingCommands, toExecute, toSend, shutdown)
 
-	// extract commands from stdin input
+	// create commands from stdin input
 	wgHandleStdin.Add(1)
 	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, *myInfos, outGoingCommands, joinChatCommands, shutdown)
 
