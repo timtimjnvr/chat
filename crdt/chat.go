@@ -2,6 +2,7 @@ package crdt
 
 import (
 	"github.com/google/uuid"
+	"time"
 )
 
 type (
@@ -44,9 +45,14 @@ func (c *Chat) SaveMessage(message *Message) {
 		return
 	}
 
+	date, _ := time.Parse(time.RFC3339, message.Date)
 	if !c.containsMessage(message) {
-		var i int
-		for message.Date.Before(c.messages[i].Date) {
+		var (
+			i          int
+			tmpDate, _ = time.Parse(time.RFC3339, c.messages[i].Date)
+		)
+
+		for date.Before(tmpDate) {
 			i++
 		}
 

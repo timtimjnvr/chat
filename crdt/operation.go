@@ -51,10 +51,10 @@ func (op *Operation) ToBytes() []byte {
 	bytes = append(bytes, uint8(len(op.TargetedChat)))
 	bytes = append(bytes, []byte(op.TargetedChat)...)
 	bytes = append(bytes, uint8(op.Typology))
-	var dataBytes = []byte{}
-	if  op.Data != nil {
-		dataBytes = op.Data.ToBytes()
 
+	var dataBytes []byte
+	if op.Data != nil {
+		dataBytes = op.Data.ToBytes()
 	}
 
 	bytes = append(bytes, uint8(len(dataBytes)))
@@ -76,32 +76,31 @@ func DecodeOperation(bytes []byte) (*Operation, error) {
 		Data:         nil,
 	}
 
-	// decode data into concrete type
+	// decode data into concrete type when needed
 	switch typology {
 	case AddNode, LeaveChat, JoinChatByName:
-		var result *NodeInfos
-		err := DecodeData(dataBytes, result)
+		var result NodeInfos
+		err := decodeData(dataBytes, &result)
 		if err != nil {
 			return nil, err
 		}
 
-		op.Data = result
+		op.Data = &result
 
 	case AddMessage:
-		var result *Message
-		err := DecodeData(dataBytes, result)
+		var result Message
+		err := decodeData(dataBytes, &result)
 		if err != nil {
 			return nil, err
 		}
 
-		op.Data = result
-	default:
+		op.Data = &result
 	}
 
 	return op, nil
 }
 
-func DecodeData(bytes []byte, result any) error {
+func decodeData(bytes []byte, result any) error {
 	err := json.Unmarshal(bytes, &result)
 	if err != nil {
 		return err
@@ -111,6 +110,10 @@ func DecodeData(bytes []byte, result any) error {
 }
 
 func getField(offset int, source []byte) (int, []byte) {
-	lenField := int(source[offset])
-	return offset + lenField + 1, source[offset+1 : offset+lenField+1]
+	if len(source) <= offset-1 {
+		return 0, []byte{}
+	} else {
+		lenField := int(source[offset])
+		return offset + lenField + 1, source[offset+1 : offset+lenField+1]
+	}
 }

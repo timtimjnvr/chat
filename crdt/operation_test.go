@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"log"
 	"reflect"
 	"testing"
 	"time"
@@ -17,49 +16,63 @@ func TestEncodeDecodeOperation(t *testing.T) {
 	)
 
 	var (
-		testOperations = []*Operation{
+		tests = []struct {
+			op          *Operation
+			expectedErr error
+		}{
 			{
-				Slot:         0,
-				Typology:     AddNode,
-				TargetedChat: uuidString,
-				Data: &NodeInfos{
-					Slot:    0,
-					Port:    "8080",
-					Address: "localhost",
-					Name:    "James",
+				&Operation{
+					Slot:         0,
+					Typology:     AddNode,
+					TargetedChat: uuidString,
+					Data: &NodeInfos{
+						Slot:    0,
+						Port:    "8080",
+						Address: "localhost",
+						Name:    "James",
+					},
 				},
+				nil,
 			},
 			{
-				Slot:         2,
-				Typology:     JoinChatByName,
-				TargetedChat: "my-awesome-Chat",
-				Data:         &NodeInfos{Name: "Bob"},
+				&Operation{
+					Slot:         2,
+					Typology:     JoinChatByName,
+					TargetedChat: "my-awesome-Chat",
+					Data: &NodeInfos{
+						Slot:    0,
+						Port:    "8080",
+						Address: "localhost",
+						Name:    "James",
+					},
+				},
+				nil,
 			},
 			{
-				Slot:         3,
-				Typology:     AddMessage,
-				TargetedChat: uuidString,
-				Data: &Message{
-					Id:      id,
-					Sender:  "James",
-					Date:    time.Now(),
-					Content: "Hello my Dear friend",
+				&Operation{
+					Slot:         3,
+					Typology:     AddMessage,
+					TargetedChat: uuidString,
+					Data: &Message{
+						Id:      id,
+						Sender:  "James",
+						Date:    time.Now().Format(time.RFC3339),
+						Content: "Hello my Dear friend",
+					},
 				},
+				nil,
 			},
 		}
 	)
 
-	for i, op := range testOperations {
-		bytes := op.ToBytes()
+	for i, test := range tests {
+		bytes := test.op.ToBytes()
 		decodedOp, err := DecodeOperation(bytes)
 		if err != nil {
-			log.Println(err)
+			assert.Equal(t, err, test.expectedErr, fmt.Sprintf("test %d failed on getting error", i))
 		}
 
-		log.Println(decodedOp)
-		log.Println(op)
-
-		assert.True(t, reflect.DeepEqual(decodedOp, op), fmt.Sprintf("test %d failed to encode/decode struct", i))
+		assert.True(t, reflect.DeepEqual(decodedOp, test.op), fmt.Sprintf("test %d failed to encode/decode struct", i))
 	}
 }
 
@@ -88,6 +101,5 @@ func TestGetField(t *testing.T) {
 		offset, field := getField(d.offset, d.bytes)
 		assert.Equal(t, d.expectedField, field, fmt.Sprintf("test %d failed on field", i))
 		assert.Equal(t, d.expectedOffset, offset, fmt.Sprintf("test %d failed on offset", i))
-
 	}
 }

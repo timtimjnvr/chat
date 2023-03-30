@@ -8,10 +8,10 @@ import (
 
 type (
 	Message struct {
-		Id      uuid.UUID `json:"Id"`
+		Id      uuid.UUID `json:"id"`
 		Sender  string    `json:"sender"`
 		Content string    `json:"content"`
-		Date    time.Time `json:"date"`
+		Date    string    `json:"date"`
 	}
 )
 
@@ -21,7 +21,7 @@ func NewMessage(sender, content string) *Message {
 		Id:      id,
 		Sender:  sender,
 		Content: content,
-		Date:    time.Now().UTC(),
+		Date:    time.Now().Format(time.RFC3339),
 	}
 }
 

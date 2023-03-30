@@ -35,7 +35,7 @@ func TestEncodeDecodeNode(t *testing.T) {
 	for i, test := range tests {
 		bytes := test.message.ToBytes()
 		var res = &NodeInfos{}
-		err := DecodeData(bytes, res)
+		err := decodeData(bytes, res)
 		assert.True(t, reflect.DeepEqual(res, test.message), fmt.Sprintf("test %d failed to encode/decode struct", i))
 		assert.True(t, reflect.DeepEqual(err, test.expectedError), fmt.Sprintf("test %d failed on error returned", i))
 	}
