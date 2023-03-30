@@ -64,16 +64,16 @@ func TestListenAndServe(t *testing.T) {
 	}
 }
 
-func TestInitConnections(t *testing.T) {
+func TestConnect(t *testing.T) {
 	var (
 		listenerInfos = crdt.NewNodeInfos("127.0.0.1", "12343", "Listener")
 		joinerInfos   = crdt.NewNodeInfos("127.0.0.1", "12342", "Joiner")
 
-		wgListen          = sync.WaitGroup{}
-		wgInitConnections = sync.WaitGroup{}
-		shutdown          = make(chan struct{}, 0)
-		lock              = sync.Mutex{}
-		isListening       = sync.NewCond(&lock)
+		wgListen    = sync.WaitGroup{}
+		wgConnect   = sync.WaitGroup{}
+		shutdown    = make(chan struct{}, 0)
+		lock        = sync.Mutex{}
+		isListening = sync.NewCond(&lock)
 
 		joinChatCommands       = make(chan parsestdin.Command)
 		newConnectionsListen   = make(chan net.Conn)
@@ -84,7 +84,7 @@ func TestInitConnections(t *testing.T) {
 	defer func() {
 		close(shutdown)
 		wgListen.Wait()
-		wgInitConnections.Wait()
+		wgConnect.Wait()
 	}()
 
 	wgListen.Add(1)
@@ -92,8 +92,8 @@ func TestInitConnections(t *testing.T) {
 	go CreateConnections(&wgListen, isListening, &crdt.NodeInfos{Address: "", Port: listenerInfos.Port}, make(chan parsestdin.Command), newConnectionsListen, shutdown)
 	isListening.Wait()
 
-	wgInitConnections.Add(1)
-	go Connect(&wgInitConnections, joinerInfos, joinChatCommands, newConnectionsInitConn, shutdown)
+	wgConnect.Add(1)
+	go Connect(&wgConnect, joinerInfos, joinChatCommands, newConnectionsInitConn, shutdown)
 
 	joinChatCommand, err := parsestdin.NewCommand(fmt.Sprintf("%s %s %s %s", "/join", listenerInfos.Address, listenerInfos.Port, listenerInfos.Name))
 	if err != nil {
