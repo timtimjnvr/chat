@@ -66,7 +66,7 @@ func handleClosure(wg *sync.WaitGroup, ln net.Listener, shutdown <-chan struct{}
 	wg.Done()
 }
 
-func InitConnections(wg *sync.WaitGroup, myInfos crdt.Infos, newJoinChatCommands <-chan parsestdin.Command, newConnections chan<- net.Conn, shutdown <-chan struct{}) {
+func InitConnections(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, newJoinChatCommands <-chan parsestdin.Command, newConnections chan<- net.Conn, shutdown <-chan struct{}) {
 	defer func() {
 		wg.Done()
 	}()
@@ -97,7 +97,7 @@ func InitConnections(wg *sync.WaitGroup, myInfos crdt.Infos, newJoinChatCommands
 			}
 
 			// init joining process
-			_, err = newConn.Write(crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos.ToBytes()).ToBytes())
+			_, err = newConn.Write(crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos).ToBytes())
 			if err != nil {
 				log.Println("[ERROR] ", err)
 			}

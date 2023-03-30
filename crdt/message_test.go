@@ -18,15 +18,15 @@ func TestEncodeDecodeMessage(t *testing.T) {
 
 	var (
 		tests = []struct {
-			message       Message
+			message       *Message
 			expectedError error
 		}{
 			{
-				message: message{
+				message: &Message{
 					Id:      id,
 					Sender:  "James",
 					Content: "Hello my friend!",
-					Date:    time.Now().UTC(),
+					Date:    time.Now().Format(time.RFC3339),
 				},
 				expectedError: nil,
 			},
@@ -35,7 +35,8 @@ func TestEncodeDecodeMessage(t *testing.T) {
 
 	for i, test := range tests {
 		bytes := test.message.ToBytes()
-		res, err := DecodeMessage(bytes)
+		var res = &Message{}
+		err := decodeData(bytes, res)
 		assert.True(t, reflect.DeepEqual(res, test.message), fmt.Sprintf("test %d failed to encode/decode struct", i))
 		assert.True(t, reflect.DeepEqual(err, test.expectedError), fmt.Sprintf("test %d failed on error returned", i))
 	}

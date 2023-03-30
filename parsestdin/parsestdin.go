@@ -140,7 +140,7 @@ func (c command) GetArgs() map[string]string {
 	return c.args
 }
 
-func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.Infos, outGoingCommands chan<- Command, joinChatCommands chan<- Command, shutdown chan struct{}) {
+func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.NodeInfos, outGoingCommands chan<- Command, joinChatCommands chan<- Command, shutdown chan struct{}) {
 	var wgReadStdin = sync.WaitGroup{}
 
 	defer func() {

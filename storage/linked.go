@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github/timtimjnvr/chat/crdt"
 )
 
 var (
@@ -13,9 +14,9 @@ var (
 
 type (
 	element struct {
-		key   uuid.UUID
-		value interface{}
-		next  *element
+		key  uuid.UUID
+		chat *crdt.Chat
+		next *element
 	}
 
 	list struct {
@@ -29,11 +30,11 @@ func NewList() *list {
 	return &list{}
 }
 
-func newElement(value interface{}) *element {
+func newElement(chat *crdt.Chat) *element {
 	id := uuid.New()
 	return &element{
-		key:   id,
-		value: value,
+		key:  id,
+		chat: chat,
 	}
 }
 func (l *list) Len() int {
@@ -41,18 +42,18 @@ func (l *list) Len() int {
 }
 
 func (l *list) Display() {
-	fmt.Printf("%d elements\n", l.length)
+	fmt.Printf("%d chats\n", l.length)
 
 	tmp := l.head
 	for tmp != nil {
-		fmt.Printf("%s ->", tmp.value)
+		fmt.Printf("%s", tmp.chat.Name)
 		tmp = tmp.next
 	}
 }
 
-// Add insert value at the end of the list and return the key of the inserted value
-func (l *list) Add(value interface{}) uuid.UUID {
-	e := newElement(value)
+// Add insert chat at the end of the list and return the key of the inserted chat
+func (l *list) Add(chat *crdt.Chat) uuid.UUID {
+	e := newElement(chat)
 	if l.length == 0 {
 		l.head = e
 		l.tail = e
@@ -92,18 +93,18 @@ func (l *list) Contains(id uuid.UUID) bool {
 	return false
 }
 
-func (l *list) Update(id uuid.UUID, value interface{}) {
+func (l *list) Update(id uuid.UUID, chat *crdt.Chat) {
 	first := l.head
 	for first.next != nil && first.key != id {
 		first = first.next
 	}
 
 	if first.key == id {
-		first.value = value
+		first.chat = chat
 	}
 }
 
-func (l *list) GetByIndex(index int) (interface{}, error) {
+func (l *list) GetByIndex(index int) (*crdt.Chat, error) {
 	if index >= l.Len() {
 		return nil, NotFound
 	}
@@ -112,17 +113,17 @@ func (l *list) GetByIndex(index int) (interface{}, error) {
 		l.head = l.head.next
 	}
 
-	return l.head.value, nil
+	return l.head.chat, nil
 }
 
-func (l *list) GetById(id uuid.UUID) (interface{}, error) {
+func (l *list) GetById(id uuid.UUID) (*crdt.Chat, error) {
 	first := l.head
 	for first.next != nil && first.key != id {
 		first = first.next
 	}
 
 	if first.key == id {
-		return first.value, nil
+		return first.chat, nil
 	}
 
 	return nil, NotFound

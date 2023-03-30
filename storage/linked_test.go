@@ -1,8 +1,10 @@
 package storage
 
 import (
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github/timtimjnvr/chat/crdt"
 	"testing"
 )
 
@@ -15,18 +17,18 @@ func TestList_Len(t *testing.T) {
 func TestList_Add(t *testing.T) {
 	ass := assert.New(t)
 	l := NewList()
-	l.Add(1)
-	l.Add(2)
-	l.Add(3)
+	l.Add(&crdt.Chat{Name: "1"})
+	l.Add(&crdt.Chat{Name: "2"})
+	l.Add(&crdt.Chat{Name: "3"})
 
 	ass.Equal(3, l.Len(), "failed on Adding elements")
 }
 
 func TestList_Contains(t *testing.T) {
 	l := NewList()
-	id1 := l.Add(1)
-	id2 := l.Add(2)
-	id3 := l.Add(3)
+	id1 := l.Add(&crdt.Chat{Name: "1"})
+	id2 := l.Add(&crdt.Chat{Name: "2"})
+	id3 := l.Add(&crdt.Chat{Name: "3"})
 
 	errMessage := "failed on finding element"
 	assert.True(t, l.Contains(id1), errMessage)
@@ -40,20 +42,20 @@ func TestList_Contains(t *testing.T) {
 func TestList_Update(t *testing.T) {
 
 	l := NewList()
-	id1 := l.Add(1)
-	l.Update(id1, 3)
-	v, _ := l.GetById(id1)
+	id1 := l.Add(&crdt.Chat{Name: "1"})
+	l.Update(id1, &crdt.Chat{Name: "3"})
+	c, _ := l.GetById(id1)
 
-	assert.Equal(t, 3, v.(int), "failed to update value")
+	assert.Equal(t, &crdt.Chat{Name: "3"}, c, "failed to update chat")
 }
 
 func TestList_Delete(t *testing.T) {
 	var (
 		ass    = assert.New(t)
 		l      = NewList()
-		first  = l.Add(1)
-		second = l.Add(2)
-		third  = l.Add(3)
+		first  = l.Add(&crdt.Chat{Name: "1"})
+		second = l.Add(&crdt.Chat{Name: "2"})
+		third  = l.Add(&crdt.Chat{Name: "3"})
 	)
 
 	l.Delete(first)
@@ -76,7 +78,7 @@ func TestList_GetById(t *testing.T) {
 	)
 
 	for _, value := range values {
-		valuesIds[value] = l.Add(value)
+		valuesIds[value] = l.Add(&crdt.Chat{Name: fmt.Sprintf("%d", value)})
 	}
 
 	for value, id := range valuesIds {
@@ -86,6 +88,6 @@ func TestList_GetById(t *testing.T) {
 			return
 		}
 
-		ass.Equal(res.(int), value, "failed on getting element by id, wrong value")
+		ass.Equal(res, &crdt.Chat{Name: fmt.Sprintf("%d", value)}, "failed on getting element by id, wrong chat")
 	}
 }

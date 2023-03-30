@@ -89,13 +89,13 @@ func TestInitConnections(t *testing.T) {
 
 	wgListen.Add(1)
 	isListening.L.Lock()
-	go Listen(&wgListen, isListening, "", listenerInfos.GetPort(), newConnectionsListen, shutdown)
+	go Listen(&wgListen, isListening, "", listenerInfos.Port, newConnectionsListen, shutdown)
 	isListening.Wait()
 
 	wgInitConnections.Add(1)
 	go InitConnections(&wgInitConnections, joinerInfos, joinChatCommands, newConnectionsInitConn, shutdown)
 
-	joinChatCommand, err := parsestdin.NewCommand(fmt.Sprintf("%s %s %s %s", "/join", listenerInfos.GetAddr(), listenerInfos.GetPort(), listenerInfos.GetName()))
+	joinChatCommand, err := parsestdin.NewCommand(fmt.Sprintf("%s %s %s %s", "/join", listenerInfos.Address, listenerInfos.Port, listenerInfos.Name))
 	if err != nil {
 		assert.Fail(t, "Failed to parse command :", err.Error())
 		return
@@ -120,7 +120,7 @@ func TestInitConnections(t *testing.T) {
 
 		case c := <-newConnectionsListen:
 			message := make([]byte, reader.MaxMessageSize)
-			expectedMessage := crdt.NewOperation(crdt.JoinChatByName, "Listener", joinerInfos.ToBytes()).ToBytes()
+			expectedMessage := crdt.NewOperation(crdt.JoinChatByName, "Listener", joinerInfos).ToBytes()
 
 			err = c.SetDeadline(time.Now().Add(maxTestDuration))
 			if err != nil {

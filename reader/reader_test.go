@@ -15,7 +15,6 @@ var separator = []byte("\n")
 
 func TestRead(t *testing.T) {
 
-
 	var (
 		maxTestDuration = 3 * time.Second
 		testData        = []string{

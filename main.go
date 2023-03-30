@@ -59,8 +59,8 @@ func main() {
 		outGoingCommands = make(chan parsestdin.Command)
 		joinChatCommands = make(chan parsestdin.Command)
 		newConnections   = make(chan net.Conn)
-		toSend           = make(chan crdt.Operation)
-		toExecute        = make(chan crdt.Operation)
+		toSend           = make(chan *crdt.Operation)
+		toExecute        = make(chan *crdt.Operation)
 	)
 
 	// listen for new connections
@@ -84,7 +84,7 @@ func main() {
 
 	// extract commands from stdin input
 	wgHandleStdin.Add(1)
-	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, myInfos, outGoingCommands, joinChatCommands, shutdown)
+	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, *myInfos, outGoingCommands, joinChatCommands, shutdown)
 
 	for {
 		select {
