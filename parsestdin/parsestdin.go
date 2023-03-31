@@ -13,14 +13,9 @@ import (
 )
 
 type (
-	command struct {
+	Command struct {
 		typology crdt.OperationType
 		args     map[string]string
-	}
-
-	Command interface {
-		GetTypology() crdt.OperationType
-		GetArgs() map[string]string
 	}
 )
 
@@ -38,14 +33,14 @@ const (
 	AddrArg     = "addrArgument"
 	ChatRoomArg = "chatRoomArgument"
 
-	joinErrorSyntax    = "command syntax : " + joinChatCommand + " <ip> <port>"
-	newChatErrorSyntax = "command syntax : " + newChatCommand + " <chat_name>"
+	joinErrorSyntax    = "Command syntax : " + joinChatCommand + " <ip> <port>"
+	newChatErrorSyntax = "Command syntax : " + newChatCommand + " <chat_name>"
 
 	MaxMessagesStdin     = 100
 	noDiscussionSelected = "you must be in a discussion to send a message"
 
 	logFrmt     = "[INFO] %s\n"
-	typeCommand = "type a command :"
+	typeCommand = "type a Command :"
 )
 
 var (
@@ -61,22 +56,22 @@ var (
 
 	/* PACKAGE ERRORS */
 
-	ErrorUnknownCommand = errors.New("unknown command")
+	ErrorUnknownCommand = errors.New("unknown Command")
 	ErrorInArguments    = errors.New("problem in arguments")
 )
 
 func NewCommand(line string) (Command, error) {
 	typology, err := parseCommandType(line)
 	if err != nil {
-		return command{}, err
+		return Command{}, err
 	}
 
 	args, err := parseArgs(line, typology)
 	if err != nil {
-		return command{}, err
+		return Command{}, err
 	}
 
-	return command{
+	return Command{
 		typology,
 		args,
 	}, nil
@@ -132,15 +127,15 @@ func parseArgs(line string, command crdt.OperationType) (map[string]string, erro
 	return args, nil
 }
 
-func (c command) GetTypology() crdt.OperationType {
+func (c Command) GetTypology() crdt.OperationType {
 	return c.typology
 }
 
-func (c command) GetArgs() map[string]string {
+func (c Command) GetArgs() map[string]string {
 	return c.args
 }
 
-func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.NodeInfos, outGoingCommands chan<- Command, joinChatCommands chan<- Command, shutdown chan struct{}) {
+func HandleStdin(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, currentChat *crdt.Chat, toExecute chan *crdt.Operation, joinChatCommands chan<- Command, shutdown chan struct{}) {
 	var wgReadStdin = sync.WaitGroup{}
 
 	defer func() {
@@ -150,7 +145,7 @@ func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.NodeInfos, outG
 
 	wgReadStdin.Add(1)
 	var stdin = make(chan []byte, MaxMessagesStdin)
-	go reader.Read(&wgReadStdin, file, stdin, reader.Separator, shutdown)
+	go reader.Read(&wgReadStdin, os.Stdin, stdin, reader.Separator, shutdown)
 
 	for {
 		fmt.Printf(logFrmt, typeCommand)
@@ -169,8 +164,33 @@ func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.NodeInfos, outG
 			switch cmd.GetTypology() {
 			case crdt.JoinChatByName:
 				joinChatCommands <- cmd
+
 			default:
-				outGoingCommands <- cmd
+				args := cmd.args
+				switch cmd.typology {
+				case crdt.CreateChat:
+					var chatName = args[ChatRoomArg]
+					toExecute <- crdt.NewOperation(crdt.CreateChat,
+						chatName, nil)
+
+				case crdt.AddMessage:
+					/* Add the messageBytes to discussion & sync with other nodes */
+					toExecute <- crdt.NewOperation(crdt.AddMessage,
+						currentChat.Id,
+						crdt.NewMessage(myInfos.Name, args[MessageArg]))
+
+				case crdt.ListChatsCommand:
+					toExecute <- crdt.NewOperation(crdt.ListChatsCommand, "", nil)
+
+				case crdt.ListUsers:
+					toExecute <- crdt.NewOperation(crdt.ListUsers, "", nil)
+
+				case crdt.LeaveChat:
+					toExecute <- crdt.NewOperation(crdt.LeaveChat, currentChat.Id, myInfos)
+
+				case crdt.Quit:
+					toExecute <- crdt.NewOperation(crdt.Quit, "", myInfos)
+				}
 			}
 		}
 	}

@@ -24,11 +24,11 @@ func main() {
 	flag.Parse()
 
 	var (
-		myInfos = crdt.NewNodeInfos(*myAddrPtr, *myPortPtr, *myNamePtr)
+		myInfos     = crdt.NewNodeInfos(*myAddrPtr, *myPortPtr, *myNamePtr)
+		currentChat *crdt.Chat
 
 		sigc             = make(chan os.Signal, 1)
 		shutdown         = make(chan struct{})
-		outGoingCommands = make(chan parsestdin.Command)
 		joinChatCommands = make(chan parsestdin.Command)
 		newConnections   = make(chan net.Conn)
 		toSend           = make(chan *crdt.Operation)
@@ -58,7 +58,7 @@ func main() {
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 
-	// create connections : tcp connect for joinChatCommands & listen for incoming connections
+	// create connections : tcp connect & listen for incoming connections
 	wgListen.Add(1)
 	isReady.L.Lock()
 	go conn.CreateConnections(&wgListen, isReady, myInfos, joinChatCommands, newConnections, shutdown)
@@ -69,13 +69,13 @@ func main() {
 	go nodeHandler.Start(newConnections, toSend, toExecute)
 	defer nodeHandler.Wg.Wait()
 
-	// maintain chat infos
+	// maintain chat infos by executing and propagating operations
 	wgHandleChats.Add(1)
-	go orch.handleChats(&wgHandleChats, outGoingCommands, toExecute, toSend, shutdown)
+	go orch.handleChats(&wgHandleChats, toExecute, toSend, shutdown)
 
-	// create commands from stdin input
+	// create operations from stdin input
 	wgHandleStdin.Add(1)
-	go parsestdin.HandleStdin(&wgHandleStdin, os.Stdin, *myInfos, outGoingCommands, joinChatCommands, shutdown)
+	go parsestdin.HandleStdin(&wgHandleStdin, myInfos, currentChat, toExecute, joinChatCommands, shutdown)
 
 	for {
 		select {
