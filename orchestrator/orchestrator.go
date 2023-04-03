@@ -1,23 +1,43 @@
-package main
+package orchestrator
 
 import (
+	"fmt"
+	"github.com/google/uuid"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/parsestdin"
+	"github/timtimjnvr/chat/reader"
 	"github/timtimjnvr/chat/storage"
 	"log"
+	"os"
 	"sync"
 )
 
 type (
 	orchestrator struct {
+		sync.RWMutex
 		myInfos     *crdt.NodeInfos
 		currentChat *crdt.Chat
 		storage     *storage.Storage
 	}
 )
 
-func newOrchestrator(myInfos *crdt.NodeInfos) *orchestrator {
-	currentChat := crdt.NewChat(myInfos.Name)
+func (o *orchestrator) getCurrentChat() *crdt.Chat {
+	o.RLock()
+	defer o.RUnlock()
+
+	return o.currentChat
+}
+
+const (
+	MaxMessagesStdin = 100
+
+	logFrmt     = "[INFO] %s\n"
+	typeCommand = "type a Command :"
+)
+
+func NewOrchestrator(myInfos *crdt.NodeInfos) *orchestrator {
+	id, _ := uuid.NewUUID()
+	currentChat := crdt.NewChat(id, myInfos.Name)
 	storage := storage.NewStorage()
 	storage.SaveChat(currentChat)
 
@@ -84,7 +104,7 @@ func (o *orchestrator) getChatFromStorage(op crdt.Operation) (*crdt.Chat, error)
 }
 
 // HandleChats maintains chat infos consistency by executing operation and building operations to send to other nodes if needed
-func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan parsestdin.Command, toExecute chan *crdt.Operation, toSend chan<- *crdt.Operation, shutdown <-chan struct{}) {
+func (o *orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Operation, toSend chan<- *crdt.Operation, shutdown <-chan struct{}) {
 	defer func() {
 		wg.Done()
 	}()
@@ -94,48 +114,35 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 		case <-shutdown:
 			return
 
-		case cmd := <-incomingCommands:
-			args := cmd.GetArgs()
+		case op := <-toExecute:
+			// execute op
 
-			switch cmd.GetTypology() {
-			case crdt.JoinChatByName:
-
+			switch op.Typology {
 			case crdt.CreateChat:
-				var (
-					chatName = args[parsestdin.ChatRoomArg]
-					newChat  = crdt.NewChat(chatName)
-				)
+				id, _ := uuid.NewUUID()
+				c := crdt.NewChat(id, op.TargetedChat)
+				c.SaveNode(o.myInfos)
+				o.storage.SaveChat(c)
+				continue
 
-				newChat.SaveNode(o.myInfos)
+			case crdt.AddChat:
+				newChatInfos, ok := op.Data.(*crdt.Chat)
+				if !ok {
+					log.Println("[ERROR] can't parse op data to Chat")
+					continue
+				}
+				id, _ := uuid.Parse(newChatInfos.Id)
+				newChat := crdt.NewChat(id, newChatInfos.Name)
 				o.storage.SaveChat(newChat)
-
-			case crdt.AddMessage:
-
-				/* Add the messageBytes to discussion & sync with other nodes */
-				toExecute <- crdt.NewOperation(crdt.AddMessage,
-					o.currentChat.Id,
-					crdt.NewMessage(o.myInfos.Name, args[parsestdin.MessageArg]))
-			case crdt.ListChatsCommand:
-				o.storage.DisplayChats()
-
-			case crdt.LeaveChat:
-				toExecute <- crdt.NewOperation(crdt.LeaveChat, o.currentChat.Id, o.myInfos)
-
-			case crdt.Quit:
-				toExecute <- crdt.NewOperation(crdt.Quit, "", o.myInfos)
 			}
 
-		case op := <-toExecute:
 			c, err := o.getChatFromStorage(*op)
 			if err != nil {
 				log.Println("[ERROR]", err)
 				continue
 			}
 
-			// execute op
 			switch op.Typology {
-			case crdt.CreateChat:
-
 			case crdt.JoinChatByName:
 				newNodeInfos, ok := op.Data.(*crdt.NodeInfos)
 				if !ok {
@@ -162,6 +169,8 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 				c.SaveNode(newNodeInfos)
 				o.storage.SaveChat(c)
 
+				log.Println(fmt.Sprintf("%s joined chat", newNodeInfos.Name))
+
 			case crdt.AddMessage:
 				newMessage, ok := op.Data.(*crdt.Message)
 				if !ok {
@@ -172,8 +181,71 @@ func (o *orchestrator) handleChats(wg *sync.WaitGroup, incomingCommands chan par
 				c.SaveMessage(newMessage)
 				o.storage.SaveChat(c)
 
+				log.Println(fmt.Sprintf("%s (%s): %s", newMessage.Sender, newMessage.Date, newMessage.Content))
+
 				for syncOp := range o.getPropagationOperations(op, c) {
 					toSend <- syncOp
+				}
+			}
+		}
+	}
+}
+
+func (o *orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Operation, joinChatCommands chan<- parsestdin.Command, shutdown chan struct{}) {
+	var wgReadStdin = sync.WaitGroup{}
+
+	defer func() {
+		wgReadStdin.Wait()
+		wg.Done()
+	}()
+
+	wgReadStdin.Add(1)
+	var stdin = make(chan []byte, MaxMessagesStdin)
+	go reader.Read(&wgReadStdin, os.Stdin, stdin, reader.Separator, shutdown)
+
+	for {
+		fmt.Printf(logFrmt, typeCommand)
+
+		select {
+		case <-shutdown:
+			return
+
+		case line := <-stdin:
+			cmd, err := parsestdin.NewCommand(string(line))
+			if err != nil {
+				log.Println("[ERROR] ", err)
+				continue
+			}
+
+			switch cmd.GetTypology() {
+			case crdt.JoinChatByName:
+				joinChatCommands <- cmd
+
+			default:
+				args := cmd.GetArgs()
+				switch cmd.GetTypology() {
+				case crdt.CreateChat:
+					var chatName = args[parsestdin.ChatRoomArg]
+					toExecute <- crdt.NewOperation(crdt.CreateChat,
+						chatName, nil)
+
+				case crdt.AddMessage:
+					/* Add the messageBytes to discussion & sync with other nodes */
+					toExecute <- crdt.NewOperation(crdt.AddMessage,
+						o.getCurrentChat().Id,
+						crdt.NewMessage(o.myInfos.Name, args[parsestdin.MessageArg]))
+
+				case crdt.ListChats:
+					toExecute <- crdt.NewOperation(crdt.ListChats, "", nil)
+
+				case crdt.ListUsers:
+					toExecute <- crdt.NewOperation(crdt.ListUsers, "", nil)
+
+				case crdt.LeaveChat:
+					toExecute <- crdt.NewOperation(crdt.LeaveChat, o.getCurrentChat().Id, o.myInfos)
+
+				case crdt.Quit:
+					toExecute <- crdt.NewOperation(crdt.Quit, "", o.myInfos)
 				}
 			}
 		}

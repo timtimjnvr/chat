@@ -22,11 +22,12 @@ type (
 const (
 	CreateChat OperationType = iota
 	JoinChatByName
+	AddChat
 	AddNode
 	AddMessage
 	LeaveChat
 	ListUsers
-	ListChatsCommand
+	ListChats
 	Quit
 )
 

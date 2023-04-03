@@ -2,25 +2,15 @@ package parsestdin
 
 import (
 	"fmt"
-	"github/timtimjnvr/chat/crdt"
-	"github/timtimjnvr/chat/reader"
-	"log"
-	"os"
-	"strings"
-	"sync"
-
 	"github.com/pkg/errors"
+	"github/timtimjnvr/chat/crdt"
+	"strings"
 )
 
 type (
-	command struct {
+	Command struct {
 		typology crdt.OperationType
 		args     map[string]string
-	}
-
-	Command interface {
-		GetTypology() crdt.OperationType
-		GetArgs() map[string]string
 	}
 )
 
@@ -38,14 +28,8 @@ const (
 	AddrArg     = "addrArgument"
 	ChatRoomArg = "chatRoomArgument"
 
-	joinErrorSyntax    = "command syntax : " + joinChatCommand + " <ip> <port>"
-	newChatErrorSyntax = "command syntax : " + newChatCommand + " <chat_name>"
-
-	MaxMessagesStdin     = 100
-	noDiscussionSelected = "you must be in a discussion to send a message"
-
-	logFrmt     = "[INFO] %s\n"
-	typeCommand = "type a command :"
+	joinErrorSyntax    = "Command syntax : " + joinChatCommand + " <ip> <port>"
+	newChatErrorSyntax = "Command syntax : " + newChatCommand + " <chat_name>"
 )
 
 var (
@@ -55,28 +39,28 @@ var (
 		joinChatCommand:  crdt.JoinChatByName,
 		leaveChatCommand: crdt.LeaveChat,
 		listUsersCommand: crdt.ListUsers,
-		listChatsCommand: crdt.ListChatsCommand,
+		listChatsCommand: crdt.ListChats,
 		quitCommand:      crdt.Quit,
 	}
 
 	/* PACKAGE ERRORS */
 
-	ErrorUnknownCommand = errors.New("unknown command")
+	ErrorUnknownCommand = errors.New("unknown Command")
 	ErrorInArguments    = errors.New("problem in arguments")
 )
 
 func NewCommand(line string) (Command, error) {
 	typology, err := parseCommandType(line)
 	if err != nil {
-		return command{}, err
+		return Command{}, err
 	}
 
 	args, err := parseArgs(line, typology)
 	if err != nil {
-		return command{}, err
+		return Command{}, err
 	}
 
-	return command{
+	return Command{
 		typology,
 		args,
 	}, nil
@@ -132,47 +116,10 @@ func parseArgs(line string, command crdt.OperationType) (map[string]string, erro
 	return args, nil
 }
 
-func (c command) GetTypology() crdt.OperationType {
+func (c Command) GetTypology() crdt.OperationType {
 	return c.typology
 }
 
-func (c command) GetArgs() map[string]string {
+func (c Command) GetArgs() map[string]string {
 	return c.args
-}
-
-func HandleStdin(wg *sync.WaitGroup, file *os.File, myInfos crdt.NodeInfos, outGoingCommands chan<- Command, joinChatCommands chan<- Command, shutdown chan struct{}) {
-	var wgReadStdin = sync.WaitGroup{}
-
-	defer func() {
-		wgReadStdin.Wait()
-		wg.Done()
-	}()
-
-	wgReadStdin.Add(1)
-	var stdin = make(chan []byte, MaxMessagesStdin)
-	go reader.Read(&wgReadStdin, file, stdin, reader.Separator, shutdown)
-
-	for {
-		fmt.Printf(logFrmt, typeCommand)
-
-		select {
-		case <-shutdown:
-			return
-
-		case line := <-stdin:
-			cmd, err := NewCommand(string(line))
-			if err != nil {
-				log.Println("[ERROR] ", err)
-				continue
-			}
-
-			switch cmd.GetTypology() {
-			case crdt.JoinChatByName:
-				joinChatCommands <- cmd
-			default:
-				outGoingCommands <- cmd
-			}
-		}
-	}
-
 }

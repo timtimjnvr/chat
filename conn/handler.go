@@ -163,6 +163,9 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 
 		case operationBytes := <-outputNodes:
 			operation, err := crdt.DecodeOperation(operationBytes)
+			if operation.Typology == crdt.AddNode {
+
+			}
 			if err != nil {
 				continue
 			}

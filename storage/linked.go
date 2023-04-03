@@ -81,6 +81,10 @@ func (l *list) Add(chat *crdt.Chat) uuid.UUID {
 }
 
 func (l *list) Contains(id uuid.UUID) bool {
+	if l.length == 0 {
+		return false
+	}
+
 	first := l.head
 	for first.next != nil && first.key != id {
 		first = first.next

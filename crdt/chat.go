@@ -1,14 +1,15 @@
 package crdt
 
 import (
+	"encoding/json"
 	"github.com/google/uuid"
 	"time"
 )
 
 type (
 	Chat struct {
-		Id         string
-		Name       string
+		Id         string `json:"id"`
+		Name       string `json:"name"`
 		nodesInfos []*NodeInfos
 		messages   []*Message
 	}
@@ -16,8 +17,7 @@ type (
 
 const maxNumberOfMessages, maxNumberOfNodes = 100, 100
 
-func NewChat(name string) *Chat {
-	id, _ := uuid.NewUUID()
+func NewChat(id uuid.UUID, name string) *Chat {
 	return &Chat{
 		Id:         id.String(),
 		Name:       name,
@@ -61,6 +61,11 @@ func (c *Chat) SaveMessage(message *Message) {
 		c.messages = append(beginning, message)
 		c.messages = append(c.messages, end...)
 	}
+}
+
+func (m *Chat) ToBytes() []byte {
+	bytesChat, _ := json.Marshal(m)
+	return bytesChat
 }
 
 func (c *Chat) GetSlots(myId uuid.UUID) []uint8 {

@@ -81,6 +81,7 @@ func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, newJoinChatCommands <-
 		select {
 		case <-shutdown:
 			return
+
 		case joinChatCommand := <-newJoinChatCommands:
 			args := joinChatCommand.GetArgs()
 			var (
@@ -95,20 +96,20 @@ func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, newJoinChatCommands <-
 			}
 
 			/* Open conn */
-			var newConn net.Conn
-			newConn, err = openConnection(addr, strconv.Itoa(pt))
+			var c net.Conn
+			c, err = openConnection(addr, strconv.Itoa(pt))
 			if err != nil {
 				log.Println("[ERROR] ", err)
 				break
 			}
 
 			// init joining process
-			_, err = newConn.Write(crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos).ToBytes())
+			_, err = c.Write(crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos).ToBytes())
 			if err != nil {
 				log.Println("[ERROR] ", err)
 			}
 
-			newConnections <- newConn
+			newConnections <- c
 		}
 	}
 }
