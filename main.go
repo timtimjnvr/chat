@@ -3,6 +3,7 @@ package main
 import (
 	"github/timtimjnvr/chat/conn"
 	"github/timtimjnvr/chat/crdt"
+	"github/timtimjnvr/chat/orchestrator"
 	"github/timtimjnvr/chat/parsestdin"
 	"net"
 
@@ -12,6 +13,13 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+)
+
+type (
+	currentChat struct {
+		crdt.Chat
+		rw *sync.RWMutex
+	}
 )
 
 func main() {
@@ -24,8 +32,7 @@ func main() {
 	flag.Parse()
 
 	var (
-		myInfos     = crdt.NewNodeInfos(*myAddrPtr, *myPortPtr, *myNamePtr)
-		currentChat *crdt.Chat
+		myInfos = crdt.NewNodeInfos(*myAddrPtr, *myPortPtr, *myNamePtr)
 
 		sigc             = make(chan os.Signal, 1)
 		shutdown         = make(chan struct{})
@@ -40,7 +47,7 @@ func main() {
 		lock          = sync.Mutex{}
 		isReady       = sync.NewCond(&lock)
 
-		orch        = newOrchestrator(myInfos)
+		orch        = orchestrator.NewOrchestrator(myInfos)
 		nodeHandler = conn.NewNodeHandler(shutdown)
 	)
 
@@ -71,11 +78,11 @@ func main() {
 
 	// maintain chat infos by executing and propagating operations
 	wgHandleChats.Add(1)
-	go orch.handleChats(&wgHandleChats, toExecute, toSend, shutdown)
+	go orch.HandleChats(&wgHandleChats, toExecute, toSend, shutdown)
 
 	// create operations from stdin input
 	wgHandleStdin.Add(1)
-	go parsestdin.HandleStdin(&wgHandleStdin, myInfos, currentChat, toExecute, joinChatCommands, shutdown)
+	go orch.HandleStdin(&wgHandleStdin, toExecute, joinChatCommands, shutdown)
 
 	for {
 		select {

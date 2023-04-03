@@ -27,7 +27,7 @@ const (
 	AddMessage
 	LeaveChat
 	ListUsers
-	ListChatsCommand
+	ListChats
 	Quit
 )
 

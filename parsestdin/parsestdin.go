@@ -2,14 +2,9 @@ package parsestdin
 
 import (
 	"fmt"
-	"github/timtimjnvr/chat/crdt"
-	"github/timtimjnvr/chat/reader"
-	"log"
-	"os"
-	"strings"
-	"sync"
-
 	"github.com/pkg/errors"
+	"github/timtimjnvr/chat/crdt"
+	"strings"
 )
 
 type (
@@ -35,12 +30,6 @@ const (
 
 	joinErrorSyntax    = "Command syntax : " + joinChatCommand + " <ip> <port>"
 	newChatErrorSyntax = "Command syntax : " + newChatCommand + " <chat_name>"
-
-	MaxMessagesStdin     = 100
-	noDiscussionSelected = "you must be in a discussion to send a message"
-
-	logFrmt     = "[INFO] %s\n"
-	typeCommand = "type a Command :"
 )
 
 var (
@@ -50,7 +39,7 @@ var (
 		joinChatCommand:  crdt.JoinChatByName,
 		leaveChatCommand: crdt.LeaveChat,
 		listUsersCommand: crdt.ListUsers,
-		listChatsCommand: crdt.ListChatsCommand,
+		listChatsCommand: crdt.ListChats,
 		quitCommand:      crdt.Quit,
 	}
 
@@ -133,66 +122,4 @@ func (c Command) GetTypology() crdt.OperationType {
 
 func (c Command) GetArgs() map[string]string {
 	return c.args
-}
-
-func HandleStdin(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, currentChat *crdt.Chat, toExecute chan *crdt.Operation, joinChatCommands chan<- Command, shutdown chan struct{}) {
-	var wgReadStdin = sync.WaitGroup{}
-
-	defer func() {
-		wgReadStdin.Wait()
-		wg.Done()
-	}()
-
-	wgReadStdin.Add(1)
-	var stdin = make(chan []byte, MaxMessagesStdin)
-	go reader.Read(&wgReadStdin, os.Stdin, stdin, reader.Separator, shutdown)
-
-	for {
-		fmt.Printf(logFrmt, typeCommand)
-
-		select {
-		case <-shutdown:
-			return
-
-		case line := <-stdin:
-			cmd, err := NewCommand(string(line))
-			if err != nil {
-				log.Println("[ERROR] ", err)
-				continue
-			}
-
-			switch cmd.GetTypology() {
-			case crdt.JoinChatByName:
-				joinChatCommands <- cmd
-
-			default:
-				args := cmd.args
-				switch cmd.typology {
-				case crdt.CreateChat:
-					var chatName = args[ChatRoomArg]
-					toExecute <- crdt.NewOperation(crdt.CreateChat,
-						chatName, nil)
-
-				case crdt.AddMessage:
-					/* Add the messageBytes to discussion & sync with other nodes */
-					toExecute <- crdt.NewOperation(crdt.AddMessage,
-						currentChat.Id,
-						crdt.NewMessage(myInfos.Name, args[MessageArg]))
-
-				case crdt.ListChatsCommand:
-					toExecute <- crdt.NewOperation(crdt.ListChatsCommand, "", nil)
-
-				case crdt.ListUsers:
-					toExecute <- crdt.NewOperation(crdt.ListUsers, "", nil)
-
-				case crdt.LeaveChat:
-					toExecute <- crdt.NewOperation(crdt.LeaveChat, currentChat.Id, myInfos)
-
-				case crdt.Quit:
-					toExecute <- crdt.NewOperation(crdt.Quit, "", myInfos)
-				}
-			}
-		}
-	}
-
 }

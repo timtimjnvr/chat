@@ -108,6 +108,12 @@ func TestGetArgs(t *testing.T) {
 			expectedErr:  nil,
 		},
 		{
+			text:         "/list_chats\n",
+			typology:     crdt.ListChats,
+			expectedArgs: make(map[string]string),
+			expectedErr:  nil,
+		},
+		{
 			text:         "/close\n",
 			typology:     crdt.LeaveChat,
 			expectedArgs: make(map[string]string),

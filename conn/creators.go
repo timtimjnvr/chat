@@ -81,6 +81,7 @@ func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, newJoinChatCommands <-
 		select {
 		case <-shutdown:
 			return
+
 		case joinChatCommand := <-newJoinChatCommands:
 			args := joinChatCommand.GetArgs()
 			var (

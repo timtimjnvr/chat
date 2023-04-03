@@ -38,4 +38,3 @@ Decentralized P2P chat built in golang.
 ## TODO
 - refacto storage : expose clear entry points in storage
 - benchmarck different ways to store chats with high throughput : linked list of chats, maps etc ...
-- when joining a chat, the joiner sends join chat by name and once connection created has to re estacblish a connection with the node.
