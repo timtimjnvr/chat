@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github/timtimjnvr/chat/crdt"
-	"github/timtimjnvr/chat/parsestdin"
 	"github/timtimjnvr/chat/reader"
 	"net"
 	"strings"
@@ -35,7 +34,7 @@ func TestListenAndServe(t *testing.T) {
 
 	wg.Add(1)
 	isListening.L.Lock()
-	go CreateConnections(&wg, isListening, &crdt.NodeInfos{Address: ip, Port: port}, make(chan parsestdin.Command), newConnections, shutdown)
+	go CreateConnections(&wg, isListening, &crdt.NodeInfos{Address: ip, Port: port}, make(chan ConnectionRequest), newConnections, shutdown)
 	isListening.Wait()
 
 	for i := 0; i < syscall.SOMAXCONN; i++ {
@@ -75,7 +74,7 @@ func TestConnect(t *testing.T) {
 		lock        = sync.Mutex{}
 		isListening = sync.NewCond(&lock)
 
-		joinChatCommands       = make(chan parsestdin.Command)
+		connectionRequests     = make(chan ConnectionRequest)
 		newConnectionsListen   = make(chan net.Conn)
 		newConnectionsInitConn = make(chan net.Conn)
 		maxTestDuration        = 1 * time.Second
@@ -89,20 +88,16 @@ func TestConnect(t *testing.T) {
 
 	wgListen.Add(1)
 	isListening.L.Lock()
-	go CreateConnections(&wgListen, isListening, &crdt.NodeInfos{Address: "", Port: listenerInfos.Port}, make(chan parsestdin.Command), newConnectionsListen, shutdown)
+	go CreateConnections(&wgListen, isListening, &crdt.NodeInfos{Address: "", Port: listenerInfos.Port}, make(chan ConnectionRequest), newConnectionsListen, shutdown)
 	isListening.Wait()
 
 	wgConnect.Add(1)
-	go Connect(&wgConnect, joinerInfos, joinChatCommands, newConnectionsInitConn, shutdown)
+	go Connect(&wgConnect, joinerInfos, connectionRequests, newConnectionsInitConn, shutdown)
 
-	joinChatCommand, err := parsestdin.NewCommand(fmt.Sprintf("%s %s %s %s", "/join", listenerInfos.Address, listenerInfos.Port, listenerInfos.Name))
-	if err != nil {
-		assert.Fail(t, "Failed to parse command :", err.Error())
-		return
-	}
+	connRequest := NewConnectionRequest(listenerInfos.Port, listenerInfos.Address, listenerInfos.Name)
 
 	for i := 0; i < syscall.SOMAXCONN; i++ {
-		joinChatCommands <- joinChatCommand
+		connectionRequests <- connRequest
 		c := <-newConnectionsInitConn
 		c.Close()
 	}
@@ -122,7 +117,7 @@ func TestConnect(t *testing.T) {
 			message := make([]byte, reader.MaxMessageSize)
 			expectedMessage := crdt.NewOperation(crdt.JoinChatByName, "Listener", joinerInfos).ToBytes()
 
-			err = c.SetDeadline(time.Now().Add(maxTestDuration))
+			err := c.SetDeadline(time.Now().Add(maxTestDuration))
 			if err != nil {
 				assert.Fail(t, "Failed to set deadline on conn : ", err.Error())
 			}
@@ -217,7 +212,7 @@ func helperGetConnections(port string) (net.Conn, net.Conn, error) {
 
 	wgListen.Add(1)
 	isListening.L.Lock()
-	go CreateConnections(&wgListen, isListening, &crdt.NodeInfos{Address: "", Port: port}, make(chan parsestdin.Command), newConnections, shutdown)
+	go CreateConnections(&wgListen, isListening, &crdt.NodeInfos{Address: "", Port: port}, make(chan ConnectionRequest), newConnections, shutdown)
 	isListening.Wait()
 
 	conn1, err := net.Dial(transportProtocol, fmt.Sprintf(":%s", port))

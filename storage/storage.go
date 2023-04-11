@@ -35,9 +35,6 @@ func (s *Storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
 		err           error
 	)
 
-
-
-
 	if byName {
 		for index := 0; index < numberOfChats; index++ {
 			c, _ = s.chats.GetByIndex(index)
@@ -49,7 +46,6 @@ func (s *Storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
 		if err != nil || c == nil {
 			return nil, NotFound
 		}
-
 	}
 
 	// by uuid
@@ -60,7 +56,6 @@ func (s *Storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
 	}
 
 	c, err = s.chats.GetById(id)
-
 	if err != nil {
 		return nil, NotFound
 	}
