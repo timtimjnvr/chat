@@ -31,7 +31,7 @@ func NewList() *list {
 }
 
 func newElement(chat *crdt.Chat) *element {
-	id := uuid.New()
+	id, _ := uuid.Parse(chat.Id)
 	return &element{
 		key:  id,
 		chat: chat,
