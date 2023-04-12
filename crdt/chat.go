@@ -17,9 +17,9 @@ type (
 
 const maxNumberOfMessages, maxNumberOfNodes = 100, 100
 
-func NewChat(id uuid.UUID, name string) *Chat {
+func NewChat(name string) *Chat {
 	return &Chat{
-		Id:         id.String(),
+		Id:         uuid.New().String(),
 		Name:       name,
 		nodesInfos: make([]*NodeInfos, 0, maxNumberOfNodes),
 		messages:   make([]*Message, 0, maxNumberOfMessages),

@@ -14,7 +14,6 @@ var (
 
 type (
 	element struct {
-		key  uuid.UUID
 		chat *crdt.Chat
 		next *element
 	}
@@ -26,14 +25,12 @@ type (
 	}
 )
 
-func NewList() *list {
+func NewList() List {
 	return &list{}
 }
 
 func newElement(chat *crdt.Chat) *element {
-	id, _ := uuid.Parse(chat.Id)
 	return &element{
-		key:  id,
 		chat: chat,
 	}
 }
@@ -58,8 +55,8 @@ func (l *list) Add(chat *crdt.Chat) uuid.UUID {
 		l.head = e
 		l.tail = e
 		l.length++
-
-		return l.tail.key
+		id, _ := uuid.Parse(l.tail.chat.Id)
+		return id
 	}
 
 	var (
@@ -77,7 +74,8 @@ func (l *list) Add(chat *crdt.Chat) uuid.UUID {
 		ptr = ptr.next
 	}
 
-	return l.tail.key
+	id, _ := uuid.Parse(l.tail.chat.Id)
+	return id
 }
 
 func (l *list) Contains(id uuid.UUID) bool {
@@ -86,11 +84,11 @@ func (l *list) Contains(id uuid.UUID) bool {
 	}
 
 	first := l.head
-	for first.next != nil && first.key != id {
+	for first.next != nil && first.chat.Id != id.String() {
 		first = first.next
 	}
 
-	if first.key == id {
+	if first.chat.Id == id.String() {
 		return true
 	}
 
@@ -99,11 +97,11 @@ func (l *list) Contains(id uuid.UUID) bool {
 
 func (l *list) Update(id uuid.UUID, chat *crdt.Chat) {
 	first := l.head
-	for first.next != nil && first.key != id {
+	for first.next != nil && first.chat.Id != id.String() {
 		first = first.next
 	}
 
-	if first.key == id {
+	if first.chat.Id == id.String() {
 		first.chat = chat
 	}
 }
@@ -122,22 +120,22 @@ func (l *list) GetByIndex(index int) (*crdt.Chat, error) {
 
 func (l *list) GetById(id uuid.UUID) (*crdt.Chat, error) {
 	first := l.head
-	for first.next != nil && first.key != id {
+	for first.next != nil && first.chat.Id != id.String() {
 		first = first.next
 	}
 
-	if first.key == id {
+	if first.chat.Id == id.String() {
 		return first.chat, nil
 	}
 
 	return nil, NotFound
 }
 
-func (l *list) Delete(key uuid.UUID) {
+func (l *list) Delete(id uuid.UUID) {
 	var previous, tmp *element
 
 	// remove first element
-	if l.head.key == key {
+	if l.head.chat.Id == id.String() {
 		l.head = l.head.next
 		l.length--
 		return
@@ -146,13 +144,13 @@ func (l *list) Delete(key uuid.UUID) {
 	// second or more
 	previous = l.head
 	tmp = l.head.next
-	for tmp != nil && tmp.next != nil && key != tmp.key {
+	for tmp != nil && tmp.next != nil && tmp.chat.Id != id.String() {
 		previous = tmp
 		tmp = tmp.next
 		tmp = previous.next
 	}
 
-	if tmp != nil && key != tmp.key {
+	if tmp != nil && tmp.chat.Id != id.String() {
 		previous.next = tmp.next
 	}
 

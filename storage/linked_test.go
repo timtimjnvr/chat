@@ -17,18 +17,18 @@ func TestList_Len(t *testing.T) {
 func TestList_Add(t *testing.T) {
 	ass := assert.New(t)
 	l := NewList()
-	l.Add(&crdt.Chat{Name: "1"})
-	l.Add(&crdt.Chat{Name: "2"})
-	l.Add(&crdt.Chat{Name: "3"})
+	l.Add(crdt.NewChat("1"))
+	l.Add(crdt.NewChat("2"))
+	l.Add(crdt.NewChat("3"))
 
 	ass.Equal(3, l.Len(), "failed on Adding elements")
 }
 
 func TestList_Contains(t *testing.T) {
 	l := NewList()
-	id1 := l.Add(&crdt.Chat{Name: "1"})
-	id2 := l.Add(&crdt.Chat{Name: "2"})
-	id3 := l.Add(&crdt.Chat{Name: "3"})
+	id1 := l.Add(crdt.NewChat("1"))
+	id2 := l.Add(crdt.NewChat("2"))
+	id3 := l.Add(crdt.NewChat("3"))
 
 	errMessage := "failed on finding element"
 	assert.True(t, l.Contains(id1), errMessage)
@@ -42,20 +42,20 @@ func TestList_Contains(t *testing.T) {
 func TestList_Update(t *testing.T) {
 
 	l := NewList()
-	id1 := l.Add(&crdt.Chat{Name: "1"})
-	l.Update(id1, &crdt.Chat{Name: "3"})
+	id1 := l.Add(crdt.NewChat("1"))
+	l.Update(id1, &crdt.Chat{Id: id1.String(), Name: "3"})
 	c, _ := l.GetById(id1)
 
-	assert.Equal(t, &crdt.Chat{Name: "3"}, c, "failed to update chat")
+	assert.Equal(t, &crdt.Chat{Id: id1.String(), Name: "3"}, c, "failed to update chat")
 }
 
 func TestList_Delete(t *testing.T) {
 	var (
 		ass    = assert.New(t)
 		l      = NewList()
-		first  = l.Add(&crdt.Chat{Name: "1"})
-		second = l.Add(&crdt.Chat{Name: "2"})
-		third  = l.Add(&crdt.Chat{Name: "3"})
+		first  = l.Add(crdt.NewChat("1"))
+		second = l.Add(crdt.NewChat("2"))
+		third  = l.Add(crdt.NewChat("3"))
 	)
 
 	l.Delete(first)
@@ -69,7 +69,6 @@ func TestList_Delete(t *testing.T) {
 }
 
 func TestList_GetById(t *testing.T) {
-
 	var (
 		ass       = assert.New(t)
 		l         = NewList()
@@ -78,7 +77,7 @@ func TestList_GetById(t *testing.T) {
 	)
 
 	for _, value := range values {
-		valuesIds[value] = l.Add(&crdt.Chat{Name: fmt.Sprintf("%d", value)})
+		valuesIds[value] = l.Add(crdt.NewChat(fmt.Sprintf("%d", value)))
 	}
 
 	for value, id := range valuesIds {
@@ -87,7 +86,9 @@ func TestList_GetById(t *testing.T) {
 			assert.Fail(t, "failed on getting element by id")
 			return
 		}
+		var expectedChat = crdt.NewChat(fmt.Sprintf("%d", value))
+		expectedChat.Id = id.String()
 
-		ass.Equal(res, &crdt.Chat{Name: fmt.Sprintf("%d", value)}, "failed on getting element by id, wrong chat")
+		ass.Equal(res, expectedChat, "failed on getting element by id, wrong chat")
 	}
 }

@@ -2,7 +2,6 @@ package orchestrator
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"github/timtimjnvr/chat/conn"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/parsestdin"
@@ -37,8 +36,7 @@ const (
 )
 
 func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
-	id, _ := uuid.NewUUID()
-	currentChat := crdt.NewChat(id, myInfos.Name)
+	currentChat := crdt.NewChat(myInfos.Name)
 	storage := storage.NewStorage()
 	storage.SaveChat(currentChat)
 
@@ -66,8 +64,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 			switch op.Typology {
 			case crdt.CreateChat:
-				id, _ := uuid.NewUUID()
-				c := crdt.NewChat(id, op.TargetedChat)
+				c := crdt.NewChat(op.TargetedChat)
 				c.SaveNode(o.myInfos)
 				o.storage.SaveChat(c)
 				continue
@@ -79,9 +76,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					continue
 				}
 
-				id, _ := uuid.Parse(newChatInfos.Id)
-				newChat := crdt.NewChat(id, newChatInfos.Name)
-				o.storage.SaveChat(newChat)
+				o.storage.SaveChat(newChatInfos)
 				continue
 			}
 
