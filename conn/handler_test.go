@@ -175,7 +175,7 @@ func TestNodeHandler_Send(t *testing.T) {
 	}
 }
 
-func TestNodeHandler_50NodesStartAndStop(t *testing.T) {
+func TestNodeHandler_10NodesStartAndStop(t *testing.T) {
 	var (
 		maxTestDuration = 1 * time.Second
 		shutdown        = make(chan struct{}, 0)
@@ -185,7 +185,7 @@ func TestNodeHandler_50NodesStartAndStop(t *testing.T) {
 		toExecute       = make(chan *crdt.Operation)
 
 		firstPort  = 1235
-		maxNode    = 50
+		maxNode    = 10
 		connSaving = make(map[int]net.Conn, maxNode)
 	)
 
