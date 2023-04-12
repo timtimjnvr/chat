@@ -36,6 +36,6 @@ Decentralized P2P chat built in golang.
 ![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/architecture.png?raw=true)
 
 ## TODO
-- why does chat data received when joining a chat (reception of addChat operation) is nil ?
-- refacto storage : expose clear entry points in storage
-- benchmarck different ways to store chats with high throughput : linked list of chats, maps etc ...
+- increase test coverage
+- benchmark different ways to store chats with high throughput : linked list of chats, maps etc ...
+- refactor storage : expose clear entry points in storage
