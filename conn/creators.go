@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github/timtimjnvr/chat/crdt"
-	"github/timtimjnvr/chat/parsestdin"
 	"log"
 	"net"
 	"strconv"
@@ -19,7 +18,20 @@ const (
 	maxMessageSize = 1000
 )
 
-func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.NodeInfos, joinChatCommands chan parsestdin.Command, newConnections chan net.Conn, shutdown <-chan struct{}) {
+type ConnectionRequest struct {
+	targetedPort    string
+	targetedAddress string
+	chatRoom        string
+}
+
+func NewConnectionRequest(port, address, chatRoom string) ConnectionRequest {
+	return ConnectionRequest{
+		targetedPort:    port,
+		targetedAddress: address,
+		chatRoom:        chatRoom,
+	}
+}
+func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.NodeInfos, incomingConnectionRequests chan ConnectionRequest, newConnections chan net.Conn, shutdown <-chan struct{}) {
 	var (
 		c                     net.Conn
 		wgInitNodeConnections = sync.WaitGroup{}
@@ -28,7 +40,7 @@ func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.Nod
 	)
 
 	wgInitNodeConnections.Add(1)
-	go Connect(&wgInitNodeConnections, myInfos, joinChatCommands, newConnections, shutdown)
+	go Connect(&wgInitNodeConnections, myInfos, incomingConnectionRequests, newConnections, shutdown)
 
 	defer func() {
 		close(newConnections)
@@ -62,17 +74,7 @@ func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.Nod
 	}
 }
 
-func handleClosure(wg *sync.WaitGroup, ln net.Listener, shutdown <-chan struct{}) {
-	<-shutdown
-	err := ln.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	wg.Done()
-}
-
-func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, newJoinChatCommands <-chan parsestdin.Command, newConnections chan<- net.Conn, shutdown <-chan struct{}) {
+func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, incomingConnectionRequest <-chan ConnectionRequest, newConnections chan<- net.Conn, shutdown <-chan struct{}) {
 	defer func() {
 		wg.Done()
 	}()
@@ -82,22 +84,22 @@ func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, newJoinChatCommands <-
 		case <-shutdown:
 			return
 
-		case joinChatCommand := <-newJoinChatCommands:
-			args := joinChatCommand.GetArgs()
+		case connectionRequest := <-incomingConnectionRequest:
+			//args := connectionRequest.GetArgs()
 			var (
-				addr     = args[parsestdin.AddrArg]
-				chatRoom = args[parsestdin.ChatRoomArg]
+				addr     = connectionRequest.targetedAddress
+				chatRoom = connectionRequest.chatRoom
 			)
 
-			// check if port is an int
-			pt, err := strconv.Atoi(args[parsestdin.PortArg])
+			// check if targetedPort is an int
+			_, err := strconv.Atoi(connectionRequest.targetedPort)
 			if err != nil {
 				log.Println(err)
 			}
 
 			/* Open conn */
 			var c net.Conn
-			c, err = openConnection(addr, strconv.Itoa(pt))
+			c, err = openConnection(addr, connectionRequest.targetedPort)
 			if err != nil {
 				log.Println("[ERROR] ", err)
 				break
@@ -114,8 +116,18 @@ func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, newJoinChatCommands <-
 	}
 }
 
+func handleClosure(wg *sync.WaitGroup, ln net.Listener, shutdown <-chan struct{}) {
+	<-shutdown
+	err := ln.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	wg.Done()
+}
+
 func openConnection(ip string, port string) (net.Conn, error) {
-	if ip == localhost || ip == localhostDecimalPointed {
+	if ip == localhost || ip == localhostDecimalPointed || ip == "" {
 		ip = ""
 	}
 

@@ -163,12 +163,42 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 
 		case operationBytes := <-outputNodes:
 			operation, err := crdt.DecodeOperation(operationBytes)
-			if operation.Typology == crdt.AddNode {
-
-			}
 			if err != nil {
+				log.Println("[ERROR] ", err)
 				continue
 			}
+
+			// need to create connection and set slot in operation
+			if operation.Typology == crdt.AddNode {
+				newNodeInfos, ok := operation.Data.(*crdt.NodeInfos)
+				if !ok {
+					log.Println("[ERROR] can't parse op data to NodeInfos")
+					continue
+				}
+
+				// establish connection and set slot
+				/* Open conn */
+				var c net.Conn
+				c, err = openConnection(newNodeInfos.Address, newNodeInfos.Port)
+				if err != nil {
+					log.Println("[ERROR] ", err)
+					break
+				}
+
+				s := d.getNextSlot()
+				n, err := newNode(c, d.getNextSlot(), outputNodes)
+				if err != nil {
+					log.Println("[ERROR] ", err)
+					continue
+				}
+
+				n.Wg.Add(1)
+				go n.start(done)
+				d.nodes[s] = n
+
+				operation.Slot = uint8(s)
+			}
+
 			toExecute <- operation
 		}
 	}

@@ -96,6 +96,15 @@ func DecodeOperation(bytes []byte) (*Operation, error) {
 		}
 
 		op.Data = &result
+
+	case AddChat:
+		var result Chat
+		err := decodeData(dataBytes, &result)
+		if err != nil {
+			return nil, err
+		}
+
+		op.Data = &result
 	}
 
 	return op, nil

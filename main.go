@@ -4,7 +4,6 @@ import (
 	"github/timtimjnvr/chat/conn"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/orchestrator"
-	"github/timtimjnvr/chat/parsestdin"
 	"net"
 
 	"flag"
@@ -34,12 +33,12 @@ func main() {
 	var (
 		myInfos = crdt.NewNodeInfos(*myAddrPtr, *myPortPtr, *myNamePtr)
 
-		sigc             = make(chan os.Signal, 1)
-		shutdown         = make(chan struct{})
-		joinChatCommands = make(chan parsestdin.Command)
-		newConnections   = make(chan net.Conn)
-		toSend           = make(chan *crdt.Operation)
-		toExecute        = make(chan *crdt.Operation)
+		sigc               = make(chan os.Signal, 1)
+		shutdown           = make(chan struct{})
+		connectionRequests = make(chan conn.ConnectionRequest)
+		newConnections     = make(chan net.Conn)
+		toSend             = make(chan *crdt.Operation)
+		toExecute          = make(chan *crdt.Operation)
 
 		wgListen      = sync.WaitGroup{}
 		wgHandleChats = sync.WaitGroup{}
@@ -68,7 +67,7 @@ func main() {
 	// create connections : tcp connect & listen for incoming connections
 	wgListen.Add(1)
 	isReady.L.Lock()
-	go conn.CreateConnections(&wgListen, isReady, myInfos, joinChatCommands, newConnections, shutdown)
+	go conn.CreateConnections(&wgListen, isReady, myInfos, connectionRequests, newConnections, shutdown)
 	isReady.Wait()
 
 	// handle created connections until closure
@@ -82,13 +81,11 @@ func main() {
 
 	// create operations from stdin input
 	wgHandleStdin.Add(1)
-	go orch.HandleStdin(&wgHandleStdin, toExecute, joinChatCommands, shutdown)
+	go orch.HandleStdin(&wgHandleStdin, toExecute, connectionRequests, shutdown)
 
-	for {
-		select {
-		case <-sigc:
-			close(shutdown)
-			return
-		}
+	select {
+	case <-sigc:
+		close(shutdown)
+		return
 	}
 }

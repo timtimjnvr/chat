@@ -86,7 +86,7 @@ func TestGetArgs(t *testing.T) {
 		{
 			text:         "/msg Hello friend!\n",
 			typology:     crdt.AddMessage,
-			expectedArgs: map[string]string{MessageArg: "Hello friend!"},
+			expectedArgs: map[string]string{MessageArg: "Hello friend!\n"},
 			expectedErr:  nil,
 		},
 		{

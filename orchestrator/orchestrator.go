@@ -2,7 +2,7 @@ package orchestrator
 
 import (
 	"fmt"
-	"github.com/google/uuid"
+	"github/timtimjnvr/chat/conn"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/parsestdin"
 	"github/timtimjnvr/chat/reader"
@@ -13,15 +13,15 @@ import (
 )
 
 type (
-	orchestrator struct {
-		sync.RWMutex
+	Orchestrator struct {
+		*sync.RWMutex
 		myInfos     *crdt.NodeInfos
 		currentChat *crdt.Chat
 		storage     *storage.Storage
 	}
 )
 
-func (o *orchestrator) getCurrentChat() *crdt.Chat {
+func (o *Orchestrator) getCurrentChat() *crdt.Chat {
 	o.RLock()
 	defer o.RUnlock()
 
@@ -35,76 +35,21 @@ const (
 	typeCommand = "type a Command :"
 )
 
-func NewOrchestrator(myInfos *crdt.NodeInfos) *orchestrator {
-	id, _ := uuid.NewUUID()
-	currentChat := crdt.NewChat(id, myInfos.Name)
+func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
+	currentChat := crdt.NewChat(myInfos.Name)
 	storage := storage.NewStorage()
 	storage.SaveChat(currentChat)
 
-	return &orchestrator{
+	return &Orchestrator{
+		RWMutex:     &sync.RWMutex{},
 		myInfos:     myInfos,
 		currentChat: currentChat,
 		storage:     storage,
 	}
 }
 
-func (o *orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.Chat) <-chan *crdt.Operation {
-	var syncOps = make(chan *crdt.Operation, 1)
-
-	go func(syncOps chan *crdt.Operation) {
-		defer close(syncOps)
-
-		switch op.Typology {
-		case crdt.JoinChatByName:
-			slot := op.Slot
-			createChatOperation := crdt.NewOperation(crdt.CreateChat, chat.Name, nil)
-			createChatOperation.Slot = slot
-			syncOps <- createChatOperation
-
-			addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.Id, o.myInfos)
-			createChatOperation.Slot = slot
-			syncOps <- addNodeOperation
-
-			// propagates new node to other chats
-			slots := chat.GetSlots(o.myInfos.Id)
-			for _, s := range slots {
-				addNodeOperation.Slot = s
-				syncOps <- addNodeOperation
-			}
-
-		case crdt.AddMessage:
-			slots := chat.GetSlots(o.myInfos.Id)
-			for _, s := range slots {
-				op.Slot = s
-				syncOps <- op
-			}
-		}
-
-	}(syncOps)
-
-	return syncOps
-}
-
-func (o *orchestrator) getChatFromStorage(op crdt.Operation) (*crdt.Chat, error) {
-	var (
-		c   *crdt.Chat
-		err error
-	)
-
-	if op.Typology == crdt.Quit {
-		return nil, nil
-	}
-
-	c, err = o.storage.GetChat(op.TargetedChat, op.Typology == crdt.JoinChatByName)
-	if err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
-
 // HandleChats maintains chat infos consistency by executing operation and building operations to send to other nodes if needed
-func (o *orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Operation, toSend chan<- *crdt.Operation, shutdown <-chan struct{}) {
+func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Operation, toSend chan<- *crdt.Operation, shutdown <-chan struct{}) {
 	defer func() {
 		wg.Done()
 	}()
@@ -119,8 +64,7 @@ func (o *orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 			switch op.Typology {
 			case crdt.CreateChat:
-				id, _ := uuid.NewUUID()
-				c := crdt.NewChat(id, op.TargetedChat)
+				c := crdt.NewChat(op.TargetedChat)
 				c.SaveNode(o.myInfos)
 				o.storage.SaveChat(c)
 				continue
@@ -131,9 +75,9 @@ func (o *orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					log.Println("[ERROR] can't parse op data to Chat")
 					continue
 				}
-				id, _ := uuid.Parse(newChatInfos.Id)
-				newChat := crdt.NewChat(id, newChatInfos.Name)
-				o.storage.SaveChat(newChat)
+
+				o.storage.SaveChat(newChatInfos)
+				continue
 			}
 
 			c, err := o.getChatFromStorage(*op)
@@ -191,7 +135,7 @@ func (o *orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 	}
 }
 
-func (o *orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Operation, joinChatCommands chan<- parsestdin.Command, shutdown chan struct{}) {
+func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Operation, outgoingConnectionRequests chan<- conn.ConnectionRequest, shutdown chan struct{}) {
 	var wgReadStdin = sync.WaitGroup{}
 
 	defer func() {
@@ -217,12 +161,12 @@ func (o *orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				continue
 			}
 
+			args := cmd.GetArgs()
 			switch cmd.GetTypology() {
 			case crdt.JoinChatByName:
-				joinChatCommands <- cmd
+				outgoingConnectionRequests <- conn.NewConnectionRequest(args[parsestdin.PortArg], args[parsestdin.AddrArg], args[parsestdin.ChatRoomArg])
 
 			default:
-				args := cmd.GetArgs()
 				switch cmd.GetTypology() {
 				case crdt.CreateChat:
 					var chatName = args[parsestdin.ChatRoomArg]
@@ -250,4 +194,59 @@ func (o *orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			}
 		}
 	}
+}
+
+func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.Chat) <-chan *crdt.Operation {
+	var syncOps = make(chan *crdt.Operation, 1)
+
+	go func(syncOps chan *crdt.Operation) {
+		defer close(syncOps)
+
+		switch op.Typology {
+		case crdt.JoinChatByName:
+			slot := op.Slot
+			createChatOperation := crdt.NewOperation(crdt.AddChat, chat.Name, chat)
+			createChatOperation.Slot = slot
+			syncOps <- createChatOperation
+
+			addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.Id, o.myInfos)
+			createChatOperation.Slot = slot
+			syncOps <- addNodeOperation
+
+			// propagates new node to other chats
+			slots := chat.GetSlots(o.myInfos.Id)
+			for _, s := range slots {
+				addNodeOperation.Slot = s
+				syncOps <- addNodeOperation
+			}
+
+		case crdt.AddMessage:
+			slots := chat.GetSlots(o.myInfos.Id)
+			for _, s := range slots {
+				op.Slot = s
+				syncOps <- op
+			}
+		}
+
+	}(syncOps)
+
+	return syncOps
+}
+
+func (o *Orchestrator) getChatFromStorage(op crdt.Operation) (*crdt.Chat, error) {
+	var (
+		c   *crdt.Chat
+		err error
+	)
+
+	if op.Typology == crdt.Quit {
+		return nil, nil
+	}
+
+	c, err = o.storage.GetChat(op.TargetedChat, op.Typology == crdt.JoinChatByName)
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
