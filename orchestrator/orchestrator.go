@@ -77,6 +77,8 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 				o.storage.SaveChat(newChatInfos)
+				log.Println(fmt.Sprintf("you joined a new chat : %s", newChatInfos.Name))
+
 				continue
 			}
 
@@ -97,6 +99,8 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				newNodeInfos.Slot = op.Slot
 				c.SaveNode(newNodeInfos)
 				o.storage.SaveChat(c)
+
+				log.Println(fmt.Sprintf("%s joined chat", newNodeInfos.Name))
 
 				for syncOp := range o.getPropagationOperations(op, c) {
 					toSend <- syncOp
@@ -210,8 +214,6 @@ func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.C
 			syncOps <- createChatOperation
 
 			addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.Id, o.myInfos)
-			createChatOperation.Slot = slot
-			syncOps <- addNodeOperation
 
 			// propagates new node to other chats
 			slots := chat.GetSlots(o.myInfos.Id)
