@@ -2,7 +2,9 @@ package crdt
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
+	"log"
 	"time"
 )
 
@@ -81,8 +83,8 @@ func (c *Chat) SaveMessage(message *Message) {
 	}
 }
 
-func (m *Chat) ToBytes() []byte {
-	bytesChat, _ := json.Marshal(m)
+func (c *Chat) ToBytes() []byte {
+	bytesChat, _ := json.Marshal(c)
 	return bytesChat
 }
 
@@ -95,6 +97,13 @@ func (c *Chat) GetSlots(myId uuid.UUID) []uint8 {
 	}
 
 	return slots
+}
+
+func (c *Chat) DisplayUsers() {
+	log.Println(fmt.Sprintf("chat : %s users :", c.Name))
+	for _, n := range c.nodesInfos {
+		log.Println(fmt.Sprintf("%s (Address: %s, Port: %s, Slot: %d", n.Name, n.Address, n.Port, n.Slot))
+	}
 }
 
 func (c *Chat) containsMessage(message *Message) bool {

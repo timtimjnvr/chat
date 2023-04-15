@@ -62,14 +62,14 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 		case op := <-toExecute:
 			// execute op
 
-			switch op.Typology {
-			case crdt.CreateChat:
+			if op.Typology == crdt.CreateChat {
 				c := crdt.NewChat(op.TargetedChat)
 				c.SaveNode(o.myInfos)
 				o.storage.SaveChat(c)
 				continue
+			}
 
-			case crdt.AddChat:
+			if op.Typology == crdt.AddChat {
 				newChatInfos, ok := op.Data.(*crdt.Chat)
 				if !ok {
 					log.Println("[ERROR] can't parse op data to Chat")
@@ -82,6 +82,17 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				continue
 			}
 
+			if op.Typology == crdt.ListChats {
+				o.storage.DisplayChats()
+				continue
+			}
+
+			if op.Typology == crdt.ListUsers {
+				o.currentChat.DisplayUsers()
+				continue
+			}
+
+			// for other operation we need to get a chat from storage
 			c, err := o.getChatFromStorage(*op)
 			if err != nil {
 				log.Println("[ERROR]", err)
