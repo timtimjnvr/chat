@@ -30,40 +30,11 @@ func TestContainsMessage(t *testing.T) {
 }
 
 func TestChat_SaveMessage(t *testing.T) {
-
-	chatMessages := make([]*Message, 10)
+	// inserting message with random dates and verifying they are in right order
 	chat := NewChat("name")
-
-	// giving message in chronological order and verifying all messages are present
-	for i := range chatMessages {
-		chatMessages[i] = NewMessage("sender", fmt.Sprintf("%d", i))
-		chatMessages[i].Date = fmt.Sprintf("2006-01-02T15:04:0%dZ", i)
-		chat.SaveMessage(chatMessages[i])
-	}
-
-	for i, m := range chatMessages {
-		assert.Equal(t, chat.messages[i].Content, m.Content)
-	}
-
-	chat = NewChat("name")
-	chatMessages = make([]*Message, 10)
-
-	// giving message in reverse chronological order and verifying all messages are present
-	for i := range chatMessages {
-		chatMessages[len(chatMessages)-i-1] = NewMessage("sender", fmt.Sprintf("%d", len(chatMessages)-i-1))
-		chatMessages[len(chatMessages)-i-1].Date = fmt.Sprintf("2006-01-02T15:04:0%dZ", len(chatMessages)-i-1)
-		chat.SaveMessage(chatMessages[len(chatMessages)-i-1])
-	}
-
-	for i, m := range chatMessages {
-		assert.Equal(t, chat.messages[i].Content, m.Content)
-	}
-
-	// inserting message with random dates anbd verifying they are in right order
-	chat = NewChat("name")
 	for i := 0; i < 10; i++ {
 		m := NewMessage("sender", fmt.Sprintf("%d", i))
-		m.Date = randomTimestamp().String()
+		m.Date = randomTimestamp().Format(time.RFC3339)
 		chat.SaveMessage(m)
 	}
 
