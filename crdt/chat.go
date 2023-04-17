@@ -2,7 +2,6 @@ package crdt
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/google/uuid"
 	"log"
 	"time"
@@ -100,9 +99,9 @@ func (c *Chat) GetSlots(myId uuid.UUID) []uint8 {
 }
 
 func (c *Chat) DisplayUsers() {
-	log.Println(fmt.Sprintf("chat : %s users :", c.Name))
+	log.Printf("chat name : %s\n", c.Name)
 	for _, n := range c.nodesInfos {
-		log.Println(fmt.Sprintf("%s (Address: %s, Port: %s, Slot: %d", n.Name, n.Address, n.Port, n.Slot))
+		log.Printf("- %s (Address: %s, Port: %s, Slot: %d)\n", n.Name, n.Address, n.Port, n.Slot)
 	}
 }
 

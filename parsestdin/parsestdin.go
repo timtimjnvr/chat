@@ -107,7 +107,7 @@ func parseArgs(line string, command crdt.OperationType) (map[string]string, erro
 		args[ChatRoomArg] = strings.Replace(splitArgs[3], " ", "", 2)
 
 	case crdt.AddMessage:
-		messageWithoutCommand  := strings.Replace(text, fmt.Sprintf("%s ", msgCommand), "", 1)
+		messageWithoutCommand := strings.Replace(text, fmt.Sprintf("%s ", msgCommand), "", 1)
 		args[MessageArg] = fmt.Sprintf("%s\n", messageWithoutCommand)
 
 	default:

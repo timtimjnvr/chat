@@ -43,7 +43,7 @@ func (l *list) Display() {
 
 	tmp := l.head
 	for tmp != nil {
-		fmt.Printf("%s", tmp.chat.Name)
+		fmt.Printf("- %s\n", tmp.chat.Name)
 		tmp = tmp.next
 	}
 }

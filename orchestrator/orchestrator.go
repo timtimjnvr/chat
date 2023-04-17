@@ -28,6 +28,13 @@ func (o *Orchestrator) getCurrentChat() *crdt.Chat {
 	return o.currentChat
 }
 
+func (o *Orchestrator) updateCurrentChat(c *crdt.Chat) {
+	o.Lock()
+	defer o.Unlock()
+	var valueChat = *c
+	o.currentChat = &valueChat
+}
+
 const (
 	MaxMessagesStdin = 100
 
@@ -38,14 +45,17 @@ const (
 func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
 	currentChat := crdt.NewChat(myInfos.Name)
 	storage := storage.NewStorage()
+
+	o := &Orchestrator{
+		RWMutex: &sync.RWMutex{},
+		myInfos: myInfos,
+		storage: storage,
+	}
+
+	o.updateCurrentChat(currentChat)
 	storage.SaveChat(currentChat)
 
-	return &Orchestrator{
-		RWMutex:     &sync.RWMutex{},
-		myInfos:     myInfos,
-		currentChat: currentChat,
-		storage:     storage,
-	}
+	return o
 }
 
 // HandleChats maintains chat infos consistency by executing operation and building operations to send to other nodes if needed
@@ -63,9 +73,10 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			// execute op
 
 			if op.Typology == crdt.CreateChat {
-				c := crdt.NewChat(op.TargetedChat)
-				c.SaveNode(o.myInfos)
-				o.storage.SaveChat(c)
+				newChat := crdt.NewChat(op.TargetedChat)
+				newChat.SaveNode(o.myInfos)
+				o.storage.SaveChat(newChat)
+				o.updateCurrentChat(newChat)
 				continue
 			}
 
@@ -76,9 +87,12 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					continue
 				}
 
-				o.storage.SaveChat(newChatInfos)
-				log.Println(fmt.Sprintf("you joined a new chat : %s", newChatInfos.Name))
+				newChat := crdt.NewChat(newChatInfos.Name)
+				newChat.Id = newChatInfos.Id
+				o.storage.SaveChat(newChat)
+				o.updateCurrentChat(newChat)
 
+				log.Println(fmt.Sprintf("you joined a new chat : %s", newChatInfos.Name))
 				continue
 			}
 
@@ -111,6 +125,8 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				c.SaveNode(newNodeInfos)
 				o.storage.SaveChat(c)
 
+				o.updateCurrentChat(c)
+
 				log.Println(fmt.Sprintf("%s joined chat", newNodeInfos.Name))
 
 				for syncOp := range o.getPropagationOperations(op, c) {
@@ -128,7 +144,9 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				c.SaveNode(newNodeInfos)
 				o.storage.SaveChat(c)
 
-				log.Println(fmt.Sprintf("%s joined chat", newNodeInfos.Name))
+				o.updateCurrentChat(c)
+
+				log.Println(fmt.Sprintf("connection established with %s", newNodeInfos.Name))
 
 			case crdt.AddMessage:
 				newMessage, ok := op.Data.(*crdt.Message)
@@ -139,6 +157,8 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				c.SaveMessage(newMessage)
 				o.storage.SaveChat(c)
+
+				o.updateCurrentChat(c)
 
 				log.Println(fmt.Sprintf("%s (%s): %s", newMessage.Sender, newMessage.Date, newMessage.Content))
 
