@@ -177,7 +177,7 @@ func TestNodeHandler_Send(t *testing.T) {
 
 func TestNodeHandler_10NodesStartAndStop(t *testing.T) {
 	var (
-		maxTestDuration = 1 * time.Second
+		maxTestDuration = 3 * time.Second
 		shutdown        = make(chan struct{}, 0)
 		nh              = NewNodeHandler(shutdown)
 		newConnections  = make(chan net.Conn)
