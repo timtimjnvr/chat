@@ -47,7 +47,7 @@ func (c *Chat) SaveMessage(message *Message) {
 	}
 
 	messageToSaveDate, _ := time.Parse(time.RFC3339, message.Date)
-	if !c.containsMessage(message) {
+	if !c.ContainsMessage(message) {
 		var (
 			i              int
 			messageDate, _ = time.Parse(time.RFC3339, c.messages[i].Date)
@@ -105,7 +105,7 @@ func (c *Chat) DisplayUsers() {
 	}
 }
 
-func (c *Chat) containsMessage(message *Message) bool {
+func (c *Chat) ContainsMessage(message *Message) bool {
 	for _, m := range c.messages {
 		if m.Id == message.Id {
 			return true

@@ -21,12 +21,12 @@ func TestContainsMessage(t *testing.T) {
 		}
 	)
 
-	assert.True(t, chat.containsMessage(chatMessages[0]))
-	assert.True(t, chat.containsMessage(chatMessages[1]))
-	assert.True(t, chat.containsMessage(chatMessages[2]))
+	assert.True(t, chat.ContainsMessage(chatMessages[0]))
+	assert.True(t, chat.ContainsMessage(chatMessages[1]))
+	assert.True(t, chat.ContainsMessage(chatMessages[2]))
 
 	var otherMessage = NewMessage("Anonymous", "Hello Guys!")
-	assert.False(t, chat.containsMessage(otherMessage))
+	assert.False(t, chat.ContainsMessage(otherMessage))
 }
 
 func TestChat_SaveMessage(t *testing.T) {
