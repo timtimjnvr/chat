@@ -71,7 +71,6 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 		case op := <-toExecute:
 			// execute op
-
 			if op.Typology == crdt.CreateChat {
 				newChat := crdt.NewChat(op.TargetedChat)
 				newChat.SaveNode(o.myInfos)
@@ -124,7 +123,6 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				newNodeInfos.Slot = op.Slot
 				c.SaveNode(newNodeInfos)
 				o.storage.SaveChat(c)
-
 				o.updateCurrentChat(c)
 
 				log.Println(fmt.Sprintf("%s joined chat", newNodeInfos.Name))
@@ -166,9 +164,9 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				log.Println(fmt.Sprintf("%s (%s): %s", newMessage.Sender, newMessage.Date, newMessage.Content))
 
-				for syncOp := range o.getPropagationOperations(op, c) {
-					toSend <- syncOp
-				}
+				// for syncOp := range o.getPropagationOperations(op, c) {
+				// 	toSend <- syncOp
+				// }
 			}
 		}
 	}
@@ -236,7 +234,7 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 }
 
 func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.Chat) <-chan *crdt.Operation {
-	var syncOps = make(chan *crdt.Operation, 1)
+	var syncOps = make(chan *crdt.Operation)
 
 	go func(syncOps chan *crdt.Operation) {
 		defer close(syncOps)
@@ -255,6 +253,19 @@ func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.C
 			for _, s := range slots {
 				addNodeOperation.Slot = s
 				syncOps <- addNodeOperation
+			}
+
+			// sending chat messages
+			addMessageOperations := make([]*crdt.Operation, 0, 0)
+			for _, m := range chat.Messages {
+				addMessageOperations = append(addMessageOperations, crdt.NewOperation(crdt.AddMessage, chat.Id, m))
+			}
+
+			for _, s := range slots {
+				for _, addMessageOperation := range addMessageOperations {
+					addMessageOperation.Slot = s
+					syncOps <- addMessageOperation
+				}
 			}
 
 		case crdt.AddMessage:

@@ -17,7 +17,7 @@ func TestContainsMessage(t *testing.T) {
 		}
 
 		chat = Chat{
-			messages: chatMessages,
+			Messages: chatMessages,
 		}
 	)
 
@@ -40,10 +40,10 @@ func TestChat_SaveMessage(t *testing.T) {
 
 	var (
 		currentDate     time.Time
-		previousDate, _ = time.Parse(time.RFC3339, chat.messages[0].Date)
+		previousDate, _ = time.Parse(time.RFC3339, chat.Messages[0].Date)
 	)
-	for i := 1; i < len(chat.messages); i++ {
-		currentDate, _ = time.Parse(time.RFC3339, chat.messages[i].Date)
+	for i := 1; i < len(chat.Messages); i++ {
+		currentDate, _ = time.Parse(time.RFC3339, chat.Messages[i].Date)
 		assert.True(t, currentDate.After(previousDate))
 	}
 }
