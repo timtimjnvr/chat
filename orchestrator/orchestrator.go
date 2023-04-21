@@ -154,6 +154,10 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					log.Println("[ERROR] can't parse op data to Message")
 					break
 				}
+				
+				if c.ContainsMessage(newMessage) {
+					continue
+				}
 
 				c.SaveMessage(newMessage)
 				o.storage.SaveChat(c)
