@@ -152,7 +152,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					log.Println("[ERROR] can't parse op data to Message")
 					break
 				}
-				
+
 				if c.ContainsMessage(newMessage) {
 					continue
 				}
@@ -164,9 +164,9 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				log.Println(fmt.Sprintf("%s (%s): %s", newMessage.Sender, newMessage.Date, newMessage.Content))
 
-				// for syncOp := range o.getPropagationOperations(op, c) {
-				// 	toSend <- syncOp
-				// }
+				for syncOp := range o.getPropagationOperations(op, c) {
+					toSend <- syncOp
+				}
 			}
 		}
 	}
@@ -247,6 +247,7 @@ func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.C
 			syncOps <- createChatOperation
 
 			addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.Id, o.myInfos)
+			syncOps <- addNodeOperation
 
 			// propagates new node to other chats
 			slots := chat.GetSlots(o.myInfos.Id)
