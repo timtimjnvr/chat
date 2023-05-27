@@ -31,6 +31,7 @@ func NewConnectionRequest(port, address, chatRoom string) ConnectionRequest {
 		chatRoom:        chatRoom,
 	}
 }
+
 func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.NodeInfos, incomingConnectionRequests chan ConnectionRequest, newConnections chan net.Conn, shutdown <-chan struct{}) {
 	var (
 		c                     net.Conn
