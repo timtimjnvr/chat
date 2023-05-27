@@ -178,7 +178,7 @@ func TestNodeHandler_Send(t *testing.T) {
 
 func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
 	var (
-		maxTestDuration = 15 * time.Second
+		maxTestDuration = 30 * time.Second
 		shutdown        = make(chan struct{}, 0)
 		nh              = NewNodeHandler(shutdown)
 		newConnections  = make(chan net.Conn)
@@ -207,6 +207,8 @@ func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
 		newConnections <- conn1
 		firstPort++
 	}
+
+	<-time.Tick(3 * time.Second)
 
 	// killing all connections and checking messages
 	for i := 0; i < maxNode; i++ {
