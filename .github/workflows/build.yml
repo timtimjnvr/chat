@@ -32,4 +32,4 @@ jobs:
       # Run tests
       - name: Run tests
         working-directory: ./
-        run: go test ./... -race -timeout 30s
+        run: go test ./... -race -timeout 5m

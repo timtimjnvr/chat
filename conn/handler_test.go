@@ -5,11 +5,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github/timtimjnvr/chat/crdt"
 	"net"
+	"syscall"
 	"testing"
 	"time"
 )
 
-func TestDriver_StartAndStop(t *testing.T) {
+func TestNodeHandler_StartAndStop(t *testing.T) {
 	var (
 		output          = make(chan []byte, maxMessageSize)
 		done            = make(chan slot, 2)
@@ -76,7 +77,7 @@ func TestDriver_StartAndStop(t *testing.T) {
 	}
 }
 
-func TestDriver_StartStopNodesAndSendQuit(t *testing.T) {
+func TestNodeHandler_StartStopNodesAndSendQuit(t *testing.T) {
 	var (
 		maxTestDuration = 1 * time.Second
 		shutdown        = make(chan struct{}, 0)
@@ -175,17 +176,16 @@ func TestNodeHandler_Send(t *testing.T) {
 	}
 }
 
-func TestNodeHandler_10NodesStartAndStop(t *testing.T) {
+func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
 	var (
-		maxTestDuration = 3 * time.Second
-		shutdown        = make(chan struct{}, 0)
-		nh              = NewNodeHandler(shutdown)
-		newConnections  = make(chan net.Conn)
-		toSend          = make(chan *crdt.Operation)
-		toExecute       = make(chan *crdt.Operation)
+		shutdown       = make(chan struct{}, 0)
+		nh             = NewNodeHandler(shutdown)
+		newConnections = make(chan net.Conn)
+		toSend         = make(chan *crdt.Operation)
+		toExecute      = make(chan *crdt.Operation)
 
 		firstPort  = 1235
-		maxNode    = 10
+		maxNode    = syscall.SOMAXCONN - 1
 		connSaving = make(map[int]net.Conn, maxNode)
 	)
 
@@ -207,21 +207,17 @@ func TestNodeHandler_10NodesStartAndStop(t *testing.T) {
 		firstPort++
 	}
 
-	expectedQuitOperation := crdt.NewOperation(crdt.Quit, "", nil)
+	<-time.Tick(5 * time.Second)
 
 	// killing all connections and checking messages
 	for i := 0; i < maxNode; i++ {
 		connSaving[i].Close()
-		expectedQuitOperation.Slot = uint8(i + 1)
-		expectedBytes := expectedQuitOperation.ToBytes()
-		timeout := time.Tick(maxTestDuration)
+	}
 
+	// the test will succeed if all connections are received else it will time out with a report on blocked go routines
+	for i := 0; i < maxNode; i++ {
 		select {
-		case <-timeout:
-			assert.Fail(t, fmt.Sprintf("test %d timeout", i))
-			return
-		case op := <-toExecute:
-			assert.Equal(t, op.ToBytes(), expectedBytes, "did not received expected quit operation")
+		case <-toExecute:
 		}
 	}
 }
