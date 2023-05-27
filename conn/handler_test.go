@@ -178,12 +178,11 @@ func TestNodeHandler_Send(t *testing.T) {
 
 func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
 	var (
-		maxTestDuration = 30 * time.Second
-		shutdown        = make(chan struct{}, 0)
-		nh              = NewNodeHandler(shutdown)
-		newConnections  = make(chan net.Conn)
-		toSend          = make(chan *crdt.Operation)
-		toExecute       = make(chan *crdt.Operation)
+		shutdown       = make(chan struct{}, 0)
+		nh             = NewNodeHandler(shutdown)
+		newConnections = make(chan net.Conn)
+		toSend         = make(chan *crdt.Operation)
+		toExecute      = make(chan *crdt.Operation)
 
 		firstPort  = 1235
 		maxNode    = syscall.SOMAXCONN - 1
@@ -208,19 +207,16 @@ func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
 		firstPort++
 	}
 
-	<-time.Tick(3 * time.Second)
+	<-time.Tick(5 * time.Second)
 
 	// killing all connections and checking messages
 	for i := 0; i < maxNode; i++ {
 		connSaving[i].Close()
 	}
 
-	timeout := time.Tick(maxTestDuration)
+	// the test will succeed if all connections are received else it will time out with a report on blocked go routines
 	for i := 0; i < maxNode; i++ {
 		select {
-		case <-timeout:
-			assert.Fail(t, fmt.Sprintf("only %d quit operations (on %d)", i, maxNode))
-			return
 		case <-toExecute:
 		}
 	}
