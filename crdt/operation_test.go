@@ -28,7 +28,7 @@ func TestEncodeDecodeOperation(t *testing.T) {
 					Data: &Chat{
 						Id:   "9b83358e-a570-4a1b-8842-6800ee770f2a",
 						Name: "james",
-						Messages: []*Message{
+						messages: []*Message{
 							{
 								Id:      uuid.New(),
 								Sender:  "james",
@@ -93,33 +93,5 @@ func TestEncodeDecodeOperation(t *testing.T) {
 		}
 
 		assert.True(t, reflect.DeepEqual(decodedOp, test.op), fmt.Sprintf("test %d failed to encode/decode struct", i))
-	}
-}
-
-func TestGetField(t *testing.T) {
-	var testData = []struct {
-		bytes          []byte
-		offset         int
-		expectedField  []byte
-		expectedOffset int
-	}{
-		{
-			bytes:          []byte{0, 0, 0, 4, 1, 1, 1, 1, 0},
-			offset:         3,
-			expectedField:  []byte{1, 1, 1, 1},
-			expectedOffset: 8,
-		},
-		{
-			bytes:          []byte{0, 0, 0, 4, 1, 1, 1, 1, 2, 1, 1, 0},
-			offset:         8,
-			expectedField:  []byte{1, 1},
-			expectedOffset: 11,
-		},
-	}
-
-	for i, d := range testData {
-		offset, field := getField(d.offset, d.bytes)
-		assert.Equal(t, d.expectedField, field, fmt.Sprintf("test %d failed on field", i))
-		assert.Equal(t, d.expectedOffset, offset, fmt.Sprintf("test %d failed on offset", i))
 	}
 }

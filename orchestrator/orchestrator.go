@@ -257,10 +257,7 @@ func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.C
 			}
 
 			// sending chat messages
-			addMessageOperations := make([]*crdt.Operation, 0, 0)
-			for _, m := range chat.Messages {
-				addMessageOperations = append(addMessageOperations, crdt.NewOperation(crdt.AddMessage, chat.Id, m))
-			}
+			addMessageOperations := chat.GetMessageOperationsForPropagation()
 
 			for _, s := range slots {
 				for _, addMessageOperation := range addMessageOperations {

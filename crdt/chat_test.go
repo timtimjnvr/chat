@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -17,7 +18,7 @@ func TestContainsMessage(t *testing.T) {
 		}
 
 		chat = Chat{
-			Messages: chatMessages,
+			messages: chatMessages,
 		}
 	)
 
@@ -40,10 +41,10 @@ func TestChat_SaveMessage(t *testing.T) {
 
 	var (
 		currentDate     time.Time
-		previousDate, _ = time.Parse(time.RFC3339, chat.Messages[0].Date)
+		previousDate, _ = time.Parse(time.RFC3339, chat.messages[0].Date)
 	)
-	for i := 1; i < len(chat.Messages); i++ {
-		currentDate, _ = time.Parse(time.RFC3339, chat.Messages[i].Date)
+	for i := 1; i < len(chat.messages); i++ {
+		currentDate, _ = time.Parse(time.RFC3339, chat.messages[i].Date)
 		assert.True(t, currentDate.After(previousDate))
 	}
 }
@@ -54,4 +55,48 @@ func randomTimestamp() time.Time {
 	randomNow := time.Unix(randomTime, 0)
 
 	return randomNow
+}
+
+func TestEncodeChatFields(t *testing.T) {
+	var (
+		uuidString = "4b8e153b-834f-4190-b5d3-aba2f35ead56"
+	)
+
+	var (
+		tests = []struct {
+			chatToEncode  *Chat
+			chatExpected  *Chat
+			expectedError error
+		}{
+			{
+				chatToEncode: &Chat{
+					Id:   uuidString,
+					Name: "James",
+					nodesInfos: []*NodeInfos{
+						{
+							Name: "test",
+						},
+					},
+					messages: []*Message{
+						{
+							Sender: "test",
+						},
+					},
+				},
+				chatExpected: &Chat{
+					Id:   uuidString,
+					Name: "James",
+				},
+				expectedError: nil,
+			},
+		}
+	)
+
+	for i, test := range tests {
+		bytes := test.chatToEncode.ToBytes()
+		var res = &Chat{}
+		err := decodeData(bytes, res)
+		assert.Equal(t, test.chatExpected, res)
+		assert.True(t, reflect.DeepEqual(err, test.expectedError), fmt.Sprintf("test %d failed on error returned", i))
+	}
 }

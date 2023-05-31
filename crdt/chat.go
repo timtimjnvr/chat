@@ -12,7 +12,7 @@ type (
 		Id         string `json:"id"`
 		Name       string `json:"name"`
 		nodesInfos []*NodeInfos
-		Messages   []*Message // ordered by date : 0 being the oldest message, 1 coming after 0 etc ...
+		messages   []*Message // ordered by date : 0 being the oldest message, 1 coming after 0 etc ...
 	}
 )
 
@@ -23,7 +23,7 @@ func NewChat(name string) *Chat {
 		Id:         uuid.New().String(),
 		Name:       name,
 		nodesInfos: make([]*NodeInfos, 0, maxNumberOfNodes),
-		Messages:   make([]*Message, 0, maxNumberOfMessages),
+		messages:   make([]*Message, 0, maxNumberOfMessages),
 	}
 }
 
@@ -41,8 +41,8 @@ func (c *Chat) SaveNode(nodeInfo *NodeInfos) {
 }
 
 func (c *Chat) SaveMessage(message *Message) {
-	if len(c.Messages) == 0 {
-		c.Messages = append(c.Messages, message)
+	if len(c.messages) == 0 {
+		c.messages = append(c.messages, message)
 		return
 	}
 
@@ -50,15 +50,15 @@ func (c *Chat) SaveMessage(message *Message) {
 	if !c.ContainsMessage(message) {
 		var (
 			i              int
-			messageDate, _ = time.Parse(time.RFC3339, c.Messages[i].Date)
+			messageDate, _ = time.Parse(time.RFC3339, c.messages[i].Date)
 		)
 
-		for messageDate, _ = time.Parse(time.RFC3339, c.Messages[i].Date); messageToSaveDate.After(messageDate) && i < len(c.Messages); i++ {
+		for messageDate, _ = time.Parse(time.RFC3339, c.messages[i].Date); messageToSaveDate.After(messageDate) && i < len(c.messages); i++ {
 		}
 
-		beginning := c.Messages[:i]
-		end := c.Messages[i:]
-		newMessages := make([]*Message, len(c.Messages)+1)
+		beginning := c.messages[:i]
+		end := c.messages[i:]
+		newMessages := make([]*Message, len(c.messages)+1)
 
 		j := 0
 		if len(beginning) > 0 {
@@ -78,7 +78,7 @@ func (c *Chat) SaveMessage(message *Message) {
 			}
 		}
 
-		c.Messages = newMessages
+		c.messages = newMessages
 	}
 }
 
@@ -106,12 +106,20 @@ func (c *Chat) DisplayUsers() {
 }
 
 func (c *Chat) ContainsMessage(message *Message) bool {
-	for _, m := range c.Messages {
+	for _, m := range c.messages {
 		if m.Id == message.Id {
 			return true
 		}
 	}
 	return false
+}
+
+func (c *Chat) GetMessageOperationsForPropagation() []*Operation {
+	addMessageOperations := make([]*Operation, 0, 0)
+	for _, m := range c.messages {
+		addMessageOperations = append(addMessageOperations, NewOperation(AddMessage, c.Id, m))
+	}
+	return addMessageOperations
 }
 
 func (c *Chat) containsNode(node *NodeInfos) bool {
