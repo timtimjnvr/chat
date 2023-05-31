@@ -69,13 +69,8 @@ func (n *node) start(done chan<- slot) {
 		case message := <-n.Input:
 			// hide own slot to remote client
 			message = resetSlot(message)
-
-			// try to Write defaultMaxRetries times if err
-			err := Write(n.conn, message)
-			if err != nil {
-				// conn closed by the remote client
-				return
-			}
+			n, err := n.conn.Write(message)
+			log.Println(n, err)
 
 		case message, ok := <-outputConnection:
 			if !ok {
