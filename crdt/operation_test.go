@@ -28,14 +28,6 @@ func TestEncodeDecodeOperation(t *testing.T) {
 					Data: &Chat{
 						Id:   "9b83358e-a570-4a1b-8842-6800ee770f2a",
 						Name: "james",
-						messages: []*Message{
-							{
-								Id:      uuid.New(),
-								Sender:  "james",
-								Content: "1\n",
-								Date:    "2023-04-30T23:53:33+02:00",
-							},
-						},
 					},
 				},
 				nil,

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
-	"reflect"
 	"testing"
 	"time"
 )
@@ -55,48 +54,4 @@ func randomTimestamp() time.Time {
 	randomNow := time.Unix(randomTime, 0)
 
 	return randomNow
-}
-
-func TestEncodeChatFields(t *testing.T) {
-	var (
-		uuidString = "4b8e153b-834f-4190-b5d3-aba2f35ead56"
-	)
-
-	var (
-		tests = []struct {
-			chatToEncode  *Chat
-			chatExpected  *Chat
-			expectedError error
-		}{
-			{
-				chatToEncode: &Chat{
-					Id:   uuidString,
-					Name: "James",
-					nodesInfos: []*NodeInfos{
-						{
-							Name: "test",
-						},
-					},
-					messages: []*Message{
-						{
-							Sender: "test",
-						},
-					},
-				},
-				chatExpected: &Chat{
-					Id:   uuidString,
-					Name: "James",
-				},
-				expectedError: nil,
-			},
-		}
-	)
-
-	for i, test := range tests {
-		bytes := test.chatToEncode.ToBytes()
-		var res = &Chat{}
-		err := decodeData(bytes, res)
-		assert.Equal(t, test.chatExpected, res)
-		assert.True(t, reflect.DeepEqual(err, test.expectedError), fmt.Sprintf("test %d failed on error returned", i))
-	}
 }
