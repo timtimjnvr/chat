@@ -1,9 +1,11 @@
 package conn
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github/timtimjnvr/chat/crdt"
+	"github/timtimjnvr/chat/reader"
 	"net"
 	"syscall"
 	"testing"
@@ -162,8 +164,8 @@ func TestNodeHandler_Send(t *testing.T) {
 
 	expectedMessageOperation := crdt.NewOperation(crdt.AddMessage, "test-chat", &crdt.Message{Content: "I love Unit Testing"})
 	expectedMessageOperation.Slot = 0
-	expectedBytes := expectedMessageOperation.ToBytes()
-
+	expectedBytesOperationWithSeparator := expectedMessageOperation.ToBytes()
+	expectedBytes := bytes.TrimSuffix(expectedBytesOperationWithSeparator, reader.Separator)
 	toSend <- messageOperation
 
 	timeout := time.Tick(maxTestDuration)
