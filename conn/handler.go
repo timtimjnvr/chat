@@ -70,7 +70,9 @@ func (n *node) start(done chan<- slot) {
 			// hide own slot to remote client
 			message = resetSlot(message)
 			n, err := n.conn.Write(message)
-			log.Println(n, err)
+			if err != nil {
+				log.Printf("Write %d, %s\n", n, err)
+			}
 
 		case message, ok := <-outputConnection:
 			if !ok {

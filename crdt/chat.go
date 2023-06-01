@@ -114,6 +114,14 @@ func (c *Chat) ContainsMessage(message *Message) bool {
 	return false
 }
 
+func (c *Chat) GetMessageOperationsForPropagation() []*Operation {
+	addMessageOperations := make([]*Operation, 0, 0)
+	for _, m := range c.messages {
+		addMessageOperations = append(addMessageOperations, NewOperation(AddMessage, c.Id, m))
+	}
+	return addMessageOperations
+}
+
 func (c *Chat) containsNode(node *NodeInfos) bool {
 	for _, n := range c.nodesInfos {
 		if n.Id == node.Id {

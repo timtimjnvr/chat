@@ -23,6 +23,18 @@ func TestEncodeDecodeOperation(t *testing.T) {
 			{
 				&Operation{
 					Slot:         0,
+					Typology:     AddChat,
+					TargetedChat: "my-awesome-chat",
+					Data: &Chat{
+						Id:   "9b83358e-a570-4a1b-8842-6800ee770f2a",
+						Name: "james",
+					},
+				},
+				nil,
+			},
+			{
+				&Operation{
+					Slot:         0,
 					Typology:     AddNode,
 					TargetedChat: uuidString,
 					Data: &NodeInfos{

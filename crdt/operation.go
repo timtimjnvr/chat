@@ -2,6 +2,7 @@ package crdt
 
 import (
 	"encoding/json"
+	"github/timtimjnvr/chat/reader"
 )
 
 type (
@@ -60,6 +61,7 @@ func (op *Operation) ToBytes() []byte {
 
 	bytes = append(bytes, uint8(len(dataBytes)))
 	bytes = append(bytes, dataBytes...)
+	bytes = append(bytes, reader.Separator...)
 
 	return bytes
 }
@@ -109,7 +111,6 @@ func DecodeOperation(bytes []byte) (*Operation, error) {
 
 	return op, nil
 }
-
 func decodeData(bytes []byte, result any) error {
 	err := json.Unmarshal(bytes, &result)
 	if err != nil {
