@@ -159,10 +159,9 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				c.SaveMessage(newMessage)
 				o.storage.SaveChat(c)
-
 				o.updateCurrentChat(c)
 
-				log.Println(fmt.Sprintf("%s (%s): %s", newMessage.Sender, newMessage.Date, newMessage.Content))
+				fmt.Printf("%s (%s): %s", newMessage.Sender, newMessage.Date, newMessage.Content)
 
 				for syncOp := range o.getPropagationOperations(op, c) {
 					toSend <- syncOp
