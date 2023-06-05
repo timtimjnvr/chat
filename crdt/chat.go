@@ -44,18 +44,48 @@ func (c *Chat) RemoveNodeBySlot(slot uint8) {
 	// get index
 	var (
 		index int
-		n     NodeInfos
+		found bool
+		n     *NodeInfos
 	)
 	for index, n = range c.nodesInfos {
 		if n.Slot == slot {
+			found = true
 			break
 		}
 	}
 
-	// node identified by slot found
-	if index != len(c.nodesInfos) {
-		c.nodesInfos = append(c.nodesInfos[:index-1], c.nodesInfos[index+1])
+	if !found {
+		return
 	}
+
+	if index == 0 && len(c.nodesInfos) == 1 {
+		c.nodesInfos = make([]*NodeInfos, 0, 0)
+		return
+	}
+
+	if index == 0 && len(c.nodesInfos) > 1 {
+		c.nodesInfos = c.nodesInfos[:index]
+		return
+	}
+
+	if index == len(c.nodesInfos)-1 {
+		c.nodesInfos = c.nodesInfos[len(c.nodesInfos):]
+		return
+	}
+	var (
+		newNodeInfos = make([]*NodeInfos, len(c.nodesInfos)-1)
+		j            int
+	)
+	for i := 0; i <= len(c.nodesInfos)-1; i++ {
+		if i == index {
+			continue
+		}
+
+		newNodeInfos[j] = c.nodesInfos[i]
+		j++
+	}
+
+	c.nodesInfos = newNodeInfos
 }
 
 func (c *Chat) SaveMessage(message *Message) {
@@ -140,9 +170,9 @@ func (c *Chat) GetMessageOperationsForPropagation() []*Operation {
 	return addMessageOperations
 }
 
-func (c *Chat) containsNode(node *NodeInfos) bool {
+func (c *Chat) containsNode(id uuid.UUID) bool {
 	for _, n := range c.nodesInfos {
-		if n.Id == node.Id {
+		if n.Id == id {
 			return true
 		}
 	}
