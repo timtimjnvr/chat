@@ -40,6 +40,24 @@ func (c *Chat) SaveNode(nodeInfo *NodeInfos) {
 	c.nodesInfos = append(c.nodesInfos, nodeInfo)
 }
 
+func (c *Chat) RemoveNodeBySlot(slot uint8) {
+	// get index
+	var (
+		index int
+		n     NodeInfos
+	)
+	for index, n = range c.nodesInfos {
+		if n.Slot == slot {
+			break
+		}
+	}
+
+	// node identified by slot found
+	if index != len(c.nodesInfos) {
+		c.nodesInfos = append(c.nodesInfos[:index-1], c.nodesInfos[index+1])
+	}
+}
+
 func (c *Chat) SaveMessage(message *Message) {
 	if len(c.messages) == 0 {
 		c.messages = append(c.messages, message)

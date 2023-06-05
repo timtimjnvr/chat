@@ -105,6 +105,25 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				continue
 			}
 
+			if op.Typology == crdt.Quit {
+				var (
+					index = 0
+					c     *crdt.Chat
+					err   error
+				)
+
+				for err != nil {
+					c, err = o.storage.GetChatByIndex(index)
+					if err != nil {
+						continue
+					}
+
+					c.RemoveNodeBySlot(op.Slot)
+				}
+
+				continue
+			}
+
 			// for other operation we need to get a chat from storage
 			c, err := o.getChatFromStorage(*op)
 			if err != nil {
@@ -125,7 +144,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				o.storage.SaveChat(c)
 				o.updateCurrentChat(c)
 
-				log.Println(fmt.Sprintf("%s joined chat", newNodeInfos.Name))
+				fmt.Printf("%s joined chat", newNodeInfos.Name)
 
 				for syncOp := range o.getPropagationOperations(op, c) {
 					toSend <- syncOp
