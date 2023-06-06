@@ -268,7 +268,6 @@ func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.C
 			syncOps <- createChatOperation
 
 			addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.Id, o.myInfos)
-			syncOps <- addNodeOperation
 
 			// propagates new node to other chats
 			slots := chat.GetSlots(o.myInfos.Id)
