@@ -3,6 +3,7 @@ package crdt
 import (
 	"encoding/json"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"log"
 	"time"
 )
@@ -15,6 +16,8 @@ type (
 		messages   []*Message // ordered by date : 0 being the oldest message, 1 coming after 0 etc ...
 	}
 )
+
+var NotFoundErr = errors.New("not found")
 
 const maxNumberOfMessages, maxNumberOfNodes = 100, 100
 
@@ -40,7 +43,7 @@ func (c *Chat) SaveNode(nodeInfo *NodeInfos) {
 	c.nodesInfos = append(c.nodesInfos, nodeInfo)
 }
 
-func (c *Chat) RemoveNodeBySlot(slot uint8) {
+func (c *Chat) RemoveNodeBySlot(slot uint8) (string, error) {
 	// get index
 	var (
 		index int
@@ -55,22 +58,25 @@ func (c *Chat) RemoveNodeBySlot(slot uint8) {
 	}
 
 	if !found {
-		return
+		return "", NotFoundErr
 	}
+
+	nodeName := c.nodesInfos[index].Name
 
 	if index == 0 && len(c.nodesInfos) == 1 {
 		c.nodesInfos = make([]*NodeInfos, 0, 0)
-		return
+		return nodeName, nil
 	}
 
 	if index == 0 && len(c.nodesInfos) > 1 {
-		c.nodesInfos = c.nodesInfos[:index]
-		return
+		c.nodesInfos = c.nodesInfos[index+1:]
+		return nodeName, nil
 	}
 
 	if index == len(c.nodesInfos)-1 {
-		c.nodesInfos = c.nodesInfos[len(c.nodesInfos):]
-		return
+		c.nodesInfos = c.nodesInfos[:len(c.nodesInfos)-1]
+		return nodeName, nil
+
 	}
 	var (
 		newNodeInfos = make([]*NodeInfos, len(c.nodesInfos)-1)
@@ -86,6 +92,8 @@ func (c *Chat) RemoveNodeBySlot(slot uint8) {
 	}
 
 	c.nodesInfos = newNodeInfos
+	return nodeName, nil
+
 }
 
 func (c *Chat) SaveMessage(message *Message) {

@@ -118,7 +118,10 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 						continue
 					}
 
-					c.RemoveNodeBySlot(op.Slot)
+					nodeName, err2 := c.RemoveNodeBySlot(op.Slot)
+					if err2 != nil {
+						fmt.Printf("%s leaved chat %s\n", nodeName, c.Name)
+					}
 				}
 
 				continue

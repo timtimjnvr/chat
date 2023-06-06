@@ -64,6 +64,7 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 			name string
 			slot uint8
 			chat *Chat
+			expectedNumberOfNodes int
 		}{
 			{
 				name: "delete first node",
@@ -84,6 +85,7 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 						},
 					},
 				},
+				expectedNumberOfNodes: 2,
 			},
 			{
 				name: "delete middle one",
@@ -104,6 +106,32 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 						},
 					},
 				},
+				expectedNumberOfNodes: 2,
+			},
+			{
+				name: "delete middle one (4 elements)",
+				slot: 2,
+				chat: &Chat{
+					nodesInfos: []*NodeInfos{
+						{
+							Id:   uuid.New(),
+							Slot: 0,
+						},
+						{
+							Id:   uuid.New(),
+							Slot: 1,
+						},
+						{
+							Id:   idToDelete,
+							Slot: 2,
+						},
+						{
+							Id:   uuid.New(),
+							Slot: 3,
+						},
+					},
+				},
+				expectedNumberOfNodes: 3,
 			},
 			{
 				name: "delete last",
@@ -124,6 +152,7 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 						},
 					},
 				},
+				expectedNumberOfNodes: 2,
 			},
 		}
 	)
@@ -132,6 +161,7 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.chat.RemoveNodeBySlot(tt.slot)
 			assert.True(t, !tt.chat.containsNode(idToDelete))
+			assert.Equal(t, tt.expectedNumberOfNodes,len(tt.chat.nodesInfos))
 		})
 	}
 }
