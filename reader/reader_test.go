@@ -5,7 +5,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"os"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -14,7 +13,6 @@ import (
 var separator = []byte("\n")
 
 func TestRead(t *testing.T) {
-
 	var (
 		maxTestDuration = 3 * time.Second
 		testData        = []string{
@@ -25,7 +23,7 @@ func TestRead(t *testing.T) {
 		n        int
 		err      error
 		w, r     *os.File
-		wgReader = sync.WaitGroup{}
+		readerDone = make(chan struct{})
 		messages = make(chan []byte, MaxMessageSize)
 		shutdown = make(chan struct{}, 0)
 	)
@@ -61,8 +59,7 @@ func TestRead(t *testing.T) {
 		return
 	}
 
-	wgReader.Add(1)
-	go Read(&wgReader, r, messages, Separator, shutdown)
+	go Read(readerDone, r, messages, Separator, shutdown)
 
 	var (
 		timeout = time.Tick(maxTestDuration)
@@ -71,7 +68,6 @@ func TestRead(t *testing.T) {
 
 	defer func() {
 		close(shutdown)
-		wgReader.Wait()
 		err = os.Remove("test.txt")
 		if err != nil {
 			assert.Fail(t, "failed to remove file (Remove) ", err.Error())
@@ -79,28 +75,45 @@ func TestRead(t *testing.T) {
 	}()
 
 	for {
+		if index == len(testData) {
+			break
+		}
+
 		select {
 		case <-timeout:
-			assert.Fail(t, "test timeout")
+			assert.Fail(t, "test timeout shutting done with shutdown")
 			return
 
 		case m := <-messages:
 			assert.Equal(t, strings.TrimSuffix(testData[index], "\n"), string(m), "message differs")
 			index++
 			if index == len(testData) {
-				return
+				continue
 			}
 		}
+	}
+
+	timeout = time.Tick(maxTestDuration)
+	_ = r.Close()
+
+	select {
+	case <-timeout:
+		assert.Fail(t, "test timeout waiting reader")
+		return
+
+	case <-readerDone:
+		// pass
+		return
 	}
 }
 
 func TestRead_SOMAXCONN(t *testing.T) {
-
 	var (
+		maxTestDuration = 3 * time.Second
 		w, r     *os.File
-		shutdown = make(chan struct{}, 0)
-		testsWg  = make(map[int]*sync.WaitGroup)
-		err      error
+		shutdown      = make(chan struct{}, 0)
+		testsDoneChan = make(map[int]chan struct{})
+		err           error
 	)
 
 	for i := 0; i < syscall.SOMAXCONN; i++ {
@@ -134,7 +147,7 @@ func TestRead_SOMAXCONN(t *testing.T) {
 			return
 		}
 
-		var wg = sync.WaitGroup{}
+		var done = make(chan struct{})
 
 		r, err = os.OpenFile(file, os.O_RDONLY, os.ModePerm)
 		if err != nil {
@@ -142,20 +155,23 @@ func TestRead_SOMAXCONN(t *testing.T) {
 			return
 		}
 
-		wg.Add(1)
-		go Read(&wg, r, messages, Separator, shutdown)
-		testsWg[i] = &wg
+		go Read(done, r, messages, Separator, shutdown)
+		testsDoneChan[i] = done
 	}
 
 	close(shutdown)
-
+	timeout := time.Tick(maxTestDuration)
 	for i := 0; i < syscall.SOMAXCONN; i++ {
-		testsWg[i].Wait()
+		select {
+			case <-timeout:
+				assert.Fail(t, "test timeout waiting for reader")
+			case <-testsDoneChan[i]:
 
-		file := fmt.Sprintf("test_%d.txt", i)
-		err = os.Remove(file)
-		if err != nil {
-			assert.Fail(t, "failed to remove file (Remove) ", err.Error())
+				file := fmt.Sprintf("test_%d.txt", i)
+				err = os.Remove(file)
+				if err != nil {
+					assert.Fail(t, "failed to remove file (Remove) ", err.Error())
+				}
 		}
 	}
 }

@@ -194,16 +194,15 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 }
 
 func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Operation, outgoingConnectionRequests chan<- conn.ConnectionRequest, shutdown chan struct{}) {
-	var wgReadStdin = sync.WaitGroup{}
+	var readStdinDone = make(chan struct{})
 
 	defer func() {
-		wgReadStdin.Wait()
+		<-readStdinDone
 		wg.Done()
 	}()
 
-	wgReadStdin.Add(1)
 	var stdin = make(chan []byte, MaxMessagesStdin)
-	go reader.Read(&wgReadStdin, os.Stdin, stdin, reader.Separator, shutdown)
+	go reader.Read(readStdinDone, os.Stdin, stdin, reader.Separator, shutdown)
 
 	for {
 		fmt.Printf(logFrmt, typeCommand)

@@ -48,18 +48,17 @@ func newNode(conn net.Conn, slot slot, output chan<- []byte) (*node, error) {
 
 func (n *node) start(done chan<- slot) {
 	var (
-		wgReadConn       = sync.WaitGroup{}
+		readerDone = make(chan struct{})
 		outputConnection = make(chan []byte)
 	)
 
 	defer func() {
-		wgReadConn.Wait()
+		<-readerDone
 		n.Wg.Done()
 		done <- n.slot
 	}()
 
-	wgReadConn.Add(1)
-	go reader.Read(&wgReadConn, n.conn, outputConnection, reader.Separator, n.Shutdown)
+	go reader.Read(readerDone, n.conn, outputConnection, reader.Separator, n.Shutdown)
 
 	for {
 		select {

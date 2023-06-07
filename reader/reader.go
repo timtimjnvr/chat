@@ -18,27 +18,31 @@ var Separator = []byte("\n")
 
 const MaxMessageSize = 1000
 
-func Read(wg *sync.WaitGroup, reader Reader, output chan<- []byte, separator []byte, shutdown <-chan struct{}) {
-	done := make(chan struct{})
+func Read(done chan struct{}, reader Reader, output chan<- []byte, separator []byte, shutdown <-chan struct{}) {
+	var (
+		wg = &sync.WaitGroup{}
+		exit = make(chan struct{})
+	)
 
 	defer func() {
 		reader.Close()
 		close(output)
+		close(exit)
+		wg.Wait()
 		close(done)
-		wg.Done()
 	}()
 
 	// writeClose is closed in order to signal to stop reading output
 	var readClose, writeClose, _ = os.Pipe()
-
-	go func(chan struct{}) {
+	wg.Add(1)
+	go func(wg *sync.WaitGroup, exit chan struct{}) {
 		select {
 		case <-shutdown:
 			_ = writeClose.Close()
-		case <-done:
-			return
+		case <-exit:
 		}
-	}(done)
+		wg.Done()
+	}(wg, exit)
 
 	for {
 		var (
