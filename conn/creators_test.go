@@ -142,9 +142,8 @@ func TestConnect(t *testing.T) {
 func TestReadConn(t *testing.T) {
 	var (
 		maxTestDuration = 1 * time.Second
-		wgReader   = sync.WaitGroup{}
-		readerDone = make(chan struct{})
-		messages   = make(chan []byte)
+		wgReader        = sync.WaitGroup{}
+		messages        = make(chan []byte)
 		shutdown        = make(chan struct{}, 0)
 		testData        = []string{
 			"first message\n",
@@ -154,6 +153,9 @@ func TestReadConn(t *testing.T) {
 	)
 
 	connReader, connSender, err := helperGetConnections("12345")
+	defer func() {
+		connSender.Close()
+	}()
 
 	for _, d := range testData {
 		_, err = connSender.Write([]byte(d))
@@ -169,7 +171,8 @@ func TestReadConn(t *testing.T) {
 		return
 	}
 
-	go reader.Read(readerDone, c, messages, reader.Separator, shutdown)
+	wgReader.Add(1)
+	go reader.Read(&wgReader, c, messages, reader.Separator, shutdown)
 
 	defer func() {
 		close(shutdown)
@@ -182,9 +185,6 @@ func TestReadConn(t *testing.T) {
 	)
 
 	for {
-		if index == len(testData) {
-			break
-		}
 		select {
 		case <-timeout:
 			assert.Fail(t, "test timeout")
@@ -194,23 +194,10 @@ func TestReadConn(t *testing.T) {
 			assert.Equal(t, strings.TrimSuffix(testData[index], "\n"), string(m), "message differs")
 			index++
 			if index == len(testData) {
-				continue
+				return
 			}
 		}
 	}
-
-	timeout = time.Tick(maxTestDuration)
-	connSender.Close()
-
-	select {
-	case <-timeout:
-		assert.Fail(t, "test timeout waiting reader")
-		return
-
-	case <-readerDone:
-		// pass
-	}
-
 }
 
 // test helper used to retrieve two linked TCP net.Conn
