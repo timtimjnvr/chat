@@ -147,7 +147,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				o.storage.SaveChat(c)
 				o.updateCurrentChat(c)
 
-				fmt.Printf("%s joined chat", newNodeInfos.Name)
+				fmt.Printf("%s joined chat\n", newNodeInfos.Name)
 
 				for syncOp := range o.getPropagationOperations(op, c) {
 					toSend <- syncOp
