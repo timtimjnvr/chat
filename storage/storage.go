@@ -80,3 +80,7 @@ func (s *Storage) SaveChat(c *crdt.Chat) {
 func (s *Storage) DisplayChats() {
 	s.chats.Display()
 }
+
+func (s *Storage) GetNumberOfChats() int {
+	return s.chats.Len()
+}

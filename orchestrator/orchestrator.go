@@ -105,23 +105,28 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				continue
 			}
 
+			// there is no chat specified in operation in this case we need to remove node identified by slot from all chats
 			if op.Typology == crdt.Quit {
 				var (
-					index = 0
-					c     *crdt.Chat
-					err   error
+					index         = 0
+					numberOfChats = o.storage.GetNumberOfChats()
+					c             *crdt.Chat
+					err           error
 				)
 
-				for err != nil {
+				for index != numberOfChats && err == nil {
 					c, err = o.storage.GetChatByIndex(index)
 					if err != nil {
+						index++
 						continue
 					}
 
 					nodeName, err2 := c.RemoveNodeBySlot(op.Slot)
-					if err2 != nil {
+					if err2 == nil {
 						fmt.Printf("%s leaved chat %s\n", nodeName, c.Name)
 					}
+
+					index++
 				}
 
 				continue
