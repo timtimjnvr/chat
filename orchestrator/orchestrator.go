@@ -105,6 +105,33 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				continue
 			}
 
+			// there is no chat specified in operation in this case we need to remove node identified by slot from all chats
+			if op.Typology == crdt.Quit {
+				var (
+					index         = 0
+					numberOfChats = o.storage.GetNumberOfChats()
+					c             *crdt.Chat
+					err           error
+				)
+
+				for index != numberOfChats && err == nil {
+					c, err = o.storage.GetChatByIndex(index)
+					if err != nil {
+						index++
+						continue
+					}
+
+					nodeName, err2 := c.RemoveNodeBySlot(op.Slot)
+					if err2 == nil {
+						fmt.Printf("%s leaved chat %s\n", nodeName, c.Name)
+					}
+
+					index++
+				}
+
+				continue
+			}
+
 			// for other operation we need to get a chat from storage
 			c, err := o.getChatFromStorage(*op)
 			if err != nil {
@@ -125,7 +152,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				o.storage.SaveChat(c)
 				o.updateCurrentChat(c)
 
-				log.Println(fmt.Sprintf("%s joined chat", newNodeInfos.Name))
+				fmt.Printf("%s joined chat\n", newNodeInfos.Name)
 
 				for syncOp := range o.getPropagationOperations(op, c) {
 					toSend <- syncOp
@@ -159,10 +186,9 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				c.SaveMessage(newMessage)
 				o.storage.SaveChat(c)
-
 				o.updateCurrentChat(c)
 
-				log.Println(fmt.Sprintf("%s (%s): %s", newMessage.Sender, newMessage.Date, newMessage.Content))
+				fmt.Printf("%s (%s): %s", newMessage.Sender, newMessage.Date, newMessage.Content)
 
 				for syncOp := range o.getPropagationOperations(op, c) {
 					toSend <- syncOp
@@ -247,7 +273,6 @@ func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.C
 			syncOps <- createChatOperation
 
 			addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.Id, o.myInfos)
-			syncOps <- addNodeOperation
 
 			// propagates new node to other chats
 			slots := chat.GetSlots(o.myInfos.Id)

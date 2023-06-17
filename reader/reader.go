@@ -23,8 +23,8 @@ func Read(wg *sync.WaitGroup, reader Reader, output chan<- []byte, separator []b
 
 	defer func() {
 		reader.Close()
-		close(output)
 		close(done)
+		close(output)
 		wg.Done()
 	}()
 
@@ -70,7 +70,7 @@ func Read(wg *sync.WaitGroup, reader Reader, output chan<- []byte, separator []b
 			return
 		}
 		if n == 0 {
-			continue
+			return
 		}
 
 		// split content into elements and output them
