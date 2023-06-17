@@ -36,7 +36,7 @@ Decentralized P2P chat built in golang.
 ![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/architecture.png?raw=true)
 
 ### Tips
-- see tcp traffic on a port (debugging) : sudo tcpdump -i lo0 port 8080`
+- see tcp traffic on a port (debugging) : `sudo tcpdump -i lo0 port 8080`
 
 ## TODO
 - find a way to have tests who ensure operation build/encode/decode/execute coherence to avoid divergence between chat handler and node handler operation handling
