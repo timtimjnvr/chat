@@ -195,9 +195,8 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 			case crdt.LeaveChat:
-				nodeName, err := c.RemoveNodeBySlot(op.Slot)
-				if err == nil {
-					fmt.Printf("%s leaved chat %s\n", nodeName, c.Name)
+				for syncOp := range o.getPropagationOperations(op, c) {
+					toSend <- syncOp
 				}
 			}
 		}
@@ -308,6 +307,13 @@ func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.C
 			}
 
 		case crdt.AddMessage:
+			slots := chat.GetSlots(o.myInfos.Id)
+			for _, s := range slots {
+				op.Slot = s
+				syncOps <- op
+			}
+
+		case crdt.LeaveChat:
 			slots := chat.GetSlots(o.myInfos.Id)
 			for _, s := range slots {
 				op.Slot = s

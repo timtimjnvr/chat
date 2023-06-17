@@ -39,6 +39,7 @@ Decentralized P2P chat built in golang.
 - see tcp traffic on a port (debugging) : `sudo tcpdump -i lo0 port 8080`
 
 ## TODO
+- when leaving chat only close connection when the connection is only used for this chat
 - find a way to have tests who ensure operation build/encode/decode/execute coherence to avoid divergence between chat handler and node handler operation handling
 - benchmark different ways to store chats with high throughput : linked list of chats, maps, redis etc ...
 - refactor storage : expose clear entry points in storage

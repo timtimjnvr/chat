@@ -162,6 +162,9 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			s := slot(operation.Slot)
 			if n, exist := d.nodes[s]; exist {
 				n.Input <- operation.ToBytes()
+				if operation.Typology == crdt.LeaveChat {
+					n.stop()
+				}
 			}
 
 		case operationBytes := <-outputNodes:
