@@ -2,6 +2,7 @@ package crdt
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"testing"
@@ -54,4 +55,113 @@ func randomTimestamp() time.Time {
 	randomNow := time.Unix(randomTime, 0)
 
 	return randomNow
+}
+
+func TestChat_RemoveNodeBySlot(t *testing.T) {
+	var (
+		idToDelete = uuid.New()
+		tests      = []struct {
+			name string
+			slot uint8
+			chat *Chat
+			expectedNumberOfNodes int
+		}{
+			{
+				name: "delete first node",
+				slot: 0,
+				chat: &Chat{
+					nodesInfos: []*NodeInfos{
+						{
+							Id:   idToDelete,
+							Slot: 0,
+						},
+						{
+							Id:   uuid.New(),
+							Slot: 1,
+						},
+						{
+							Id:   uuid.New(),
+							Slot: 2,
+						},
+					},
+				},
+				expectedNumberOfNodes: 2,
+			},
+			{
+				name: "delete middle one",
+				slot: 1,
+				chat: &Chat{
+					nodesInfos: []*NodeInfos{
+						{
+							Id:   uuid.New(),
+							Slot: 0,
+						},
+						{
+							Id:   idToDelete,
+							Slot: 1,
+						},
+						{
+							Id:   uuid.New(),
+							Slot: 2,
+						},
+					},
+				},
+				expectedNumberOfNodes: 2,
+			},
+			{
+				name: "delete middle one (4 elements)",
+				slot: 2,
+				chat: &Chat{
+					nodesInfos: []*NodeInfos{
+						{
+							Id:   uuid.New(),
+							Slot: 0,
+						},
+						{
+							Id:   uuid.New(),
+							Slot: 1,
+						},
+						{
+							Id:   idToDelete,
+							Slot: 2,
+						},
+						{
+							Id:   uuid.New(),
+							Slot: 3,
+						},
+					},
+				},
+				expectedNumberOfNodes: 3,
+			},
+			{
+				name: "delete last",
+				slot: 2,
+				chat: &Chat{
+					nodesInfos: []*NodeInfos{
+						{
+							Id:   uuid.New(),
+							Slot: 0,
+						},
+						{
+							Id:   uuid.New(),
+							Slot: 1,
+						},
+						{
+							Id:   idToDelete,
+							Slot: 2,
+						},
+					},
+				},
+				expectedNumberOfNodes: 2,
+			},
+		}
+	)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.chat.RemoveNodeBySlot(tt.slot)
+			assert.True(t, !tt.chat.containsNode(idToDelete))
+			assert.Equal(t, tt.expectedNumberOfNodes,len(tt.chat.nodesInfos))
+		})
+	}
 }

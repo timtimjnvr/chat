@@ -35,7 +35,10 @@ Decentralized P2P chat built in golang.
 - Architecture
 ![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/architecture.png?raw=true)
 
+### Tips
+- see tcp traffic on a port (debugging) : sudo tcpdump -i lo0 port 8080`
+
 ## TODO
-- increase test coverage
-- benchmark different ways to store chats with high throughput : linked list of chats, maps etc ...
+- find a way to have tests who ensure operation build/encode/decode/execute coherence to avoid divergence between chat handler and node handler operation handling
+- benchmark different ways to store chats with high throughput : linked list of chats, maps, redis etc ...
 - refactor storage : expose clear entry points in storage

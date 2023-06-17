@@ -63,6 +63,10 @@ func (s *Storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
 	return c, nil
 }
 
+func (s *Storage) GetChatByIndex(index int) (*crdt.Chat, error) {
+	return s.chats.GetByIndex(index)
+}
+
 func (s *Storage) SaveChat(c *crdt.Chat) {
 	id, _ := uuid.Parse(c.Id)
 	if !s.chats.Contains(id) {
@@ -75,4 +79,8 @@ func (s *Storage) SaveChat(c *crdt.Chat) {
 
 func (s *Storage) DisplayChats() {
 	s.chats.Display()
+}
+
+func (s *Storage) GetNumberOfChats() int {
+	return s.chats.Len()
 }
