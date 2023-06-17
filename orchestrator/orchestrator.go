@@ -193,6 +193,12 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				for syncOp := range o.getPropagationOperations(op, c) {
 					toSend <- syncOp
 				}
+
+			case crdt.LeaveChat:
+				nodeName, err := c.RemoveNodeBySlot(op.Slot)
+				if err == nil {
+					fmt.Printf("%s leaved chat %s\n", nodeName, c.Name)
+				}
 			}
 		}
 	}
@@ -256,8 +262,6 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					toExecute <- crdt.NewOperation(crdt.LeaveChat, o.getCurrentChat().Id, o.myInfos)
 
 				case crdt.Quit:
-					toExecute <- crdt.NewOperation(crdt.Quit, "", o.myInfos)
-					log.Println("shutting down")
 					process, err := os.FindProcess(os.Getpid())
 					if err != nil {
 						log.Fatal(err)
