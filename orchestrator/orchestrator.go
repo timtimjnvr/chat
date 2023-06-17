@@ -199,16 +199,20 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 }
 
 func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Operation, outgoingConnectionRequests chan<- conn.ConnectionRequest, shutdown chan struct{}) {
-	var wgReadStdin = sync.WaitGroup{}
+	var (
+		wgReadStdin = sync.WaitGroup{}
+		stdin = make(chan []byte, MaxMessagesStdin)
+		stopReading = make(chan struct{}, 0)
+	)
 
 	defer func() {
+		close(stopReading)
 		wgReadStdin.Wait()
 		wg.Done()
 	}()
 
 	wgReadStdin.Add(1)
-	var stdin = make(chan []byte, MaxMessagesStdin)
-	go reader.Read(&wgReadStdin, os.Stdin, stdin, reader.Separator, shutdown)
+	go reader.Read(&wgReadStdin, os.Stdin, stdin, reader.Separator, stopReading)
 
 	for {
 		fmt.Printf(logFrmt, typeCommand)
@@ -253,6 +257,14 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				case crdt.Quit:
 					toExecute <- crdt.NewOperation(crdt.Quit, "", o.myInfos)
+					log.Println("shutting down")
+					process, err := os.FindProcess(os.Getpid())
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					// signal main to stop
+					process.Signal(os.Interrupt)
 				}
 			}
 		}
