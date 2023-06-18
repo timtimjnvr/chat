@@ -195,6 +195,50 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 			case crdt.LeaveChat:
+				var (
+					currentSlots = c.GetSlots(o.myInfos.Id)
+					toDelete     = make(map[uint8]bool)
+				)
+
+				for _, slot := range currentSlots {
+					toDelete[slot] = true
+				}
+
+				var (
+					index         = 0
+					numberOfChats = o.storage.GetNumberOfChats()
+					tmpChat       *crdt.Chat
+					err           error
+				)
+
+				for index != numberOfChats && err == nil {
+					tmpChat, err = o.storage.GetChatByIndex(index)
+					if err != nil {
+						index++
+						continue
+					}
+
+					// don't kill connections in use in other chats
+					tmpSlots := tmpChat.GetSlots(o.myInfos.Id)
+					for _, s := range tmpSlots {
+						if toDelete[s] {
+							toDelete[s] = false
+						}
+					}
+
+					index++
+				}
+
+				for s, killConnection := range toDelete {
+					if killConnection {
+						leaveOperation := crdt.NewOperation(crdt.LeaveChat, "", nil)
+						leaveOperation.Slot = s
+						toExecute <- leaveOperation
+					}
+				}
+
+				continue
+
 				for syncOp := range o.getPropagationOperations(op, c) {
 					toSend <- syncOp
 				}
@@ -206,7 +250,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Operation, outgoingConnectionRequests chan<- conn.ConnectionRequest, shutdown chan struct{}) {
 	var (
 		wgReadStdin = sync.WaitGroup{}
-		stdin = make(chan []byte, MaxMessagesStdin)
+		stdin       = make(chan []byte, MaxMessagesStdin)
 		stopReading = make(chan struct{}, 0)
 	)
 
@@ -307,13 +351,6 @@ func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.C
 			}
 
 		case crdt.AddMessage:
-			slots := chat.GetSlots(o.myInfos.Id)
-			for _, s := range slots {
-				op.Slot = s
-				syncOps <- op
-			}
-
-		case crdt.LeaveChat:
 			slots := chat.GetSlots(o.myInfos.Id)
 			for _, s := range slots {
 				op.Slot = s
