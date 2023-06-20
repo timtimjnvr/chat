@@ -147,18 +147,35 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					continue
 				}
 
+				for syncOp := range o.getPropagationOperations(op, c) {
+					toSend <- syncOp
+				}
+
 				newNodeInfos.Slot = op.Slot
 				c.SaveNode(newNodeInfos)
 				o.storage.SaveChat(c)
 				o.updateCurrentChat(c)
 
 				fmt.Printf("%s joined chat\n", newNodeInfos.Name)
+				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
 
-				for syncOp := range o.getPropagationOperations(op, c) {
-					toSend <- syncOp
+			// connection just established
+			case crdt.AddNode:
+				newNodeInfos, ok := op.Data.(*crdt.NodeInfos)
+				if !ok {
+					log.Println("[ERROR] can't parse op data to NodeInfos")
+					continue
 				}
 
-			case crdt.AddNode:
+				newNodeInfos.Slot = op.Slot
+				c.SaveNode(newNodeInfos)
+				o.storage.SaveChat(c)
+
+				o.updateCurrentChat(c)
+
+				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
+
+			case crdt.SaveNode:
 				newNodeInfos, ok := op.Data.(*crdt.NodeInfos)
 				if !ok {
 					log.Println("[ERROR] can't parse op data to NodeInfos")
@@ -331,23 +348,28 @@ func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.C
 			createChatOperation.Slot = slot
 			syncOps <- createChatOperation
 
-			addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.Id, o.myInfos)
+			// add me
+			addMeOperation := crdt.NewOperation(crdt.SaveNode, chat.Id, o.myInfos)
+			addMeOperation.Slot = slot
+			syncOps <- addMeOperation
 
-			// propagates new node to other chats
+			// add other nodes
 			slots := chat.GetSlots(o.myInfos.Id)
 			for _, s := range slots {
-				addNodeOperation.Slot = s
+				nodeInfo, err := chat.GetNodeBySlot(s)
+				if err != nil {
+					log.Println(err)
+				}
+				addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.Id, nodeInfo)
+				addNodeOperation.Slot = slot
 				syncOps <- addNodeOperation
 			}
 
-			// sending chat messages
+			// sending chat history
 			addMessageOperations := chat.GetMessageOperationsForPropagation()
-
-			for _, s := range slots {
-				for _, addMessageOperation := range addMessageOperations {
-					addMessageOperation.Slot = s
-					syncOps <- addMessageOperation
-				}
+			for _, addMessageOperation := range addMessageOperations {
+				addMessageOperation.Slot = slot
+				syncOps <- addMessageOperation
 			}
 
 		case crdt.AddMessage:

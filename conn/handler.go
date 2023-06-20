@@ -183,7 +183,6 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 				}
 
 				// establish connection and set slot
-				/* Open conn */
 				var c net.Conn
 				c, err = openConnection(newNodeInfos.Address, newNodeInfos.Port)
 				if err != nil {

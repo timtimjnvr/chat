@@ -154,6 +154,15 @@ func (c *Chat) GetSlots(myId uuid.UUID) []uint8 {
 	return slots
 }
 
+func (c *Chat) GetNodeBySlot(slot uint8) (*NodeInfos, error) {
+	for _, i := range c.nodesInfos {
+		if i.Slot == slot {
+			return i, nil
+		}
+	}
+
+	return &NodeInfos{}, NotFoundErr
+}
 func (c *Chat) DisplayUsers() {
 	log.Printf("chat name : %s\n", c.Name)
 	for _, n := range c.nodesInfos {

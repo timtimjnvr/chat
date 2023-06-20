@@ -3,13 +3,13 @@
 ## Operation based CRDTs
 Propagation of commutative operations rather than whole node state (chat history) :
  
-- add, update or remove a message from a discussion history given the message id (uuid).
-- messages order is chosen based on sending date.
+- add, update or remove a message from a discussion (messages order is chosen based on sending date).
+- add, remove a node from a given discussion.
 
 ## Synchronisation strategy
-For now, each node propagates his operations to all other nodes (except himself). 
+The nodes are connected in a fully meshed network (each node from a discussion has an open TCP connection to each node of the discussion)
+For now, each node propagates its operations to all other nodes : 
 
-Synchronisation happens when :
-- a message is sent.
-- a new node arrives in the chat.
+- a message is added, updated or removed in the discussion.
+- a new node arrives in the chat (the entry point node first forwards the add node operation to the other nodes).
 - a node leaves the chat.
