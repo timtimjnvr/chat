@@ -86,6 +86,5 @@ func main() {
 	select {
 	case <-sigc:
 		close(shutdown)
-		return
 	}
 }
