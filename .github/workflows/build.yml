@@ -32,4 +32,4 @@ jobs:
       # Run tests
       - name: Run tests
         working-directory: ./
-        run: go test ./... -race -timeout 5m
+        run: export GODEBUG=asyncpreemptoff=1; go test ./... -race -timeout 5m
