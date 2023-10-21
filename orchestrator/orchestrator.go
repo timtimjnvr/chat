@@ -277,8 +277,8 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 		wg.Done()
 	}()
 
-	wgReadStdin.Add(1)
-	go reader.Read(&wgReadStdin, os.Stdin, stdin, reader.Separator, stopReading)
+	isDone := make(chan struct{})
+	go reader.Read(os.Stdin, stdin, reader.Separator, stopReading, isDone)
 
 	for {
 		fmt.Printf(logFrmt, typeCommand)

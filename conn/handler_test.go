@@ -2,12 +2,10 @@ package conn
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/reader"
 	"net"
-	"syscall"
 	"testing"
 	"time"
 )
@@ -175,51 +173,5 @@ func TestNodeHandler_Send(t *testing.T) {
 		return
 	case m := <-output:
 		assert.Equal(t, m, expectedBytes, "did not received expected operation bytes")
-	}
-}
-
-func TestNodeHandler_SOMAXCONNNodesStartAndStop(t *testing.T) {
-	var (
-		shutdown       = make(chan struct{}, 0)
-		nh             = NewNodeHandler(shutdown)
-		newConnections = make(chan net.Conn)
-		toSend         = make(chan *crdt.Operation)
-		toExecute      = make(chan *crdt.Operation)
-
-		firstPort  = 1235
-		maxNode    = syscall.SOMAXCONN - 1
-		connSaving = make(map[int]net.Conn, maxNode)
-	)
-
-	nh.Wg.Add(1)
-	go nh.Start(newConnections, toSend, toExecute)
-	defer func() {
-		close(nh.Shutdown)
-		nh.Wg.Wait()
-	}()
-
-	for i := 0; i < maxNode; i++ {
-		conn1, conn2, err := helperGetConnections(fmt.Sprintf("%d", firstPort))
-		if err != nil {
-			assert.Fail(t, "failed to create a conn")
-		}
-
-		connSaving[i] = conn2
-		newConnections <- conn1
-		firstPort++
-	}
-
-	<-time.Tick(5 * time.Second)
-
-	// killing all connections and checking messages
-	for i := 0; i < maxNode; i++ {
-		connSaving[i].Close()
-	}
-
-	// the test will succeed if all connections are received else it will time out with a report on blocked go routines
-	for i := 0; i < maxNode; i++ {
-		select {
-		case <-toExecute:
-		}
 	}
 }

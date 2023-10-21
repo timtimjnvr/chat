@@ -5,7 +5,6 @@ import (
 	"golang.org/x/sys/unix"
 	"log"
 	"os"
-	"sync"
 )
 
 type Reader interface {
@@ -18,14 +17,14 @@ var Separator = []byte("\n")
 
 const MaxMessageSize = 1000
 
-func Read(wg *sync.WaitGroup, reader Reader, output chan<- []byte, separator []byte, shutdown <-chan struct{}) {
+func Read(reader Reader, output chan<- []byte, separator []byte, shutdown, isDone chan struct{}) {
 	done := make(chan struct{})
 
 	defer func() {
 		reader.Close()
 		close(done)
 		close(output)
-		wg.Done()
+		close(isDone)
 	}()
 
 	// writeClose is closed in order to signal to stop reading output
