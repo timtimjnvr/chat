@@ -24,6 +24,7 @@ const (
 	CreateChat OperationType = iota
 	JoinChatByName
 	AddChat
+	SaveNode
 	AddNode
 	AddMessage
 	LeaveChat
@@ -81,7 +82,7 @@ func DecodeOperation(bytes []byte) (*Operation, error) {
 
 	// decode data into concrete type when needed
 	switch typology {
-	case AddNode, LeaveChat, JoinChatByName:
+	case AddNode, SaveNode, LeaveChat, JoinChatByName:
 		var result NodeInfos
 		err := decodeData(dataBytes, &result)
 		if err != nil {

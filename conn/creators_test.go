@@ -142,7 +142,6 @@ func TestConnect(t *testing.T) {
 func TestReadConn(t *testing.T) {
 	var (
 		maxTestDuration = 1 * time.Second
-		wgReader        = sync.WaitGroup{}
 		messages        = make(chan []byte)
 		shutdown        = make(chan struct{}, 0)
 		testData        = []string{
@@ -171,12 +170,12 @@ func TestReadConn(t *testing.T) {
 		return
 	}
 
-	wgReader.Add(1)
-	go reader.Read(&wgReader, c, messages, reader.Separator, shutdown)
+	isDone := make(chan struct{})
+	go reader.Read(c, messages, reader.Separator, shutdown, isDone)
 
 	defer func() {
 		close(shutdown)
-		wgReader.Wait()
+		<-isDone
 	}()
 
 	var (

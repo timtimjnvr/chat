@@ -147,18 +147,35 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					continue
 				}
 
+				for syncOp := range o.getPropagationOperations(op, c) {
+					toSend <- syncOp
+				}
+
 				newNodeInfos.Slot = op.Slot
 				c.SaveNode(newNodeInfos)
 				o.storage.SaveChat(c)
 				o.updateCurrentChat(c)
 
 				fmt.Printf("%s joined chat\n", newNodeInfos.Name)
+				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
 
-				for syncOp := range o.getPropagationOperations(op, c) {
-					toSend <- syncOp
+			// connection just established
+			case crdt.AddNode:
+				newNodeInfos, ok := op.Data.(*crdt.NodeInfos)
+				if !ok {
+					log.Println("[ERROR] can't parse op data to NodeInfos")
+					continue
 				}
 
-			case crdt.AddNode:
+				newNodeInfos.Slot = op.Slot
+				c.SaveNode(newNodeInfos)
+				o.storage.SaveChat(c)
+
+				o.updateCurrentChat(c)
+
+				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
+
+			case crdt.SaveNode:
 				newNodeInfos, ok := op.Data.(*crdt.NodeInfos)
 				if !ok {
 					log.Println("[ERROR] can't parse op data to NodeInfos")
@@ -193,6 +210,55 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				for syncOp := range o.getPropagationOperations(op, c) {
 					toSend <- syncOp
 				}
+
+			case crdt.LeaveChat:
+				var (
+					currentSlots = c.GetSlots(o.myInfos.Id)
+					toDelete     = make(map[uint8]bool)
+				)
+
+				for _, slot := range currentSlots {
+					toDelete[slot] = true
+				}
+
+				var (
+					index         = 0
+					numberOfChats = o.storage.GetNumberOfChats()
+					tmpChat       *crdt.Chat
+					err           error
+				)
+
+				for index != numberOfChats && err == nil {
+					tmpChat, err = o.storage.GetChatByIndex(index)
+					if err != nil {
+						index++
+						continue
+					}
+
+					// don't kill connections in use in other chats
+					tmpSlots := tmpChat.GetSlots(o.myInfos.Id)
+					for _, s := range tmpSlots {
+						if toDelete[s] {
+							toDelete[s] = false
+						}
+					}
+
+					index++
+				}
+
+				for s, killConnection := range toDelete {
+					if killConnection {
+						leaveOperation := crdt.NewOperation(crdt.LeaveChat, "", nil)
+						leaveOperation.Slot = s
+						toExecute <- leaveOperation
+					}
+				}
+
+				continue
+
+				for syncOp := range o.getPropagationOperations(op, c) {
+					toSend <- syncOp
+				}
 			}
 		}
 	}
@@ -201,7 +267,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Operation, outgoingConnectionRequests chan<- conn.ConnectionRequest, shutdown chan struct{}) {
 	var (
 		wgReadStdin = sync.WaitGroup{}
-		stdin = make(chan []byte, MaxMessagesStdin)
+		stdin       = make(chan []byte, MaxMessagesStdin)
 		stopReading = make(chan struct{}, 0)
 	)
 
@@ -211,8 +277,8 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 		wg.Done()
 	}()
 
-	wgReadStdin.Add(1)
-	go reader.Read(&wgReadStdin, os.Stdin, stdin, reader.Separator, stopReading)
+	isDone := make(chan struct{})
+	go reader.Read(os.Stdin, stdin, reader.Separator, stopReading, isDone)
 
 	for {
 		fmt.Printf(logFrmt, typeCommand)
@@ -256,8 +322,6 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					toExecute <- crdt.NewOperation(crdt.LeaveChat, o.getCurrentChat().Id, o.myInfos)
 
 				case crdt.Quit:
-					toExecute <- crdt.NewOperation(crdt.Quit, "", o.myInfos)
-					log.Println("shutting down")
 					process, err := os.FindProcess(os.Getpid())
 					if err != nil {
 						log.Fatal(err)
@@ -284,23 +348,28 @@ func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.C
 			createChatOperation.Slot = slot
 			syncOps <- createChatOperation
 
-			addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.Id, o.myInfos)
+			// add me
+			addMeOperation := crdt.NewOperation(crdt.SaveNode, chat.Id, o.myInfos)
+			addMeOperation.Slot = slot
+			syncOps <- addMeOperation
 
-			// propagates new node to other chats
+			// add other nodes
 			slots := chat.GetSlots(o.myInfos.Id)
 			for _, s := range slots {
-				addNodeOperation.Slot = s
+				nodeInfo, err := chat.GetNodeBySlot(s)
+				if err != nil {
+					log.Println(err)
+				}
+				addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.Id, nodeInfo)
+				addNodeOperation.Slot = slot
 				syncOps <- addNodeOperation
 			}
 
-			// sending chat messages
+			// sending chat history
 			addMessageOperations := chat.GetMessageOperationsForPropagation()
-
-			for _, s := range slots {
-				for _, addMessageOperation := range addMessageOperations {
-					addMessageOperation.Slot = s
-					syncOps <- addMessageOperation
-				}
+			for _, addMessageOperation := range addMessageOperations {
+				addMessageOperation.Slot = slot
+				syncOps <- addMessageOperation
 			}
 
 		case crdt.AddMessage:
