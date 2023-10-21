@@ -26,6 +26,9 @@ const (
 	AddChat
 	SaveNode
 	AddNode
+
+	RemoveNode
+	KillNode
 	AddMessage
 	LeaveChat
 	ListUsers

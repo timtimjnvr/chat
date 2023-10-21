@@ -111,7 +111,7 @@ func (l *list) GetByIndex(index int) (*crdt.Chat, error) {
 		return nil, NotFound
 	}
 	i := 0
-	for l.head != nil && i != index {
+	for l.head.next != nil && i != index {
 		l.head = l.head.next
 	}
 
