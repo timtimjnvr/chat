@@ -115,7 +115,6 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				)
 
 				for index < numberOfChats && err == nil {
-					log.Println("here", op, index, numberOfChats)
 					c, err = o.storage.GetChatByIndex(index)
 					if err != nil {
 						index++
