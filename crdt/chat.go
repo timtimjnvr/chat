@@ -143,6 +143,7 @@ func (c *Chat) ToBytes() []byte {
 	return bytesChat
 }
 
+// GetSlots returns all the slots used by a given chat
 func (c *Chat) GetSlots(myId uuid.UUID) []uint8 {
 	slots := make([]uint8, 0, len(c.nodesInfos))
 	for _, i := range c.nodesInfos {

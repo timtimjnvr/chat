@@ -114,7 +114,8 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					err           error
 				)
 
-				for index != numberOfChats && err == nil {
+				for index < numberOfChats && err == nil {
+					log.Println("here", op, index, numberOfChats)
 					c, err = o.storage.GetChatByIndex(index)
 					if err != nil {
 						index++
@@ -213,22 +214,29 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 			case crdt.LeaveChat:
 				var (
-					currentSlots = c.GetSlots(o.myInfos.Id)
-					toDelete     = make(map[uint8]bool)
+					chatNodeSlots = c.GetSlots(o.myInfos.Id)
+					toDelete      = make(map[uint8]bool)
 				)
 
-				for _, slot := range currentSlots {
+				for _, slot := range chatNodeSlots {
+					leaveOperation := crdt.NewOperation(crdt.RemoveNode, op.TargetedChat, nil)
+					leaveOperation.Slot = slot
+					toSend <- leaveOperation
+				}
+
+				for _, slot := range chatNodeSlots {
 					toDelete[slot] = true
 				}
 
 				var (
 					index         = 0
 					numberOfChats = o.storage.GetNumberOfChats()
-					tmpChat       *crdt.Chat
+					tmpChat       = o.currentChat
 					err           error
 				)
 
-				for index != numberOfChats && err == nil {
+				// Verify that slots are not used by any other chats
+				for index < numberOfChats && err == nil && tmpChat.Id != o.currentChat.Id {
 					tmpChat, err = o.storage.GetChatByIndex(index)
 					if err != nil {
 						index++
@@ -246,18 +254,24 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					index++
 				}
 
+				// Operation used by node handler to kill connections if it is not used anymore
 				for s, killConnection := range toDelete {
 					if killConnection {
-						leaveOperation := crdt.NewOperation(crdt.LeaveChat, "", nil)
-						leaveOperation.Slot = s
-						toExecute <- leaveOperation
+						removeNode := crdt.NewOperation(crdt.KillNode, "", nil)
+						removeNode.Slot = s
+						toSend <- removeNode
 					}
 				}
 
-				continue
+				// Finally remove chat from list
+				/// TODO
 
-				for syncOp := range o.getPropagationOperations(op, c) {
-					toSend <- syncOp
+			case crdt.RemoveNode:
+				log.Println("removing node")
+				// remove node from chat and that's all
+				nodeName, err := c.RemoveNodeBySlot(op.Slot)
+				if err == nil {
+					fmt.Printf("%s leaved chat %s\n", nodeName, c.Name)
 				}
 			}
 		}
