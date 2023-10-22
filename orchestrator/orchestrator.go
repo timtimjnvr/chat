@@ -44,6 +44,8 @@ const (
 
 func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
 	currentChat := crdt.NewChat(myInfos.Name)
+	currentChat.SaveNode(myInfos)
+
 	storage := storage.NewStorage()
 
 	o := &Orchestrator{
@@ -88,6 +90,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				newChat := crdt.NewChat(newChatInfos.Name)
 				newChat.Id = newChatInfos.Id
+				newChat.SaveNode(o.myInfos)
 				o.storage.SaveChat(newChat)
 				o.updateCurrentChat(newChat)
 
@@ -153,6 +156,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				newNodeInfos.Slot = op.Slot
 				c.SaveNode(newNodeInfos)
+				c.SaveNode(o.myInfos)
 				o.storage.SaveChat(c)
 				o.updateCurrentChat(c)
 
@@ -212,6 +216,11 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 			case crdt.LeaveChat:
+				if o.storage.GetNumberOfChats() <= 1 {
+					fmt.Printf("[ERROR] You can't leave the current chat\n")
+					continue
+				}
+
 				var (
 					chatNodeSlots = c.GetSlots(o.myInfos.Id)
 					toDelete      = make(map[uint8]bool)
@@ -262,15 +271,24 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					}
 				}
 
-				// Finally remove chat from list
-				/// TODO
+				// Removing chat from storage and setting current chat to index 0
+				fmt.Printf("Leaving chat %s\n", c.Name)
+				o.storage.DeleteChatById(c.Id)
+				newCurrent, _ := o.storage.GetChatByIndex(0)
+				o.updateCurrentChat(newCurrent)
+				fmt.Printf("Switched to chat %s\n", newCurrent.Name)
 
 			case crdt.RemoveNode:
-				log.Println("removing node")
 				// remove node from chat and that's all
 				nodeName, err := c.RemoveNodeBySlot(op.Slot)
 				if err == nil {
 					fmt.Printf("%s leaved chat %s\n", nodeName, c.Name)
+				}
+
+				// Update chat storage and current chat if needed
+				o.storage.SaveChat(c)
+				if o.currentChat.Id == c.Id {
+					o.updateCurrentChat(c)
 				}
 			}
 		}

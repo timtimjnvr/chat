@@ -164,6 +164,7 @@ func (c *Chat) GetNodeBySlot(slot uint8) (*NodeInfos, error) {
 
 	return &NodeInfos{}, NotFoundErr
 }
+
 func (c *Chat) DisplayUsers() {
 	log.Printf("chat name : %s\n", c.Name)
 	for _, n := range c.nodesInfos {
