@@ -150,9 +150,8 @@ func (l *list) Delete(id uuid.UUID) {
 		tmp = previous.next
 	}
 
-	if tmp != nil && tmp.chat.Id != id.String() {
+	if tmp != nil && tmp.chat.Id == id.String() {
 		previous.next = tmp.next
+		l.length--
 	}
-
-	l.length--
 }

@@ -77,6 +77,12 @@ func (s *Storage) SaveChat(c *crdt.Chat) {
 	s.chats.Update(id, c)
 }
 
+func (s *Storage) DeleteChatById(identifier string) {
+	id, _ := uuid.Parse(identifier)
+
+	s.chats.Delete(id)
+}
+
 func (s *Storage) DisplayChats() {
 	s.chats.Display()
 }
