@@ -162,7 +162,6 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			if n, exist := d.nodes[s]; exist {
 				n.Input <- operation.ToBytes()
 				if operation.Typology == crdt.KillNode {
-					log.Println("stopping node")
 					n.stop()
 				}
 			}

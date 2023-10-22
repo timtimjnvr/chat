@@ -271,15 +271,24 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					}
 				}
 
-				// Finally remove chat from list
+				// Removing chat from storage and setting current chat to index 0
+				fmt.Printf("Leaving chat %s\n", c.Name)
 				o.storage.DeleteChatById(c.Id)
+				newCurrent, _ := o.storage.GetChatByIndex(0)
+				o.updateCurrentChat(newCurrent)
+				fmt.Printf("Switched to chat %s\n", newCurrent.Name)
 
 			case crdt.RemoveNode:
-				log.Println("removing node")
 				// remove node from chat and that's all
 				nodeName, err := c.RemoveNodeBySlot(op.Slot)
 				if err == nil {
 					fmt.Printf("%s leaved chat %s\n", nodeName, c.Name)
+				}
+
+				// Update chat storage and current chat if needed
+				o.storage.SaveChat(c)
+				if o.currentChat.Id == c.Id {
+					o.updateCurrentChat(c)
 				}
 			}
 		}
