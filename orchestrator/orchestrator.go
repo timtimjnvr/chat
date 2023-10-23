@@ -17,7 +17,6 @@ type (
 		*sync.RWMutex
 		myInfos      *crdt.NodeInfos
 		currenChatID string
-		currentChat  *crdt.Chat
 		storage      *storage.Storage
 	}
 )
@@ -46,16 +45,16 @@ func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
 	currentChat := crdt.NewChat(myInfos.Name)
 	currentChat.SaveNode(myInfos)
 
-	storage := storage.NewStorage()
+	s := storage.NewStorage()
 
 	o := &Orchestrator{
 		RWMutex: &sync.RWMutex{},
 		myInfos: myInfos,
-		storage: storage,
+		storage: s,
 	}
 
 	o.updateCurrentChat(currentChat.Id)
-	storage.SaveChat(currentChat)
+	s.SaveChat(currentChat)
 
 	return o
 }
@@ -97,7 +96,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			}
 
 			if op.Typology == crdt.ListUsers {
-				o.currentChat.DisplayUsers()
+				o.getCurrentChat(o.currenChatID).DisplayUsers()
 				continue
 			}
 
@@ -206,15 +205,20 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				var (
 					index         = 0
 					numberOfChats = o.storage.GetNumberOfChats()
-					tmpChat       = o.currentChat
 					err           error
 				)
 
 				// Verify that slots are not used by any other chats
-				for index < numberOfChats && err == nil && tmpChat.Id != o.currentChat.Id {
-					tmpChat, err = o.storage.GetChatByIndex(index)
-					if err != nil {
+				for index < numberOfChats && err == nil {
+					tmpChat, _ := o.storage.GetChatByIndex(index)
+					if tmpChat.Id != o.currenChatID {
 						index++
+						continue
+					}
+
+					tmpChat, err = o.storage.GetChatByIndex(index)
+					index++
+					if err != nil {
 						continue
 					}
 
@@ -225,8 +229,6 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 							toDelete[s] = false
 						}
 					}
-
-					index++
 				}
 
 				// Operation used by node handler to kill connections if it is not used anymore
