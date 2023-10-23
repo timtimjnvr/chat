@@ -307,6 +307,7 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					}
 
 					o.updateCurrentChat(newCurrentChat.Id)
+					fmt.Printf(logFrmt, fmt.Sprintf("Switched to chat %s", chatName))
 
 				case crdt.AddMessage:
 					/* Add the messageBytes to discussion & sync with other nodes */
