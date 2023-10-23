@@ -18,6 +18,7 @@ const (
 	newChatCommand   = "/chat"
 	msgCommand       = "/msg"
 	joinChatCommand  = "/join"
+	switchCommand    = "/switch"
 	leaveChatCommand = "/close"
 	listUsersCommand = "/list"
 	listChatsCommand = "/list_chats"
@@ -28,6 +29,7 @@ const (
 	AddrArg     = "addrArgument"
 	ChatRoomArg = "chatRoomArgument"
 
+	switchErrorSyntax  = "Command syntax :" + switchCommand + " <chat_name>"
 	joinErrorSyntax    = "Command syntax : " + joinChatCommand + " <ip> <port>"
 	newChatErrorSyntax = "Command syntax : " + newChatCommand + " <chat_name>"
 )
@@ -37,6 +39,7 @@ var (
 		newChatCommand:   crdt.CreateChat,
 		msgCommand:       crdt.AddMessage,
 		joinChatCommand:  crdt.JoinChatByName,
+		switchCommand:    crdt.SwitchChat,
 		leaveChatCommand: crdt.LeaveChat,
 		listUsersCommand: crdt.ListUsers,
 		listChatsCommand: crdt.ListChats,
@@ -92,6 +95,13 @@ func parseArgs(line string, command crdt.OperationType) (map[string]string, erro
 		// no chat room specified
 		if len(splitArgs) < 2 {
 			return args, errors.Wrap(ErrorInArguments, newChatErrorSyntax)
+		}
+
+		args[ChatRoomArg] = strings.Replace(splitArgs[1], " ", "", 2)
+
+	case crdt.SwitchChat:
+		if len(splitArgs) < 2 {
+			return args, errors.Wrap(ErrorInArguments, switchErrorSyntax)
 		}
 
 		args[ChatRoomArg] = strings.Replace(splitArgs[1], " ", "", 2)

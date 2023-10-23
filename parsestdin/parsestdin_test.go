@@ -125,6 +125,18 @@ func TestGetArgs(t *testing.T) {
 			expectedArgs: make(map[string]string),
 			expectedErr:  nil,
 		},
+		{
+			text:         "/switch\n",
+			typology:     crdt.SwitchChat,
+			expectedArgs: make(map[string]string),
+			expectedErr:  ErrorInArguments,
+		},
+		{
+			text:         "/switch my-awesome-chat\n",
+			typology:     crdt.SwitchChat,
+			expectedArgs: map[string]string{ChatRoomArg: "my-awesome-chat"},
+			expectedErr:  nil,
+		},
 	}
 
 	for i, test := range tests {

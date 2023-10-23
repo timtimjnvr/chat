@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"github.com/google/uuid"
 	"github/timtimjnvr/chat/crdt"
 )
@@ -89,4 +90,43 @@ func (s *Storage) DisplayChats() {
 
 func (s *Storage) GetNumberOfChats() int {
 	return s.chats.Len()
+}
+
+func (s *Storage) CreateNewChat(name string, myInfos *crdt.NodeInfos) *crdt.Chat {
+	newChat := crdt.NewChat(name)
+	newChat.SaveNode(myInfos)
+	s.SaveChat(newChat)
+	return newChat
+}
+
+func (s *Storage) AddChat(name string, id string, myInfos *crdt.NodeInfos) *crdt.Chat {
+	newChat := crdt.NewChat(name)
+	newChat.Id = id
+	newChat.SaveNode(myInfos)
+	s.SaveChat(newChat)
+	return newChat
+}
+
+func (s *Storage) RemoveNodeSlotFromStorage(slot uint8) {
+	var (
+		index         = 0
+		numberOfChats = s.GetNumberOfChats()
+		c             *crdt.Chat
+		err           error
+	)
+
+	for index < numberOfChats && err == nil {
+		c, err = s.GetChatByIndex(index)
+		if err != nil {
+			index++
+			continue
+		}
+
+		nodeName, err2 := c.RemoveNodeBySlot(slot)
+		if err2 == nil {
+			fmt.Printf("%s leaved chat %s\n", nodeName, c.Name)
+		}
+
+		index++
+	}
 }

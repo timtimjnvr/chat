@@ -26,10 +26,10 @@ const (
 	AddChat
 	SaveNode
 	AddNode
-
 	RemoveNode
 	KillNode
 	AddMessage
+	SwitchChat
 	LeaveChat
 	ListUsers
 	ListChats
