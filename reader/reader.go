@@ -3,7 +3,6 @@ package reader
 import (
 	"bytes"
 	"golang.org/x/sys/unix"
-	"log"
 	"os"
 )
 
@@ -58,9 +57,9 @@ func Read(reader Reader, output chan<- []byte, separator []byte, shutdown, isDon
 			continue
 		}
 
+		// Interrupted Syscall sometimes
 		if err != nil {
-			log.Fatal("[ERROR] ", err)
-			return
+			continue
 		}
 
 		// readClose : stop reading output
