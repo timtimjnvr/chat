@@ -1,13 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"github/timtimjnvr/chat/conn"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/orchestrator"
 	"net"
 
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"sync"
@@ -55,7 +55,7 @@ func main() {
 		wgHandleChats.Wait()
 		wgListen.Wait()
 		nodeHandler.Wg.Wait()
-		log.Println("[INFO] program shutdown")
+		fmt.Println("[INFO] program shutdown")
 	}()
 
 	signal.Notify(sigc,

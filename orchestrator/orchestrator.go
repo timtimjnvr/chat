@@ -80,13 +80,13 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			if op.Typology == crdt.AddChat {
 				newChatInfos, ok := op.Data.(*crdt.Chat)
 				if !ok {
-					log.Println("[ERROR] can't parse op data to Chat")
+					fmt.Println("[ERROR] can't parse op data to Chat")
 					continue
 				}
 
 				o.storage.AddChat(newChatInfos.Name, newChatInfos.Id, o.myInfos)
 
-				log.Println(fmt.Sprintf("you joined a new chat : %s", newChatInfos.Name))
+				fmt.Printf("you joined a new chat : %s\n", newChatInfos.Name)
 				continue
 			}
 
@@ -109,7 +109,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			// for other operation we need to get a chat from storage
 			c, err := o.getChatFromStorage(*op)
 			if err != nil {
-				log.Println("[ERROR]", err)
+				fmt.Printf(logErrFrmt, err)
 				continue
 			}
 
@@ -286,13 +286,18 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 		case line := <-stdin:
 			cmd, err := parsestdin.NewCommand(string(line))
 			if err != nil {
-				log.Println("[ERROR] ", err)
+				fmt.Printf(logErrFrmt, err)
 				continue
 			}
 
 			args := cmd.GetArgs()
 			switch cmd.GetTypology() {
 			case crdt.JoinChatByName:
+				if args[parsestdin.PortArg] == o.myInfos.Port && sameAddress(o.myInfos.Address, args[parsestdin.AddrArg]) {
+					fmt.Printf(logErrFrmt, "You are trying to connect to yourself")
+					continue
+				}
+
 				outgoingConnectionRequests <- conn.NewConnectionRequest(args[parsestdin.PortArg], args[parsestdin.AddrArg], args[parsestdin.ChatRoomArg])
 
 			default:
@@ -406,4 +411,18 @@ func (o *Orchestrator) getChatFromStorage(op crdt.Operation) (*crdt.Chat, error)
 	}
 
 	return c, nil
+}
+
+func sameAddress(addr1, addr2 string) bool {
+	if addr1 == addr2 {
+		return true
+	}
+
+	isLocalhost := func(addr string) bool {
+		return addr == "" || addr == "localhost" || addr == "127.0.0.1"
+	}
+
+	// TODO later : get address from domain and compare addresses
+
+	return isLocalhost(addr1) && isLocalhost(addr2)
 }

@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"fmt"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/reader"
 	"log"
@@ -70,7 +71,7 @@ func (n *node) start(done chan<- slot) {
 			message = resetSlot(message)
 			n, err := n.conn.Write(message)
 			if err != nil {
-				log.Printf("Write %d, %s\n", n, err)
+				fmt.Printf("Write %d, %s\n", n, err)
 			}
 
 		case message, ok := <-outputConnection:
