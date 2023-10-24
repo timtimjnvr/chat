@@ -95,21 +95,21 @@ func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, incomingConnectionRequ
 			// check if targetedPort is an int
 			_, err := strconv.Atoi(connectionRequest.targetedPort)
 			if err != nil {
-				log.Println(err)
+				fmt.Println(err)
 			}
 
 			/* Open conn */
 			var c net.Conn
 			c, err = openConnection(addr, connectionRequest.targetedPort)
 			if err != nil {
-				log.Println("[ERROR] ", err)
+				fmt.Println("[ERROR] ", err)
 				break
 			}
 
 			// init joining process
 			_, err = c.Write(crdt.NewOperation(crdt.JoinChatByName, chatRoom, myInfos).ToBytes())
 			if err != nil {
-				log.Println("[ERROR] ", err)
+				fmt.Println("[ERROR] ", err)
 			}
 
 			newConnections <- c
