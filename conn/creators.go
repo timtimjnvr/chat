@@ -86,7 +86,6 @@ func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, incomingConnectionRequ
 			return
 
 		case connectionRequest := <-incomingConnectionRequest:
-			//args := connectionRequest.GetArgs()
 			var (
 				addr     = connectionRequest.targetedAddress
 				chatRoom = connectionRequest.chatRoom

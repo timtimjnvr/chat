@@ -85,6 +85,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 				o.storage.AddChat(newChatInfos.Name, newChatInfos.Id, o.myInfos)
+				o.updateCurrentChat(newChatInfos.Id)
 
 				fmt.Printf("you joined a new chat : %s\n", newChatInfos.Name)
 				continue
@@ -125,12 +126,12 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					toSend <- syncOp
 				}
 
+				// Slot previously set when connection established
 				newNodeInfos.Slot = op.Slot
 				c.SaveNode(newNodeInfos)
-				c.SaveNode(o.myInfos)
 				o.storage.SaveChat(c)
 
-				fmt.Printf("%s joined chat\n", newNodeInfos.Name)
+				fmt.Printf("%s joined chat %s\n", newNodeInfos.Name, c.Name)
 				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
 
 			// connection just established
