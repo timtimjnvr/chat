@@ -40,7 +40,6 @@ func TestList_Contains(t *testing.T) {
 }
 
 func TestList_Update(t *testing.T) {
-
 	l := NewList()
 	id1 := l.Add(crdt.NewChat("1"))
 	l.Update(id1, &crdt.Chat{Id: id1.String(), Name: "3"})
@@ -57,15 +56,62 @@ func TestList_Delete(t *testing.T) {
 		second = l.Add(crdt.NewChat("2"))
 		third  = l.Add(crdt.NewChat("3"))
 	)
-
+	// 1 -> 2 -> 3 becomes 2 -> 3
 	l.Delete(first)
-	ass.True(l.Len() == 2, "failed on Deleting first element")
+	ass.Equal(l.Len(), 2, "failed on Deleting first element")
 
+	// Verify new first = 2
+	c, err := l.GetByIndex(0)
+	if err != nil {
+		ass.Fail("failed to get element after deleting first")
+	}
+	ass.Equal(c.Id, second.String())
+
+	// Verify new second = 3
+	c, err = l.GetByIndex(1)
+	if err != nil {
+		ass.Fail("failed to get element after deleting first")
+	}
+
+	ass.Equal(c.Id, third.String())
+
+	// 2 -> 3 becomes 2
 	l.Delete(third)
-	ass.True(l.Len() == 1, "failed on Deleting third element")
+	ass.Equal(l.Len(), 1, "failed on Deleting third element")
+
+	// Verify new first = 2
+	c, err = l.GetByIndex(0)
+	if err != nil {
+		ass.Fail("failed to get element after deleting first")
+	}
+
+	ass.Equal(c.Id, second.String())
 
 	l.Delete(second)
-	ass.True(l.Len() == 0, "failed on Deleting remaining element")
+	ass.Equal(l.Len(), 0, "failed on Deleting remaining element")
+
+	first = l.Add(crdt.NewChat("1"))
+	second = l.Add(crdt.NewChat("2"))
+	third = l.Add(crdt.NewChat("3"))
+
+	// 1 -> 2 -> 3 becomes 1 -> 3
+	l.Delete(second)
+	ass.Equal(l.Len(), 2, "failed on Deleting first element")
+
+	// Verify new first = 2
+	c, err = l.GetByIndex(0)
+	if err != nil {
+		ass.Fail("failed to get element after deleting first")
+	}
+	ass.Equal(c.Id, first.String())
+
+	// Verify new second = 3
+	c, err = l.GetByIndex(1)
+	if err != nil {
+		ass.Fail("failed to get element after deleting first")
+	}
+
+	ass.Equal(c.Id, third.String())
 }
 
 func TestList_GetById(t *testing.T) {

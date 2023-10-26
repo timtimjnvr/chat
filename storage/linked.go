@@ -110,12 +110,16 @@ func (l *list) GetByIndex(index int) (*crdt.Chat, error) {
 	if index >= l.Len() {
 		return nil, NotFound
 	}
-	i := 0
-	for l.head.next != nil && i != index {
-		l.head = l.head.next
+	var (
+		i   = 0
+		tmp = l.head
+	)
+	for tmp.next != nil && i != index {
+		tmp = tmp.next
+		i++
 	}
 
-	return l.head.chat, nil
+	return tmp.chat, nil
 }
 
 func (l *list) GetById(id uuid.UUID) (*crdt.Chat, error) {
