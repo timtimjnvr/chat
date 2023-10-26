@@ -85,6 +85,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 				o.storage.AddChat(newChatInfos.Name, newChatInfos.Id, o.myInfos)
+				o.updateCurrentChat(newChatInfos.Id)
 
 				fmt.Printf("you joined a new chat : %s\n", newChatInfos.Name)
 				continue
