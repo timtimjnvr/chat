@@ -18,10 +18,28 @@ func TestList_Len(t *testing.T) {
 func TestList_Add(t *testing.T) {
 	ass := assert.New(t)
 	l := NewList()
-	l.Add(crdt.NewChat("1"))
-	l.Add(crdt.NewChat("2"))
-	l.Add(crdt.NewChat("3"))
 
+	id, err := l.Add(crdt.NewChat("1"))
+	assert.Nil(t, err)
+
+	// adding chat with name already in list
+	existingChat := crdt.NewChat("1")
+	_, err = l.Add(existingChat)
+	assert.True(t, errors.Is(err, AlreadyInListWithNameErr))
+
+	// adding chat with id already in list
+	existingChat = crdt.NewChat("toto")
+	existingChat.Id = id.String()
+	_, err = l.Add(existingChat)
+	assert.True(t, errors.Is(err, AlreadyInListWithIDErr))
+
+	// adding more elements
+	_, err = l.Add(crdt.NewChat("2"))
+	assert.Nil(t, err)
+	_, err = l.Add(crdt.NewChat("3"))
+	assert.Nil(t, err)
+
+	// checking list length
 	ass.Equal(3, l.Len(), "failed on Adding elements")
 }
 
@@ -32,9 +50,9 @@ func TestList_Contains(t *testing.T) {
 	contains := l.Contains(inExistingID)
 	assert.False(t, contains)
 
-	id1 := l.Add(crdt.NewChat("1"))
-	id2 := l.Add(crdt.NewChat("2"))
-	id3 := l.Add(crdt.NewChat("3"))
+	id1, _ := l.Add(crdt.NewChat("1"))
+	id2, _ := l.Add(crdt.NewChat("2"))
+	id3, _ := l.Add(crdt.NewChat("3"))
 
 	errMessage := "failed on finding element"
 	assert.True(t, l.Contains(id1), errMessage)
@@ -78,11 +96,11 @@ func TestList_Update(t *testing.T) {
 
 func TestList_Delete(t *testing.T) {
 	var (
-		ass    = assert.New(t)
-		l      = NewList()
-		first  = l.Add(crdt.NewChat("1"))
-		second = l.Add(crdt.NewChat("2"))
-		third  = l.Add(crdt.NewChat("3"))
+		ass       = assert.New(t)
+		l         = NewList()
+		first, _  = l.Add(crdt.NewChat("1"))
+		second, _ = l.Add(crdt.NewChat("2"))
+		third, _  = l.Add(crdt.NewChat("3"))
 	)
 	// 1 -> 2 -> 3 becomes 2 -> 3
 	l.Delete(first)
@@ -118,9 +136,9 @@ func TestList_Delete(t *testing.T) {
 	l.Delete(second)
 	ass.Equal(l.Len(), 0, "failed on Deleting remaining element")
 
-	first = l.Add(crdt.NewChat("1"))
-	second = l.Add(crdt.NewChat("2"))
-	third = l.Add(crdt.NewChat("3"))
+	first, _ = l.Add(crdt.NewChat("1"))
+	second, _ = l.Add(crdt.NewChat("2"))
+	third, _ = l.Add(crdt.NewChat("3"))
 
 	// 1 -> 2 -> 3 becomes 1 -> 3
 	l.Delete(second)
@@ -173,7 +191,7 @@ func TestList_GetById(t *testing.T) {
 	)
 
 	for _, value := range values {
-		valuesIds[value] = l.Add(crdt.NewChat(fmt.Sprintf("%d", value)))
+		valuesIds[value], _ = l.Add(crdt.NewChat(fmt.Sprintf("%d", value)))
 	}
 
 	for value, id := range valuesIds {

@@ -13,13 +13,25 @@ type (
 
 	List interface {
 		Len() int
-		Add(chat *crdt.Chat) uuid.UUID
+		Add(chat *crdt.Chat) (uuid.UUID, error)
 		Contains(id uuid.UUID) bool
 		Update(chat *crdt.Chat) error
 		GetByIndex(index int) (*crdt.Chat, error)
 		GetById(id uuid.UUID) (*crdt.Chat, error)
 		Delete(key uuid.UUID)
 		Display()
+	}
+
+	Refactored interface {
+		// AddNewChat chatName need to be unique and non-existent in storage (return error if needed) : called at orchestrator start up
+		AddNewChat(chatName string) (uuid.UUID, error)
+		// AddNode add a node to a given chat :need to return an error if the chat is not found
+		AddNode(nodeInfos crdt.NodeInfos, chatID uuid.UUID) error
+
+		GetNumberOfChats() int
+		// DisplayChatUsers return an error if the chat identified by chatID is not found
+		DisplayChatUsers(chatID uuid.UUID) error
+		DisplayChats()
 	}
 )
 
@@ -29,6 +41,10 @@ func NewStorage() *Storage {
 	}
 }
 
+func (s *Storage) AddNewChat(chatName string) (uuid.UUID, error) {
+	newChat := crdt.NewChat(chatName)
+	return s.chats.Add(newChat)
+}
 func (s *Storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
 	var (
 		numberOfChats = s.chats.Len()

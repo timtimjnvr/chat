@@ -8,9 +8,11 @@ import (
 )
 
 var (
-	InvalidChatErr       = errors.New("invalid chat")
-	NotFoundErr          = errors.New("not found")
-	InvalidIdentifierErr = errors.New("invalid identifier")
+	AlreadyInListWithNameErr = errors.New("already a chat with this name in the list")
+	AlreadyInListWithIDErr   = errors.New("already a chat with this ID in the list")
+	InvalidChatErr           = errors.New("invalid chat")
+	NotFoundErr              = errors.New("not found")
+	InvalidIdentifierErr     = errors.New("invalid identifier")
 )
 
 type (
@@ -50,14 +52,18 @@ func (l *list) Display() {
 }
 
 // Add insert chat at the end of the list and return the key of the inserted chat
-func (l *list) Add(chat *crdt.Chat) uuid.UUID {
+func (l *list) Add(chat *crdt.Chat) (uuid.UUID, error) {
 	e := newElement(chat)
+	id, err := uuid.Parse(chat.Id)
+	if err != nil {
+		return uuid.UUID{}, InvalidIdentifierErr
+	}
+
 	if l.length == 0 {
 		l.head = e
 		l.tail = e
 		l.length++
-		id, _ := uuid.Parse(l.tail.chat.Id)
-		return id
+		return id, nil
 	}
 
 	var (
@@ -66,6 +72,14 @@ func (l *list) Add(chat *crdt.Chat) uuid.UUID {
 	)
 
 	for i := 0; i < length; i++ {
+		if ptr.chat.Name == chat.Name {
+			return uuid.UUID{}, AlreadyInListWithNameErr
+		}
+
+		if ptr.chat.Id == chat.Id {
+			return uuid.UUID{}, AlreadyInListWithIDErr
+		}
+
 		if ptr.next == nil {
 			ptr.next = e
 			l.tail = e
@@ -75,8 +89,7 @@ func (l *list) Add(chat *crdt.Chat) uuid.UUID {
 		ptr = ptr.next
 	}
 
-	id, _ := uuid.Parse(l.tail.chat.Id)
-	return id
+	return id, nil
 }
 
 func (l *list) Contains(id uuid.UUID) bool {
