@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github/timtimjnvr/chat/crdt"
 	"testing"
@@ -26,6 +27,11 @@ func TestList_Add(t *testing.T) {
 
 func TestList_Contains(t *testing.T) {
 	l := NewList()
+	// test on empty list
+	inExistingID, _ := uuid.NewUUID()
+	contains := l.Contains(inExistingID)
+	assert.False(t, contains)
+
 	id1 := l.Add(crdt.NewChat("1"))
 	id2 := l.Add(crdt.NewChat("2"))
 	id3 := l.Add(crdt.NewChat("3"))
@@ -40,13 +46,34 @@ func TestList_Contains(t *testing.T) {
 }
 
 func TestList_Update(t *testing.T) {
-
 	l := NewList()
-	id1 := l.Add(crdt.NewChat("1"))
-	l.Update(id1, &crdt.Chat{Id: id1.String(), Name: "3"})
-	c, _ := l.GetById(id1)
+	// Try to update chat in empty list
+	err := l.Update(crdt.NewChat("non existing"))
+	assert.True(t, errors.Is(err, NotFoundErr))
 
-	assert.Equal(t, &crdt.Chat{Id: id1.String(), Name: "3"}, c, "failed to update chat")
+	c := crdt.NewChat("1")
+	id1String := c.Id
+	l.Add(c)
+
+	// Try to update with invalid chat
+	err = l.Update(nil)
+	assert.True(t, errors.Is(err, InvalidChatErr))
+
+	// Try to update with chat with invalid identifier
+	c2 := crdt.NewChat("invalid")
+	c2.Id = "toto"
+	err = l.Update(c2)
+	assert.True(t, errors.Is(err, InvalidIdentifierErr))
+
+	err = l.Update(&crdt.Chat{Id: id1String, Name: "3"})
+	// no error
+	assert.Nil(t, err)
+
+	id1, err := uuid.Parse(id1String)
+	assert.Nil(t, err)
+	c, err = l.GetById(id1)
+	assert.Nil(t, err)
+	assert.Equal(t, &crdt.Chat{Id: id1String, Name: "3"}, c, "failed to update chat")
 }
 
 func TestList_Delete(t *testing.T) {
@@ -57,15 +84,84 @@ func TestList_Delete(t *testing.T) {
 		second = l.Add(crdt.NewChat("2"))
 		third  = l.Add(crdt.NewChat("3"))
 	)
-
+	// 1 -> 2 -> 3 becomes 2 -> 3
 	l.Delete(first)
-	ass.True(l.Len() == 2, "failed on Deleting first element")
+	ass.Equal(l.Len(), 2, "failed on Deleting first element")
 
+	// Verify new first = 2
+	c, err := l.GetByIndex(0)
+	if err != nil {
+		ass.Fail("failed to get element after deleting first")
+	}
+	ass.Equal(c.Id, second.String())
+
+	// Verify new second = 3
+	c, err = l.GetByIndex(1)
+	if err != nil {
+		ass.Fail("failed to get element after deleting first")
+	}
+
+	ass.Equal(c.Id, third.String())
+
+	// 2 -> 3 becomes 2
 	l.Delete(third)
-	ass.True(l.Len() == 1, "failed on Deleting third element")
+	ass.Equal(l.Len(), 1, "failed on Deleting third element")
+
+	// Verify new first = 2
+	c, err = l.GetByIndex(0)
+	if err != nil {
+		ass.Fail("failed to get element after deleting first")
+	}
+
+	ass.Equal(c.Id, second.String())
 
 	l.Delete(second)
-	ass.True(l.Len() == 0, "failed on Deleting remaining element")
+	ass.Equal(l.Len(), 0, "failed on Deleting remaining element")
+
+	first = l.Add(crdt.NewChat("1"))
+	second = l.Add(crdt.NewChat("2"))
+	third = l.Add(crdt.NewChat("3"))
+
+	// 1 -> 2 -> 3 becomes 1 -> 3
+	l.Delete(second)
+	ass.Equal(l.Len(), 2, "failed on Deleting first element")
+
+	// Verify new first = 1
+	c, err = l.GetByIndex(0)
+	if err != nil {
+		ass.Fail("failed to get element after deleting first")
+	}
+	ass.Equal(c.Id, first.String())
+
+	// Verify new second = 3
+	c, err = l.GetByIndex(1)
+	if err != nil {
+		ass.Fail("failed to get element after deleting first")
+	}
+
+	ass.Equal(c.Id, third.String())
+
+	// Try to delete in existing element (2) and validate that nothing has changed
+	l.Delete(second)
+
+	// Verify first has not changed = 1
+	c, err = l.GetByIndex(0)
+	if err != nil {
+		ass.Fail("failed to get element after deleting first")
+	}
+	ass.Equal(c.Id, first.String())
+
+	// Verify second has not changed = 3
+	c, err = l.GetByIndex(1)
+	if err != nil {
+		ass.Fail("failed to get element after deleting first")
+	}
+
+	ass.Equal(c.Id, third.String())
+
+	// try to delete an element in an empty list
+	l = NewList()
+	l.Delete(second)
 }
 
 func TestList_GetById(t *testing.T) {
@@ -90,5 +186,41 @@ func TestList_GetById(t *testing.T) {
 		expectedChat.Id = id.String()
 
 		ass.Equal(res, expectedChat, "failed on getting element by id, wrong chat")
+	}
+
+	// try to get in existing element in a non empty list
+	unExistingID, _ := uuid.NewUUID()
+	res, err := l.GetById(unExistingID)
+	assert.True(t, errors.Is(err, NotFoundErr))
+	assert.Nil(t, res)
+
+	// try to get in existing element in an empty list
+	l = NewList()
+	res, err = l.GetById(unExistingID)
+	assert.True(t, errors.Is(err, NotFoundErr))
+	assert.Nil(t, res)
+}
+
+func TestList_GetByIndex(t *testing.T) {
+	l := NewList()
+
+	// Try to get more than length
+	e, err := l.GetByIndex(2)
+	assert.True(t, errors.Is(err, NotFoundErr))
+	assert.Nil(t, e)
+
+	var (
+		values = []int{1, 2, 3, 4}
+	)
+
+	for _, value := range values {
+		l.Add(crdt.NewChat(fmt.Sprintf("%d", value)))
+	}
+
+	for index, value := range values {
+		var c *crdt.Chat
+		c, err = l.GetByIndex(index)
+		assert.NoError(t, err)
+		assert.Equal(t, c.Name, fmt.Sprintf("%d", value))
 	}
 }

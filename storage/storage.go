@@ -15,7 +15,7 @@ type (
 		Len() int
 		Add(chat *crdt.Chat) uuid.UUID
 		Contains(id uuid.UUID) bool
-		Update(id uuid.UUID, chat *crdt.Chat)
+		Update(chat *crdt.Chat) error
 		GetByIndex(index int) (*crdt.Chat, error)
 		GetById(id uuid.UUID) (*crdt.Chat, error)
 		Delete(key uuid.UUID)
@@ -45,7 +45,7 @@ func (s *Storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
 		}
 
 		if err != nil || c == nil {
-			return nil, NotFound
+			return nil, NotFoundErr
 		}
 	}
 
@@ -53,12 +53,12 @@ func (s *Storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
 	var id uuid.UUID
 	id, err = uuid.Parse(identifier)
 	if err != nil {
-		return nil, InvalidIdentifier
+		return nil, InvalidIdentifierErr
 	}
 
 	c, err = s.chats.GetById(id)
 	if err != nil {
-		return nil, NotFound
+		return nil, NotFoundErr
 	}
 
 	return c, nil
@@ -75,7 +75,7 @@ func (s *Storage) SaveChat(c *crdt.Chat) {
 		return
 	}
 
-	s.chats.Update(id, c)
+	s.chats.Update(c)
 }
 
 func (s *Storage) DeleteChatById(identifier string) {
