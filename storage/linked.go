@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	NotFound          = errors.New("Not found")
-	InvalidIdentifier = errors.New("Invalid identifier")
+	InvalidChatErr       = errors.New("invalid chat")
+	NotFoundErr          = errors.New("not found")
+	InvalidIdentifierErr = errors.New("invalid identifier")
 )
 
 type (
@@ -83,32 +84,48 @@ func (l *list) Contains(id uuid.UUID) bool {
 		return false
 	}
 
-	first := l.head
-	for first.next != nil && first.chat.Id != id.String() {
-		first = first.next
+	tmp := l.head
+	for tmp.next != nil && tmp.chat.Id != id.String() {
+		tmp = tmp.next
 	}
 
-	if first.chat.Id == id.String() {
+	if tmp.chat.Id == id.String() {
 		return true
 	}
 
 	return false
 }
 
-func (l *list) Update(id uuid.UUID, chat *crdt.Chat) {
-	first := l.head
-	for first.next != nil && first.chat.Id != id.String() {
-		first = first.next
+func (l *list) Update(chat *crdt.Chat) error {
+	if chat == nil {
+		return InvalidChatErr
 	}
 
-	if first.chat.Id == id.String() {
-		first.chat = chat
+	id, err := uuid.Parse(chat.Id)
+	if err != nil {
+		return InvalidIdentifierErr
 	}
+
+	if l.length == 0 {
+		return NotFoundErr
+	}
+
+	tmp := l.head
+	for tmp.next != nil && tmp.chat.Id != id.String() {
+		tmp = tmp.next
+	}
+
+	if tmp.chat.Id == id.String() {
+		tmp.chat = chat
+		return nil
+	}
+
+	return NotFoundErr
 }
 
 func (l *list) GetByIndex(index int) (*crdt.Chat, error) {
 	if index >= l.Len() {
-		return nil, NotFound
+		return nil, NotFoundErr
 	}
 	var (
 		i   = 0
@@ -123,6 +140,10 @@ func (l *list) GetByIndex(index int) (*crdt.Chat, error) {
 }
 
 func (l *list) GetById(id uuid.UUID) (*crdt.Chat, error) {
+	if l.length == 0 {
+		return nil, NotFoundErr
+	}
+
 	first := l.head
 	for first.next != nil && first.chat.Id != id.String() {
 		first = first.next
@@ -132,10 +153,14 @@ func (l *list) GetById(id uuid.UUID) (*crdt.Chat, error) {
 		return first.chat, nil
 	}
 
-	return nil, NotFound
+	return nil, NotFoundErr
 }
 
 func (l *list) Delete(id uuid.UUID) {
+	if l.length == 0 {
+		return
+	}
+
 	var previous, tmp *element
 
 	// remove first element
@@ -145,15 +170,15 @@ func (l *list) Delete(id uuid.UUID) {
 		return
 	}
 
-	// second or more
+	// iterate until element found or end of list
 	previous = l.head
 	tmp = l.head.next
 	for tmp != nil && tmp.next != nil && tmp.chat.Id != id.String() {
 		previous = tmp
 		tmp = tmp.next
-		tmp = previous.next
 	}
 
+	// element found or end of list
 	if tmp != nil && tmp.chat.Id == id.String() {
 		previous.next = tmp.next
 		l.length--
