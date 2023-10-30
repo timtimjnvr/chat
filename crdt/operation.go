@@ -23,14 +23,14 @@ type (
 const (
 	CreateChat OperationType = iota
 	JoinChatByName
-	AddChat
 	SaveNode
+	KillNode
 	AddNode
 	RemoveNode
-	KillNode
-	AddMessage
-	SwitchChat
+	AddChat
 	LeaveChat
+	SwitchChat
+	AddMessage
 	ListUsers
 	ListChats
 	Quit
@@ -47,7 +47,7 @@ func NewOperation(typology OperationType, targetedChat string, data Data) *Opera
 
 // *------*-------------------*--------------*----------*---------*------*
 // | Slot | lenTargetedChat   | TargetedChat | Typology | lenData | Data |
-// *------*-------------------*--------------*----------*---------*------*
+// *------*-------*------------*--------------*----------*---------*-----*
 //							 lenTargetedChat				  	  lenData
 //	 1 byte	 	1 byte	  	 	bytes		  1 byte	 1 byte	   bytes
 

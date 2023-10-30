@@ -7,7 +7,7 @@ import (
 )
 
 type (
-	Storage struct {
+	storage struct {
 		chats List
 	}
 
@@ -22,11 +22,15 @@ type (
 		Display()
 	}
 
-	Refactored interface {
+	Storage interface {
 		// AddNewChat chatName need to be unique and non-existent in storage (return error if needed) : called at orchestrator start up
 		AddNewChat(chatName string) (uuid.UUID, error)
-		// AddNode add a node to a given chat :need to return an error if the chat is not found
-		AddNode(nodeInfos crdt.NodeInfos, chatID uuid.UUID) error
+		AddChat(chat *crdt.Chat) error
+		RemoveChat(chatID uuid.UUID)
+
+		// AddNodeToChat add a node to a given chat :need to return an error if the chat is not found
+		AddNodeToChat(nodeInfos *crdt.NodeInfos, chatID uuid.UUID) error
+		RemoveNodeFromChat(nodeSlot uint8, chatID uuid.UUID) error
 
 		GetNumberOfChats() int
 		// DisplayChatUsers return an error if the chat identified by chatID is not found
@@ -35,17 +39,47 @@ type (
 	}
 )
 
-func NewStorage() *Storage {
-	return &Storage{
+func NewStorage() Storage {
+	return &storage{
 		chats: NewList(),
 	}
 }
 
-func (s *Storage) AddNewChat(chatName string) (uuid.UUID, error) {
+func (s *storage) AddNewChat(chatName string) (uuid.UUID, error) {
 	newChat := crdt.NewChat(chatName)
 	return s.chats.Add(newChat)
 }
-func (s *Storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
+
+func (s *storage) AddChat(chat *crdt.Chat) error {
+	_, err := s.chats.Add(chat)
+	return err
+}
+
+func (s *storage) RemoveChat(chatID uuid.UUID) {
+	s.chats.Delete(chatID)
+}
+
+func (s *storage) AddNodeToChat(nodeInfos *crdt.NodeInfos, chatID uuid.UUID) error {
+	c, err := s.GetChat(chatID.String(), false)
+	if err != nil {
+		return err
+	}
+
+	c.SaveNode(nodeInfos)
+	return nil
+}
+
+func (s *storage) RemoveNodeFromChat(nodeSlot uint8, chatID uuid.UUID) error {
+	c, err := s.GetChat(chatID.String(), false)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.RemoveNodeBySlot(nodeSlot)
+	return err
+}
+
+func (s *storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
 	var (
 		numberOfChats = s.chats.Len()
 		c             *crdt.Chat
@@ -80,50 +114,44 @@ func (s *Storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
 	return c, nil
 }
 
-func (s *Storage) GetChatByIndex(index int) (*crdt.Chat, error) {
+func (s *storage) GetChatByIndex(index int) (*crdt.Chat, error) {
 	return s.chats.GetByIndex(index)
 }
 
-func (s *Storage) SaveChat(c *crdt.Chat) {
-	id, _ := uuid.Parse(c.Id)
+func (s *storage) SaveChat(c *crdt.Chat) error {
+	id, err := uuid.Parse(c.Id)
+	if err != nil {
+		return InvalidIdentifierErr
+	}
 	if !s.chats.Contains(id) {
-		s.chats.Add(c)
-		return
+		_, err = s.chats.Add(c)
+		if err != nil {
+			return err
+		}
 	}
 
-	s.chats.Update(c)
+	return s.chats.Update(c)
 }
 
-func (s *Storage) DeleteChatById(identifier string) {
-	id, _ := uuid.Parse(identifier)
-
-	s.chats.Delete(id)
-}
-
-func (s *Storage) DisplayChats() {
+func (s *storage) DisplayChats() {
 	s.chats.Display()
 }
 
-func (s *Storage) GetNumberOfChats() int {
+func (s *storage) DisplayChatUsers(chatID uuid.UUID) error {
+	c, err := s.chats.GetById(chatID)
+	if err != nil {
+		return err
+	}
+
+	c.DisplayUsers()
+	return nil
+}
+
+func (s *storage) GetNumberOfChats() int {
 	return s.chats.Len()
 }
 
-func (s *Storage) CreateNewChat(name string, myInfos *crdt.NodeInfos) *crdt.Chat {
-	newChat := crdt.NewChat(name)
-	newChat.SaveNode(myInfos)
-	s.SaveChat(newChat)
-	return newChat
-}
-
-func (s *Storage) AddChat(name string, id string, myInfos *crdt.NodeInfos) *crdt.Chat {
-	newChat := crdt.NewChat(name)
-	newChat.Id = id
-	newChat.SaveNode(myInfos)
-	s.SaveChat(newChat)
-	return newChat
-}
-
-func (s *Storage) RemoveNodeSlotFromStorage(slot uint8) {
+func (s *storage) RemoveNodeSlotFromStorage(slot uint8) {
 	var (
 		index         = 0
 		numberOfChats = s.GetNumberOfChats()

@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github/timtimjnvr/chat/conn"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/parsestdin"
@@ -16,19 +17,19 @@ type (
 	Orchestrator struct {
 		*sync.RWMutex
 		myInfos      *crdt.NodeInfos
-		currenChatID string
-		storage      *storage.Storage
+		currenChatID uuid.UUID
+		storage      *storage.S
 	}
 )
 
-func (o *Orchestrator) getCurrentChat(currenChatID string) *crdt.Chat {
+func (o *Orchestrator) getCurrentChat(currenChatID uuid.UUID) *crdt.Chat {
 	o.RLock()
 	defer o.RUnlock()
-	c, _ := o.storage.GetChat(currenChatID, false)
+	c, _ := o.storage.GetChat(currenChatID.String(), false)
 	return c
 }
 
-func (o *Orchestrator) updateCurrentChat(currenChatID string) {
+func (o *Orchestrator) updateCurrentChat(currenChatID uuid.UUID) {
 	o.Lock()
 	defer o.Unlock()
 	o.currenChatID = currenChatID
@@ -42,10 +43,9 @@ const (
 )
 
 func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
-	currentChat := crdt.NewChat(myInfos.Name)
-	currentChat.SaveNode(myInfos)
-
 	s := storage.NewStorage()
+	id, _ := s.AddNewChat(myInfos.Name)
+	_ = s.AddNode(myInfos, id)
 
 	o := &Orchestrator{
 		RWMutex: &sync.RWMutex{},
@@ -53,9 +53,7 @@ func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
 		storage: s,
 	}
 
-	o.updateCurrentChat(currentChat.Id)
-	s.SaveChat(currentChat)
-
+	o.updateCurrentChat(id)
 	return o
 }
 
@@ -73,7 +71,14 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 		case op := <-toExecute:
 			// execute op
 			if op.Typology == crdt.CreateChat {
-				o.storage.CreateNewChat(op.TargetedChat, o.myInfos)
+				id, err := o.storage.AddNewChat(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+					continue
+				}
+
+				// don't care about error since we just added the given chat
+				_ = o.storage.AddNode(o.myInfos, id)
 				continue
 			}
 
@@ -83,6 +88,14 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					fmt.Println("[ERROR] can't parse op data to Chat")
 					continue
 				}
+
+				o.storage.Add(newChatInfos)
+
+				newChat := crdt.NewChat(name)
+				newChat.Id = id.String()
+				newChat.SaveNode(myInfos)
+				s.SaveChat(newChat)
+				return newChat
 
 				o.storage.AddChat(newChatInfos.Name, newChatInfos.Id, o.myInfos)
 				o.updateCurrentChat(newChatInfos.Id)
@@ -135,20 +148,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
 
 			// connection just established
-			case crdt.AddNode:
-				newNodeInfos, ok := op.Data.(*crdt.NodeInfos)
-				if !ok {
-					log.Println("[ERROR] can't parse op data to NodeInfos")
-					continue
-				}
-
-				newNodeInfos.Slot = op.Slot
-				c.SaveNode(newNodeInfos)
-				o.storage.SaveChat(c)
-
-				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
-
-			case crdt.SaveNode:
+			case crdt.AddNode, crdt.SaveNode:
 				newNodeInfos, ok := op.Data.(*crdt.NodeInfos)
 				if !ok {
 					log.Println("[ERROR] can't parse op data to NodeInfos")
@@ -243,7 +243,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				// Removing chat from storage and setting current chat to index 0
 				fmt.Printf("Leaving chat %s\n", c.Name)
-				o.storage.DeleteChatById(c.Id)
+				o.storage.RemoveChat(c.Id)
 				newCurrent, _ := o.storage.GetChatByIndex(0)
 				fmt.Printf("Switched to chat %s\n", newCurrent.Name)
 
