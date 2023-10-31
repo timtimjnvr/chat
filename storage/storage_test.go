@@ -164,3 +164,59 @@ func Test_storage_RemoveNodeFromChat(t *testing.T) {
 	err = s.RemoveNodeFromChat(node.Slot, chatId)
 	assert.NotNil(t, err)
 }
+
+func Test_storage_GetNumberOfChats(t *testing.T) {
+	s := NewStorage()
+	_, err := s.AddNewChat("chat name")
+	assert.Nil(t, err)
+
+	assert.Equal(t, 1, s.GetNumberOfChats())
+}
+
+func TestStorage_RemoveNodeSlotFromStorage(t *testing.T) {
+	s := NewStorage()
+
+	first, err := s.AddNewChat("first")
+	assert.Nil(t, err)
+	second, err := s.AddNewChat("second")
+	assert.Nil(t, err)
+
+	firstNode := crdt.NewNodeInfos("", "", "first")
+	firstNode.Slot = uint8(1)
+
+	secondNode := crdt.NewNodeInfos("", "", "second")
+	secondNode.Slot = uint8(2)
+
+	err = s.AddNodeToChat(firstNode, first)
+	assert.Nil(t, err)
+
+	err = s.AddNodeToChat(secondNode, first)
+
+	concreteStorage := s.(*storage)
+	c1, err := concreteStorage.getChat(first.String(), false)
+	assert.Nil(t, err)
+
+	_, err = c1.GetNodeBySlot(uint8(1))
+	assert.Nil(t, err)
+
+	_, err = c1.GetNodeBySlot(uint8(2))
+	assert.Nil(t, err)
+
+	s.RemoveNodeSlotFromStorage(2)
+	_, err = c1.GetNodeBySlot(uint8(2))
+	assert.Equal(t, err, NotFoundErr)
+
+	err = s.AddNodeToChat(secondNode, first)
+	assert.Nil(t, err)
+	err = s.AddNodeToChat(secondNode, second)
+	assert.Nil(t, err)
+
+	c2, err := concreteStorage.getChat(second.String(), false)
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(c1.GetSlots(uuid.New())))
+	assert.Equal(t, 1, len(c2.GetSlots(uuid.New())))
+
+	s.RemoveNodeSlotFromStorage(2)
+	assert.Equal(t, 1, len(c1.GetSlots(uuid.New())))
+	assert.Equal(t, 0, len(c2.GetSlots(uuid.New())))
+}

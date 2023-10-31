@@ -28,6 +28,7 @@ type (
 		RemoveChat(chatID uuid.UUID)
 		AddNodeToChat(nodeInfos *crdt.NodeInfos, chatID uuid.UUID) error
 		RemoveNodeFromChat(nodeSlot uint8, chatID uuid.UUID) error
+		RemoveNodeSlotFromStorage(slot uint8)
 		GetNumberOfChats() int
 		DisplayChatUsers(chatID uuid.UUID) error
 		DisplayChats()
