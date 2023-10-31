@@ -23,17 +23,12 @@ type (
 	}
 
 	Storage interface {
-		// AddNewChat chatName need to be unique and non-existent in storage (return error if needed) : called at orchestrator start up
 		AddNewChat(chatName string) (uuid.UUID, error)
 		AddChat(chat *crdt.Chat) error
 		RemoveChat(chatID uuid.UUID)
-
-		// AddNodeToChat add a node to a given chat :need to return an error if the chat is not found
 		AddNodeToChat(nodeInfos *crdt.NodeInfos, chatID uuid.UUID) error
 		RemoveNodeFromChat(nodeSlot uint8, chatID uuid.UUID) error
-
 		GetNumberOfChats() int
-		// DisplayChatUsers return an error if the chat identified by chatID is not found
 		DisplayChatUsers(chatID uuid.UUID) error
 		DisplayChats()
 	}
@@ -60,7 +55,7 @@ func (s *storage) RemoveChat(chatID uuid.UUID) {
 }
 
 func (s *storage) AddNodeToChat(nodeInfos *crdt.NodeInfos, chatID uuid.UUID) error {
-	c, err := s.GetChat(chatID.String(), false)
+	c, err := s.getChat(chatID.String(), false)
 	if err != nil {
 		return err
 	}
@@ -70,48 +65,13 @@ func (s *storage) AddNodeToChat(nodeInfos *crdt.NodeInfos, chatID uuid.UUID) err
 }
 
 func (s *storage) RemoveNodeFromChat(nodeSlot uint8, chatID uuid.UUID) error {
-	c, err := s.GetChat(chatID.String(), false)
+	c, err := s.getChat(chatID.String(), false)
 	if err != nil {
 		return err
 	}
 
 	_, err = c.RemoveNodeBySlot(nodeSlot)
 	return err
-}
-
-func (s *storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
-	var (
-		numberOfChats = s.chats.Len()
-		c             *crdt.Chat
-		err           error
-	)
-
-	if byName {
-		for index := 0; index < numberOfChats; index++ {
-			c, _ = s.chats.GetByIndex(index)
-			if c.Name == identifier {
-				return c, nil
-			}
-		}
-
-		if err != nil || c == nil {
-			return nil, NotFoundErr
-		}
-	}
-
-	// by uuid
-	var id uuid.UUID
-	id, err = uuid.Parse(identifier)
-	if err != nil {
-		return nil, InvalidIdentifierErr
-	}
-
-	c, err = s.chats.GetById(id)
-	if err != nil {
-		return nil, NotFoundErr
-	}
-
-	return c, nil
 }
 
 func (s *storage) GetChatByIndex(index int) (*crdt.Chat, error) {
@@ -173,4 +133,39 @@ func (s *storage) RemoveNodeSlotFromStorage(slot uint8) {
 
 		index++
 	}
+}
+
+func (s *storage) getChat(identifier string, byName bool) (*crdt.Chat, error) {
+	var (
+		numberOfChats = s.chats.Len()
+		c             *crdt.Chat
+		err           error
+	)
+
+	if byName {
+		for index := 0; index < numberOfChats; index++ {
+			c, _ = s.chats.GetByIndex(index)
+			if c.Name == identifier {
+				return c, nil
+			}
+		}
+
+		if err != nil || c == nil {
+			return nil, NotFoundErr
+		}
+	}
+
+	// by uuid
+	var id uuid.UUID
+	id, err = uuid.Parse(identifier)
+	if err != nil {
+		return nil, InvalidIdentifierErr
+	}
+
+	c, err = s.chats.GetById(id)
+	if err != nil {
+		return nil, NotFoundErr
+	}
+
+	return c, nil
 }
