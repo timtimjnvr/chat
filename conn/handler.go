@@ -153,7 +153,7 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			d.nodes[s] = n
 
 		case s := <-done:
-			quitOperation := crdt.NewOperation(crdt.Quit, "", nil)
+			quitOperation := crdt.NewOperation(crdt.RemoveNode, "", nil)
 			quitOperation.Slot = uint8(s)
 			toExecute <- quitOperation
 			d.nodes[s] = nil

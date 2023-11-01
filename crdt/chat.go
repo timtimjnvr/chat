@@ -10,8 +10,8 @@ import (
 
 type (
 	Chat struct {
-		Id         string `json:"id"`
-		Name       string `json:"name"`
+		Id         uuid.UUID `json:"id"`
+		Name       string    `json:"name"`
 		nodesInfos []*NodeInfos
 		messages   []*Message // ordered by date : 0 being the oldest message, 1 coming after 0 etc ...
 	}
@@ -23,7 +23,7 @@ const maxNumberOfMessages, maxNumberOfNodes = 100, 100
 
 func NewChat(name string) *Chat {
 	return &Chat{
-		Id:         uuid.New().String(),
+		Id:         uuid.New(),
 		Name:       name,
 		nodesInfos: make([]*NodeInfos, 0, maxNumberOfNodes),
 		messages:   make([]*Message, 0, maxNumberOfMessages),
@@ -184,7 +184,7 @@ func (c *Chat) ContainsMessage(message *Message) bool {
 func (c *Chat) GetMessageOperationsForPropagation() []*Operation {
 	addMessageOperations := make([]*Operation, 0, 0)
 	for _, m := range c.messages {
-		addMessageOperations = append(addMessageOperations, NewOperation(AddMessage, c.Id, m))
+		addMessageOperations = append(addMessageOperations, NewOperation(AddMessage, c.Id.String(), m))
 	}
 	return addMessageOperations
 }
