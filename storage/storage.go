@@ -19,6 +19,7 @@ func NewStorage() *Storage {
 		chats: NewList(),
 	}
 }
+
 func (s *Storage) GetNodeFromChatBySlot(chatID uuid.UUID, slot uint8) (*crdt.NodeInfos, error) {
 	c, err := s.getChat(chatID.String(), true)
 	if err != nil {
