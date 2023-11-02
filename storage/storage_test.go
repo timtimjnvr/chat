@@ -35,7 +35,7 @@ func Test_storage_AddChat(t *testing.T) {
 	s := NewStorage()
 	name := "my-chat"
 	chat := crdt.NewChat(name)
-	idString := chat.Id
+	idString := chat.Id.String()
 
 	err := s.AddChat(chat)
 	assert.Nil(t, err)
@@ -68,7 +68,7 @@ func Test_storage_RemoveChat(t *testing.T) {
 	s := NewStorage()
 	name := "my-chat"
 	chat := crdt.NewChat(name)
-	idString := chat.Id
+	idString := chat.Id.String()
 	err := s.AddChat(chat)
 	assert.Nil(t, err)
 
@@ -88,7 +88,7 @@ func Test_storage_getChat(t *testing.T) {
 	err := s.AddChat(chat)
 	assert.Nil(t, err)
 
-	gotFromStorage, err := concreteStorage.GetChat(chat.Id, false)
+	gotFromStorage, err := concreteStorage.GetChat(chat.Id.String(), false)
 	assert.Nil(t, err)
 	assert.Equal(t, chat, gotFromStorage)
 
@@ -153,14 +153,12 @@ func Test_storage_RemoveNodeFromChat(t *testing.T) {
 	numberOfSlots := c.GetSlots(uuid.New())
 	assert.Equal(t, 1, len(numberOfSlots))
 
-	chatId, err := uuid.Parse(c.Id)
+	chatId, err := uuid.Parse(c.Id.String())
 	assert.Nil(t, err)
 	err = s.RemoveNodeFromChat(node.Slot, chatId)
 	assert.Nil(t, err)
 
 	// try to remove in existent node slot
-	chatId, err = uuid.Parse(c.Id)
-	assert.Nil(t, err)
 	err = s.RemoveNodeFromChat(node.Slot, chatId)
 	assert.NotNil(t, err)
 }
