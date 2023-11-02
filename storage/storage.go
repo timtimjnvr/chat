@@ -10,6 +10,7 @@ import (
 type (
 	Storage struct {
 		chats *list
+		nodes *list
 	}
 )
 
@@ -18,9 +19,17 @@ func NewStorage() *Storage {
 		chats: NewList(),
 	}
 }
+func (s *Storage) GetNodeFromChatBySlot(chatID uuid.UUID, slot uint8) (*crdt.NodeInfos, error) {
+	c, err := s.getChat(chatID.String(), true)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.GetNodeBySlot(slot)
+}
 
 func (s *Storage) GetChatName(id uuid.UUID) (string, error) {
-	c, err := s.GetChat(id.String(), false)
+	c, err := s.getChat(id.String(), false)
 	if err != nil {
 		return "", err
 	}
@@ -28,8 +37,12 @@ func (s *Storage) GetChatName(id uuid.UUID) (string, error) {
 	return c.Name, nil
 }
 
+func (s *Storage) Exist(chatID uuid.UUID) bool {
+	return s.chats.Contains(chatID)
+}
+
 func (s *Storage) GetChatID(chatName string) (uuid.UUID, error) {
-	c, err := s.GetChat(chatName, true)
+	c, err := s.getChat(chatName, true)
 	if err != nil {
 		return uuid.UUID{}, err
 	}
@@ -52,7 +65,7 @@ func (s *Storage) GetNewCurrentChatID() (uuid.UUID, error) {
 
 func (s *Storage) AddMessageToChat(message *crdt.Message, chatID uuid.UUID) error {
 
-	c, err := s.GetChat(chatID.String(), true)
+	c, err := s.getChat(chatID.String(), true)
 	if err != nil {
 		return err
 	}
@@ -80,7 +93,7 @@ func (s *Storage) RemoveChat(chatID uuid.UUID) {
 }
 
 func (s *Storage) AddNodeToChat(nodeInfos *crdt.NodeInfos, chatID uuid.UUID) error {
-	c, err := s.GetChat(chatID.String(), false)
+	c, err := s.getChat(chatID.String(), false)
 	if err != nil {
 		return err
 	}
@@ -116,7 +129,7 @@ func (s *Storage) IsSlotUsedByOtherChats(slotToFind uint8, myNodeID uuid.UUID, e
 }
 
 func (s *Storage) RemoveNodeFromChat(nodeSlot uint8, chatID uuid.UUID) error {
-	c, err := s.GetChat(chatID.String(), false)
+	c, err := s.getChat(chatID.String(), false)
 	if err != nil {
 		return err
 	}
@@ -182,7 +195,16 @@ func (s *Storage) RemoveNodeSlotFromStorage(slot uint8) {
 	}
 }
 
-func (s *Storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
+func (s *Storage) GetSlots(chatID uuid.UUID) ([]uint8, error) {
+	c, err := s.getChat(chatID.String(), false)
+	if err != nil {
+		return []uint8{}, err
+	}
+
+	return c.GetSlots(), nil
+}
+
+func (s *Storage) getChat(identifier string, byName bool) (*crdt.Chat, error) {
 	var (
 		numberOfChats = s.chats.Len()
 		c             *crdt.Chat
@@ -215,13 +237,4 @@ func (s *Storage) GetChat(identifier string, byName bool) (*crdt.Chat, error) {
 	}
 
 	return c, nil
-}
-
-func (s *Storage) GetSlots(chatID uuid.UUID) ([]uint8, error) {
-	c, err := s.GetChat(chatID.String(), false)
-	if err != nil {
-		return []uint8{}, err
-	}
-
-	return c.GetSlots(), nil
 }

@@ -16,7 +16,7 @@ func Test_storage_AddNewChat(t *testing.T) {
 	assert.Equal(t, 1, s.GetNumberOfChats())
 
 	// try to get by id
-	c, err := s.GetChat(id.String(), false)
+	c, err := s.getChat(id.String(), false)
 	assert.Nil(t, err)
 	assert.Equal(t, name, c.Name)
 
@@ -41,7 +41,7 @@ func Test_storage_AddChat(t *testing.T) {
 	assert.Equal(t, 1, s.GetNumberOfChats())
 
 	// try to get by idString
-	c, err := s.GetChat(idString, false)
+	c, err := s.getChat(idString, false)
 	assert.Nil(t, err)
 	assert.Equal(t, name, c.Name)
 
@@ -86,11 +86,11 @@ func Test_storage_getChat(t *testing.T) {
 	err := s.AddChat(chat)
 	assert.Nil(t, err)
 
-	gotFromStorage, err := s.GetChat(chat.Id.String(), false)
+	gotFromStorage, err := s.getChat(chat.Id.String(), false)
 	assert.Nil(t, err)
 	assert.Equal(t, chat, gotFromStorage)
 
-	gotFromStorage, err = s.GetChat(chat.Name, true)
+	gotFromStorage, err = s.getChat(chat.Name, true)
 	assert.Nil(t, err)
 	assert.Equal(t, chat, gotFromStorage)
 }
@@ -101,7 +101,7 @@ func Test_storage_AddNodeToChat(t *testing.T) {
 	id, err := s.AddNewChat(chatName)
 	assert.Nil(t, err)
 
-	c, err := s.GetChat(id.String(), false)
+	c, err := s.getChat(id.String(), false)
 	assert.Nil(t, err)
 
 	addr := "127.0.0.1"
@@ -139,7 +139,7 @@ func Test_storage_RemoveNodeFromChat(t *testing.T) {
 	id, err := s.AddNewChat(name)
 	assert.Nil(t, err)
 
-	c, err := s.GetChat(id.String(), false)
+	c, err := s.getChat(id.String(), false)
 	assert.Nil(t, err)
 
 	node := crdt.NewNodeInfos("127.0.0.1", "8080", "toto")
@@ -188,7 +188,7 @@ func TestStorage_RemoveNodeSlotFromStorage(t *testing.T) {
 
 	err = s.AddNodeToChat(secondNode, first)
 
-	c1, err := s.GetChat(first.String(), false)
+	c1, err := s.getChat(first.String(), false)
 	assert.Nil(t, err)
 
 	_, err = c1.GetNodeBySlot(uint8(1))
@@ -206,7 +206,7 @@ func TestStorage_RemoveNodeSlotFromStorage(t *testing.T) {
 	err = s.AddNodeToChat(secondNode, second)
 	assert.Nil(t, err)
 
-	c2, err := s.GetChat(second.String(), false)
+	c2, err := s.getChat(second.String(), false)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(c1.GetSlots()))
 	assert.Equal(t, 1, len(c2.GetSlots()))
