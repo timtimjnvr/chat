@@ -61,9 +61,9 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 	var (
 		idToDelete = uuid.New()
 		tests      = []struct {
-			name string
-			slot uint8
-			chat *Chat
+			name                  string
+			slot                  uint8
+			chat                  *Chat
 			expectedNumberOfNodes int
 		}{
 			{
@@ -161,7 +161,7 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.chat.RemoveNodeBySlot(tt.slot)
 			assert.True(t, !tt.chat.containsNode(idToDelete))
-			assert.Equal(t, tt.expectedNumberOfNodes,len(tt.chat.nodesInfos))
+			assert.Equal(t, tt.expectedNumberOfNodes, len(tt.chat.nodesInfos))
 		})
 	}
 }

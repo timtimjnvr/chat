@@ -18,7 +18,7 @@ type (
 		*sync.RWMutex
 		myInfos      *crdt.NodeInfos
 		currenChatID uuid.UUID
-		storage      storage.Storage
+		storage      *storage.Storage
 	}
 )
 
@@ -70,7 +70,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					continue
 				}
 
-				// don't care about error since we just added the given chat
+				// don't care about error since we just added the given c
 				_ = o.storage.AddNodeToChat(o.myInfos, id)
 				continue
 			}
@@ -98,7 +98,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				o.updateCurrentChat(id)
 
-				fmt.Printf("you joined a new chat : %s\n", newChatInfos.Name)
+				fmt.Printf("you joined a new c : %s\n", newChatInfos.Name)
 				continue
 			}
 
@@ -112,20 +112,18 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				continue
 			}
 
-			// there is no chat specified in operation in this case we need to remove node identified by slot from all chats
+			// there is no c specified in operation in this case we need to remove node identified by newNodeSlot from all chats
 			if op.Typology == crdt.RemoveNode {
 				o.storage.RemoveNodeSlotFromStorage(op.Slot)
 				continue
 			}
 
-			// for other operation we need to get a chat from storage
+			// for other operation we need to get a c from storage
 			c, err := o.storage.GetChat(op.TargetedChat, op.Typology == crdt.JoinChatByName)
 			if err != nil {
 				fmt.Printf(logErrFrmt, err)
 				continue
 			}
-
-			id := c.Id
 
 			switch op.Typology {
 			case crdt.JoinChatByName:
@@ -135,14 +133,42 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					continue
 				}
 
-				for syncOp := range o.getPropagationOperations(op, c) {
-					toSend <- syncOp
+				newNodeSlot := op.Slot
+
+				// create c
+				createChatOperation := crdt.NewOperation(crdt.AddChat, op.TargetedChat, c)
+				createChatOperation.Slot = newNodeSlot
+				toSend <- createChatOperation
+
+				// add me
+				addMeOperation := crdt.NewOperation(crdt.SaveNode, c.Id.String(), o.myInfos)
+				addMeOperation.Slot = newNodeSlot
+				toSend <- addMeOperation
+
+				// add other nodes
+				slots, _ := o.storage.GetSlots(c.Id)
+				for _, s := range slots {
+					nodeInfo, err := c.GetNodeBySlot(s)
+					if err != nil {
+						log.Println(err)
+					}
+					addNodeOperation := crdt.NewOperation(crdt.AddNode, c.Id.String(), nodeInfo)
+					addNodeOperation.Slot = newNodeSlot
+					toSend <- addNodeOperation
 				}
 
-				newNodeInfos.Slot = op.Slot
-				err = o.storage.AddNodeToChat(newNodeInfos, id)
+				// sending c history
+				addMessageOperations := c.GetMessageOperationsForPropagation()
+				for _, addMessageOperation := range addMessageOperations {
+					addMessageOperation.Slot = newNodeSlot
+					toSend <- addMessageOperation
+				}
 
-				fmt.Printf("%s joined chat\n", newNodeInfos.Name)
+				// add new node
+				newNodeInfos.Slot = op.Slot
+				err = o.storage.AddNodeToChat(newNodeInfos, c.Id)
+
+				fmt.Printf("%s joined c\n", newNodeInfos.Name)
 				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
 
 			// connection just established
@@ -155,7 +181,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				newNodeInfos.Slot = op.Slot
 				c.SaveNode(newNodeInfos)
-				o.storage.AddNodeToChat(newNodeInfos, id)
+				o.storage.AddNodeToChat(newNodeInfos, c.Id)
 
 				log.Println(fmt.Sprintf("connection established with %s", newNodeInfos.Name))
 
@@ -166,7 +192,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					break
 				}
 
-				err = o.storage.AddMessageToChat(newMessage, id)
+				err = o.storage.AddMessageToChat(newMessage, c.Id)
 				if err != nil {
 					fmt.Printf(logErrFrmt, err)
 					continue
@@ -174,22 +200,30 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				fmt.Printf("%s (%s): %s", newMessage.Sender, newMessage.Date, newMessage.Content)
 
-				for syncOp := range o.getPropagationOperations(op, c) {
-					toSend <- syncOp
+				slots, err := o.storage.GetSlots(c.Id)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+					continue
+				}
+
+				for _, s := range slots {
+					op.Slot = s
+					toSend <- op
 				}
 
 			case crdt.LeaveChat:
 				// Only one chat in storage
 				if o.storage.GetNumberOfChats() <= 1 {
-					fmt.Printf("[ERROR] You can't leave the current chat\n")
+					fmt.Printf("[ERROR] You can't leave the current c\n")
 					continue
 				}
 
-				var (
-					chatNodeSlots = c.GetSlots(o.myInfos.Id)
-					toDelete      = make(map[uint8]bool)
-				)
+				chatNodeSlots, err := o.storage.GetSlots(c.Id)
+				if err != nil {
+					fmt.Printf(logFrmt, err)
+				}
 
+				toDelete := make(map[uint8]bool)
 				for _, slot := range chatNodeSlots {
 					leaveOperation := crdt.NewOperation(crdt.RemoveNode, op.TargetedChat, nil)
 					leaveOperation.Slot = slot
@@ -202,7 +236,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				// Verify that slots are not used by any other chats
 				for s, _ := range toDelete {
-					if o.storage.IsUsedByOtherChats(s, o.myInfos.Id, id) {
+					if o.storage.IsSlotUsedByOtherChats(s, o.myInfos.Id, c.Id) {
 						toDelete[s] = false
 					}
 				}
@@ -216,13 +250,13 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					}
 				}
 
-				// Removing chat from storage and getting new current
-				fmt.Printf("Leaving chat %s\n", c.Name)
-				o.storage.RemoveChat(id)
-				newID, _ := o.storage.GetNewCurrent()
+				// Removing c from storage and getting new current
+				fmt.Printf("Leaving c %s\n", c.Name)
+				o.storage.RemoveChat(c.Id)
+				newID, _ := o.storage.GetNewCurrentChatID()
 				o.updateCurrentChat(newID)
-				newCurrent, _ := o.storage.GetChat(newID.String(), false)
-				fmt.Printf("Switched to chat %s\n", newCurrent.Name)
+				newCurrentName, _ := o.storage.GetChatName(newID)
+				fmt.Printf("Switched to c %s\n", newCurrentName)
 
 			case crdt.RemoveNode:
 				o.storage.RemoveNodeSlotFromStorage(op.Slot)
@@ -287,12 +321,12 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				case crdt.SwitchChat:
 					chatName := args[parsestdin.ChatRoomArg]
-					c, err := o.storage.GetChat(chatName, true)
+					id, err := o.storage.GetChatID(chatName)
 					if err != nil {
 						fmt.Printf(logErrFrmt, err)
 					}
 
-					o.updateCurrentChat(c.Id)
+					o.updateCurrentChat(id)
 
 					fmt.Printf(logFrmt, fmt.Sprintf("Switched to chat %s", chatName))
 
@@ -323,56 +357,6 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			}
 		}
 	}
-}
-
-func (o *Orchestrator) getPropagationOperations(op *crdt.Operation, chat *crdt.Chat) <-chan *crdt.Operation {
-	var syncOps = make(chan *crdt.Operation)
-
-	go func(syncOps chan *crdt.Operation) {
-		defer close(syncOps)
-
-		switch op.Typology {
-		case crdt.JoinChatByName:
-			slot := op.Slot
-			createChatOperation := crdt.NewOperation(crdt.AddChat, chat.Name, chat)
-			createChatOperation.Slot = slot
-			syncOps <- createChatOperation
-
-			// add me
-			addMeOperation := crdt.NewOperation(crdt.SaveNode, chat.Id.String(), o.myInfos)
-			addMeOperation.Slot = slot
-			syncOps <- addMeOperation
-
-			// add other nodes
-			slots := chat.GetSlots(o.myInfos.Id)
-			for _, s := range slots {
-				nodeInfo, err := chat.GetNodeBySlot(s)
-				if err != nil {
-					log.Println(err)
-				}
-				addNodeOperation := crdt.NewOperation(crdt.AddNode, chat.Id.String(), nodeInfo)
-				addNodeOperation.Slot = slot
-				syncOps <- addNodeOperation
-			}
-
-			// sending chat history
-			addMessageOperations := chat.GetMessageOperationsForPropagation()
-			for _, addMessageOperation := range addMessageOperations {
-				addMessageOperation.Slot = slot
-				syncOps <- addMessageOperation
-			}
-
-		case crdt.AddMessage:
-			slots := chat.GetSlots(o.myInfos.Id)
-			for _, s := range slots {
-				op.Slot = s
-				syncOps <- op
-			}
-		}
-
-	}(syncOps)
-
-	return syncOps
 }
 
 func sameAddress(addr1, addr2 string) bool {

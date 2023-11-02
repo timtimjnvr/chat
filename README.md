@@ -28,7 +28,7 @@ Decentralized P2P chat built in golang.
 - run `go run . -p=<port_number> -u=<your_nickname>` (default port_number 8080)
 - test : `go test ./... -race -timeout 30s -coverprofile cover.out`
 - open coverage in browser: `go tool cover -html=cover.out`
-- see tcp traffic on a port (debugging) : `sudo tcpdump -i lo0 port 8080`
+- see tcp traffic on a port (debugging) : `sudo tcpdump -i lo0 port <port>`
 
 ## Doc
 - Node management : [CRDTs choices](doc/crdt.md)

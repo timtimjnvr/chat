@@ -143,13 +143,21 @@ func (c *Chat) ToBytes() []byte {
 	return bytesChat
 }
 
-// GetSlots returns all the slots used by a given chat
-func (c *Chat) GetSlots(myId uuid.UUID) []uint8 {
-	slots := make([]uint8, 0, len(c.nodesInfos))
+// GetSlots returns all the slots identifying active TCP connections between nodes.
+func (c *Chat) GetSlots() []uint8 {
+	length := 0
+	if len(c.nodesInfos) > 0 {
+		length = len(c.nodesInfos) - 1
+	}
+
+	slots := make([]uint8, 0, length)
 	for _, i := range c.nodesInfos {
-		if i.Id != myId {
-			slots = append(slots, i.Slot)
+		// My own slot
+		if i.Slot == 0 {
+			continue
 		}
+
+		slots = append(slots, i.Slot)
 	}
 
 	return slots

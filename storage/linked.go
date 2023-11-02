@@ -28,7 +28,7 @@ type (
 	}
 )
 
-func NewList() List {
+func NewList() *list {
 	return &list{}
 }
 

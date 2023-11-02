@@ -14,15 +14,14 @@ func Test_storage_AddNewChat(t *testing.T) {
 	id, err := s.AddNewChat(name)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.GetNumberOfChats())
-	concreteStorage := s.(*storage)
 
 	// try to get by id
-	c, err := concreteStorage.GetChat(id.String(), false)
+	c, err := s.GetChat(id.String(), false)
 	assert.Nil(t, err)
 	assert.Equal(t, name, c.Name)
 
 	// try to get by index
-	c, err = concreteStorage.GetChatByIndex(0)
+	c, err = s.GetChatByIndex(0)
 	assert.Nil(t, err)
 	assert.Equal(t, name, c.Name)
 
@@ -40,15 +39,14 @@ func Test_storage_AddChat(t *testing.T) {
 	err := s.AddChat(chat)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, s.GetNumberOfChats())
-	concreteStorage := s.(*storage)
 
 	// try to get by idString
-	c, err := concreteStorage.GetChat(idString, false)
+	c, err := s.GetChat(idString, false)
 	assert.Nil(t, err)
 	assert.Equal(t, name, c.Name)
 
 	// try to get by index
-	c, err = concreteStorage.GetChatByIndex(0)
+	c, err = s.GetChatByIndex(0)
 	assert.Nil(t, err)
 	assert.Equal(t, name, c.Name)
 
@@ -84,15 +82,15 @@ func Test_storage_RemoveChat(t *testing.T) {
 func Test_storage_getChat(t *testing.T) {
 	chat := crdt.NewChat("chat name")
 	s := NewStorage()
-	concreteStorage := s.(*storage)
+
 	err := s.AddChat(chat)
 	assert.Nil(t, err)
 
-	gotFromStorage, err := concreteStorage.GetChat(chat.Id.String(), false)
+	gotFromStorage, err := s.GetChat(chat.Id.String(), false)
 	assert.Nil(t, err)
 	assert.Equal(t, chat, gotFromStorage)
 
-	gotFromStorage, err = concreteStorage.GetChat(chat.Name, true)
+	gotFromStorage, err = s.GetChat(chat.Name, true)
 	assert.Nil(t, err)
 	assert.Equal(t, chat, gotFromStorage)
 }
@@ -103,8 +101,7 @@ func Test_storage_AddNodeToChat(t *testing.T) {
 	id, err := s.AddNewChat(chatName)
 	assert.Nil(t, err)
 
-	concreteStorage := s.(*storage)
-	c, err := concreteStorage.GetChat(id.String(), false)
+	c, err := s.GetChat(id.String(), false)
 	assert.Nil(t, err)
 
 	addr := "127.0.0.1"
@@ -114,13 +111,13 @@ func Test_storage_AddNodeToChat(t *testing.T) {
 	node := crdt.NewNodeInfos(addr, port, nodeName)
 	node.Slot = slot
 
-	numberOfSlots := c.GetSlots(uuid.New())
+	numberOfSlots := c.GetSlots()
 	assert.Equal(t, 0, len(numberOfSlots))
 	err = s.AddNodeToChat(node, id)
 	assert.Nil(t, err)
 
 	assert.Nil(t, err)
-	numberOfSlots = c.GetSlots(uuid.New())
+	numberOfSlots = c.GetSlots()
 	assert.Equal(t, 1, len(numberOfSlots))
 
 	// Verify node
@@ -142,15 +139,16 @@ func Test_storage_RemoveNodeFromChat(t *testing.T) {
 	id, err := s.AddNewChat(name)
 	assert.Nil(t, err)
 
-	concreteStorage := s.(*storage)
-	c, err := concreteStorage.GetChat(id.String(), false)
+	c, err := s.GetChat(id.String(), false)
 	assert.Nil(t, err)
 
 	node := crdt.NewNodeInfos("127.0.0.1", "8080", "toto")
+	// Setting slot to identify active TCP connection
+	node.Slot = 1
 	err = s.AddNodeToChat(node, id)
 	assert.Nil(t, err)
 
-	numberOfSlots := c.GetSlots(uuid.New())
+	numberOfSlots := c.GetSlots()
 	assert.Equal(t, 1, len(numberOfSlots))
 
 	chatId, err := uuid.Parse(c.Id.String())
@@ -190,8 +188,7 @@ func TestStorage_RemoveNodeSlotFromStorage(t *testing.T) {
 
 	err = s.AddNodeToChat(secondNode, first)
 
-	concreteStorage := s.(*storage)
-	c1, err := concreteStorage.GetChat(first.String(), false)
+	c1, err := s.GetChat(first.String(), false)
 	assert.Nil(t, err)
 
 	_, err = c1.GetNodeBySlot(uint8(1))
@@ -209,12 +206,12 @@ func TestStorage_RemoveNodeSlotFromStorage(t *testing.T) {
 	err = s.AddNodeToChat(secondNode, second)
 	assert.Nil(t, err)
 
-	c2, err := concreteStorage.GetChat(second.String(), false)
+	c2, err := s.GetChat(second.String(), false)
 	assert.Nil(t, err)
-	assert.Equal(t, 2, len(c1.GetSlots(uuid.New())))
-	assert.Equal(t, 1, len(c2.GetSlots(uuid.New())))
+	assert.Equal(t, 2, len(c1.GetSlots()))
+	assert.Equal(t, 1, len(c2.GetSlots()))
 
 	s.RemoveNodeSlotFromStorage(2)
-	assert.Equal(t, 1, len(c1.GetSlots(uuid.New())))
-	assert.Equal(t, 0, len(c2.GetSlots(uuid.New())))
+	assert.Equal(t, 1, len(c1.GetSlots()))
+	assert.Equal(t, 0, len(c2.GetSlots()))
 }
