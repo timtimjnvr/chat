@@ -16,7 +16,8 @@ func TestEncodeDecodeOperation(t *testing.T) {
 	)
 
 	var (
-		tests = []struct {
+		idString, _ = uuid.Parse("9b83358e-a570-4a1b-8842-6800ee770f2a")
+		tests       = []struct {
 			op          *Operation
 			expectedErr error
 		}{
@@ -26,7 +27,7 @@ func TestEncodeDecodeOperation(t *testing.T) {
 					Typology:     AddChat,
 					TargetedChat: "my-awesome-chat",
 					Data: &Chat{
-						Id:   "9b83358e-a570-4a1b-8842-6800ee770f2a",
+						Id:   id,
 						Name: "james",
 					},
 				},
@@ -66,7 +67,7 @@ func TestEncodeDecodeOperation(t *testing.T) {
 					Typology:     AddMessage,
 					TargetedChat: uuidString,
 					Data: &Message{
-						Id:      id,
+						Id:      idString,
 						Sender:  "James",
 						Date:    time.Now().Format(time.RFC3339),
 						Content: "Hello my Dear friend",

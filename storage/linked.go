@@ -8,9 +8,11 @@ import (
 )
 
 var (
-	InvalidChatErr       = errors.New("invalid chat")
-	NotFoundErr          = errors.New("not found")
-	InvalidIdentifierErr = errors.New("invalid identifier")
+	AlreadyInListWithNameErr = errors.New("already a chat with this name in the list")
+	AlreadyInListWithIDErr   = errors.New("already a chat with this ID in the list")
+	InvalidChatErr           = errors.New("invalid chat")
+	NotFoundErr              = errors.New("not found")
+	InvalidIdentifierErr     = errors.New("invalid identifier")
 )
 
 type (
@@ -26,7 +28,7 @@ type (
 	}
 )
 
-func NewList() List {
+func NewList() *list {
 	return &list{}
 }
 
@@ -50,14 +52,18 @@ func (l *list) Display() {
 }
 
 // Add insert chat at the end of the list and return the key of the inserted chat
-func (l *list) Add(chat *crdt.Chat) uuid.UUID {
+func (l *list) Add(chat *crdt.Chat) (uuid.UUID, error) {
 	e := newElement(chat)
+	id, err := uuid.Parse(chat.Id.String())
+	if err != nil {
+		return uuid.UUID{}, InvalidIdentifierErr
+	}
+
 	if l.length == 0 {
 		l.head = e
 		l.tail = e
 		l.length++
-		id, _ := uuid.Parse(l.tail.chat.Id)
-		return id
+		return id, nil
 	}
 
 	var (
@@ -66,6 +72,14 @@ func (l *list) Add(chat *crdt.Chat) uuid.UUID {
 	)
 
 	for i := 0; i < length; i++ {
+		if ptr.chat.Name == chat.Name {
+			return uuid.UUID{}, AlreadyInListWithNameErr
+		}
+
+		if ptr.chat.Id == chat.Id {
+			return uuid.UUID{}, AlreadyInListWithIDErr
+		}
+
 		if ptr.next == nil {
 			ptr.next = e
 			l.tail = e
@@ -75,8 +89,7 @@ func (l *list) Add(chat *crdt.Chat) uuid.UUID {
 		ptr = ptr.next
 	}
 
-	id, _ := uuid.Parse(l.tail.chat.Id)
-	return id
+	return id, nil
 }
 
 func (l *list) Contains(id uuid.UUID) bool {
@@ -85,11 +98,11 @@ func (l *list) Contains(id uuid.UUID) bool {
 	}
 
 	tmp := l.head
-	for tmp.next != nil && tmp.chat.Id != id.String() {
+	for tmp.next != nil && tmp.chat.Id != id {
 		tmp = tmp.next
 	}
 
-	if tmp.chat.Id == id.String() {
+	if tmp.chat.Id == id {
 		return true
 	}
 
@@ -101,7 +114,7 @@ func (l *list) Update(chat *crdt.Chat) error {
 		return InvalidChatErr
 	}
 
-	id, err := uuid.Parse(chat.Id)
+	id, err := uuid.Parse(chat.Id.String())
 	if err != nil {
 		return InvalidIdentifierErr
 	}
@@ -111,11 +124,11 @@ func (l *list) Update(chat *crdt.Chat) error {
 	}
 
 	tmp := l.head
-	for tmp.next != nil && tmp.chat.Id != id.String() {
+	for tmp.next != nil && tmp.chat.Id != id {
 		tmp = tmp.next
 	}
 
-	if tmp.chat.Id == id.String() {
+	if tmp.chat.Id == id {
 		tmp.chat = chat
 		return nil
 	}
@@ -145,11 +158,11 @@ func (l *list) GetById(id uuid.UUID) (*crdt.Chat, error) {
 	}
 
 	first := l.head
-	for first.next != nil && first.chat.Id != id.String() {
+	for first.next != nil && first.chat.Id != id {
 		first = first.next
 	}
 
-	if first.chat.Id == id.String() {
+	if first.chat.Id == id {
 		return first.chat, nil
 	}
 
@@ -164,7 +177,7 @@ func (l *list) Delete(id uuid.UUID) {
 	var previous, tmp *element
 
 	// remove first element
-	if l.head.chat.Id == id.String() {
+	if l.head.chat.Id == id {
 		l.head = l.head.next
 		l.length--
 		return
@@ -173,13 +186,13 @@ func (l *list) Delete(id uuid.UUID) {
 	// iterate until element found or end of list
 	previous = l.head
 	tmp = l.head.next
-	for tmp != nil && tmp.next != nil && tmp.chat.Id != id.String() {
+	for tmp != nil && tmp.next != nil && tmp.chat.Id != id {
 		previous = tmp
 		tmp = tmp.next
 	}
 
 	// element found or end of list
-	if tmp != nil && tmp.chat.Id == id.String() {
+	if tmp != nil && tmp.chat.Id == id {
 		previous.next = tmp.next
 		l.length--
 	}

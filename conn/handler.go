@@ -10,6 +10,8 @@ import (
 )
 
 type (
+	// slot identifies a TCP connection in one node referential (it get its values between 0 and 255).
+	// Any slot between 1 and 255 identifies an active TCP connection in the node handler.
 	slot uint8
 
 	node struct {
@@ -153,12 +155,13 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			d.nodes[s] = n
 
 		case s := <-done:
-			quitOperation := crdt.NewOperation(crdt.Quit, "", nil)
+			quitOperation := crdt.NewOperation(crdt.RemoveNode, "", nil)
 			quitOperation.Slot = uint8(s)
 			toExecute <- quitOperation
 			d.nodes[s] = nil
 
 		case operation := <-toSend:
+			// Set slot
 			s := slot(operation.Slot)
 			if n, exist := d.nodes[s]; exist {
 				n.Input <- operation.ToBytes()

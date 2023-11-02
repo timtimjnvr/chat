@@ -10,8 +10,8 @@ import (
 
 type (
 	Chat struct {
-		Id         string `json:"id"`
-		Name       string `json:"name"`
+		Id         uuid.UUID `json:"id"`
+		Name       string    `json:"name"`
 		nodesInfos []*NodeInfos
 		messages   []*Message // ordered by date : 0 being the oldest message, 1 coming after 0 etc ...
 	}
@@ -23,7 +23,7 @@ const maxNumberOfMessages, maxNumberOfNodes = 100, 100
 
 func NewChat(name string) *Chat {
 	return &Chat{
-		Id:         uuid.New().String(),
+		Id:         uuid.New(),
 		Name:       name,
 		nodesInfos: make([]*NodeInfos, 0, maxNumberOfNodes),
 		messages:   make([]*Message, 0, maxNumberOfMessages),
@@ -143,13 +143,21 @@ func (c *Chat) ToBytes() []byte {
 	return bytesChat
 }
 
-// GetSlots returns all the slots used by a given chat
-func (c *Chat) GetSlots(myId uuid.UUID) []uint8 {
-	slots := make([]uint8, 0, len(c.nodesInfos))
+// GetSlots returns all the slots identifying active TCP connections between nodes.
+func (c *Chat) GetSlots() []uint8 {
+	length := 0
+	if len(c.nodesInfos) > 0 {
+		length = len(c.nodesInfos) - 1
+	}
+
+	slots := make([]uint8, 0, length)
 	for _, i := range c.nodesInfos {
-		if i.Id != myId {
-			slots = append(slots, i.Slot)
+		// My own slot
+		if i.Slot == 0 {
+			continue
 		}
+
+		slots = append(slots, i.Slot)
 	}
 
 	return slots
@@ -184,7 +192,7 @@ func (c *Chat) ContainsMessage(message *Message) bool {
 func (c *Chat) GetMessageOperationsForPropagation() []*Operation {
 	addMessageOperations := make([]*Operation, 0, 0)
 	for _, m := range c.messages {
-		addMessageOperations = append(addMessageOperations, NewOperation(AddMessage, c.Id, m))
+		addMessageOperations = append(addMessageOperations, NewOperation(AddMessage, c.Id.String(), m))
 	}
 	return addMessageOperations
 }

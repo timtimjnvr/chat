@@ -18,10 +18,28 @@ func TestList_Len(t *testing.T) {
 func TestList_Add(t *testing.T) {
 	ass := assert.New(t)
 	l := NewList()
-	l.Add(crdt.NewChat("1"))
-	l.Add(crdt.NewChat("2"))
-	l.Add(crdt.NewChat("3"))
 
+	id, err := l.Add(crdt.NewChat("1"))
+	assert.Nil(t, err)
+
+	// adding chat with name already in list
+	existingChat := crdt.NewChat("1")
+	_, err = l.Add(existingChat)
+	assert.True(t, errors.Is(err, AlreadyInListWithNameErr))
+
+	// adding chat with id already in list
+	existingChat = crdt.NewChat("toto")
+	existingChat.Id = id
+	_, err = l.Add(existingChat)
+	assert.True(t, errors.Is(err, AlreadyInListWithIDErr))
+
+	// adding more elements
+	_, err = l.Add(crdt.NewChat("2"))
+	assert.Nil(t, err)
+	_, err = l.Add(crdt.NewChat("3"))
+	assert.Nil(t, err)
+
+	// checking list length
 	ass.Equal(3, l.Len(), "failed on Adding elements")
 }
 
@@ -32,9 +50,9 @@ func TestList_Contains(t *testing.T) {
 	contains := l.Contains(inExistingID)
 	assert.False(t, contains)
 
-	id1 := l.Add(crdt.NewChat("1"))
-	id2 := l.Add(crdt.NewChat("2"))
-	id3 := l.Add(crdt.NewChat("3"))
+	id1, _ := l.Add(crdt.NewChat("1"))
+	id2, _ := l.Add(crdt.NewChat("2"))
+	id3, _ := l.Add(crdt.NewChat("3"))
 
 	errMessage := "failed on finding element"
 	assert.True(t, l.Contains(id1), errMessage)
@@ -52,20 +70,14 @@ func TestList_Update(t *testing.T) {
 	assert.True(t, errors.Is(err, NotFoundErr))
 
 	c := crdt.NewChat("1")
-	id1String := c.Id
+	id1String := c.Id.String()
 	l.Add(c)
 
 	// Try to update with invalid chat
 	err = l.Update(nil)
 	assert.True(t, errors.Is(err, InvalidChatErr))
 
-	// Try to update with chat with invalid identifier
-	c2 := crdt.NewChat("invalid")
-	c2.Id = "toto"
-	err = l.Update(c2)
-	assert.True(t, errors.Is(err, InvalidIdentifierErr))
-
-	err = l.Update(&crdt.Chat{Id: id1String, Name: "3"})
+	err = l.Update(&crdt.Chat{Id: c.Id, Name: "3"})
 	// no error
 	assert.Nil(t, err)
 
@@ -73,16 +85,16 @@ func TestList_Update(t *testing.T) {
 	assert.Nil(t, err)
 	c, err = l.GetById(id1)
 	assert.Nil(t, err)
-	assert.Equal(t, &crdt.Chat{Id: id1String, Name: "3"}, c, "failed to update chat")
+	assert.Equal(t, &crdt.Chat{Id: id1, Name: "3"}, c, "failed to update chat")
 }
 
 func TestList_Delete(t *testing.T) {
 	var (
-		ass    = assert.New(t)
-		l      = NewList()
-		first  = l.Add(crdt.NewChat("1"))
-		second = l.Add(crdt.NewChat("2"))
-		third  = l.Add(crdt.NewChat("3"))
+		ass       = assert.New(t)
+		l         = NewList()
+		first, _  = l.Add(crdt.NewChat("1"))
+		second, _ = l.Add(crdt.NewChat("2"))
+		third, _  = l.Add(crdt.NewChat("3"))
 	)
 	// 1 -> 2 -> 3 becomes 2 -> 3
 	l.Delete(first)
@@ -93,7 +105,7 @@ func TestList_Delete(t *testing.T) {
 	if err != nil {
 		ass.Fail("failed to get element after deleting first")
 	}
-	ass.Equal(c.Id, second.String())
+	ass.Equal(c.Id, second)
 
 	// Verify new second = 3
 	c, err = l.GetByIndex(1)
@@ -101,7 +113,7 @@ func TestList_Delete(t *testing.T) {
 		ass.Fail("failed to get element after deleting first")
 	}
 
-	ass.Equal(c.Id, third.String())
+	ass.Equal(c.Id, third)
 
 	// 2 -> 3 becomes 2
 	l.Delete(third)
@@ -113,14 +125,14 @@ func TestList_Delete(t *testing.T) {
 		ass.Fail("failed to get element after deleting first")
 	}
 
-	ass.Equal(c.Id, second.String())
+	ass.Equal(c.Id, second)
 
 	l.Delete(second)
 	ass.Equal(l.Len(), 0, "failed on Deleting remaining element")
 
-	first = l.Add(crdt.NewChat("1"))
-	second = l.Add(crdt.NewChat("2"))
-	third = l.Add(crdt.NewChat("3"))
+	first, _ = l.Add(crdt.NewChat("1"))
+	second, _ = l.Add(crdt.NewChat("2"))
+	third, _ = l.Add(crdt.NewChat("3"))
 
 	// 1 -> 2 -> 3 becomes 1 -> 3
 	l.Delete(second)
@@ -131,7 +143,7 @@ func TestList_Delete(t *testing.T) {
 	if err != nil {
 		ass.Fail("failed to get element after deleting first")
 	}
-	ass.Equal(c.Id, first.String())
+	ass.Equal(c.Id, first)
 
 	// Verify new second = 3
 	c, err = l.GetByIndex(1)
@@ -139,7 +151,7 @@ func TestList_Delete(t *testing.T) {
 		ass.Fail("failed to get element after deleting first")
 	}
 
-	ass.Equal(c.Id, third.String())
+	ass.Equal(c.Id, third)
 
 	// Try to delete in existing element (2) and validate that nothing has changed
 	l.Delete(second)
@@ -149,7 +161,7 @@ func TestList_Delete(t *testing.T) {
 	if err != nil {
 		ass.Fail("failed to get element after deleting first")
 	}
-	ass.Equal(c.Id, first.String())
+	ass.Equal(c.Id, first)
 
 	// Verify second has not changed = 3
 	c, err = l.GetByIndex(1)
@@ -157,7 +169,7 @@ func TestList_Delete(t *testing.T) {
 		ass.Fail("failed to get element after deleting first")
 	}
 
-	ass.Equal(c.Id, third.String())
+	ass.Equal(c.Id, third)
 
 	// try to delete an element in an empty list
 	l = NewList()
@@ -173,7 +185,7 @@ func TestList_GetById(t *testing.T) {
 	)
 
 	for _, value := range values {
-		valuesIds[value] = l.Add(crdt.NewChat(fmt.Sprintf("%d", value)))
+		valuesIds[value], _ = l.Add(crdt.NewChat(fmt.Sprintf("%d", value)))
 	}
 
 	for value, id := range valuesIds {
@@ -183,7 +195,7 @@ func TestList_GetById(t *testing.T) {
 			return
 		}
 		var expectedChat = crdt.NewChat(fmt.Sprintf("%d", value))
-		expectedChat.Id = id.String()
+		expectedChat.Id = id
 
 		ass.Equal(res, expectedChat, "failed on getting element by id, wrong chat")
 	}
