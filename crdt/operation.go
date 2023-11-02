@@ -126,6 +126,7 @@ func DecodeOperation(bytes []byte) (*Operation, error) {
 
 	return op, nil
 }
+
 func decodeData(bytes []byte, result any) error {
 	err := json.Unmarshal(bytes, &result)
 	if err != nil {

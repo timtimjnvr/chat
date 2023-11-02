@@ -9,8 +9,8 @@ import (
 
 type (
 	Storage struct {
-		chats *list
-		nodes *list
+		chats *listOld
+		nodes *listOld
 	}
 )
 

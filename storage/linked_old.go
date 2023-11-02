@@ -3,52 +3,49 @@ package storage
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github/timtimjnvr/chat/crdt"
 )
 
+var (
+	AlreadyInListWithNameErr = errors.New("already a chat with this name in the listOld")
+	AlreadyInListWithIDErr   = errors.New("already a chat with this ID in the listOld")
+	InvalidChatErr           = errors.New("invalid chat")
+	NotFoundErr              = errors.New("not found")
+	InvalidIdentifierErr     = errors.New("invalid identifier")
+)
+
 type (
-	value interface {
-		*crdt.Chat | *crdt.NodeInfos
+	elementOld struct {
+		chat *crdt.Chat
+		next *elementOld
 	}
 
-	element[T value] struct {
-		v    T
-		next *element[T]
-	}
-
-	list[T value] struct {
-		typeName string
-		length   int
-		head     *element[T]
-		tail     *element[T]
+	listOld struct {
+		length int
+		head   *elementOld
+		tail   *elementOld
 	}
 )
 
-func NewChatList() *list[*crdt.Chat] {
-	return &list[*crdt.Chat]{
-		typeName: "chats",
-	}
+func NewList() *listOld {
+	return &listOld{}
 }
 
-func NewNodeList() *list[*crdt.NodeInfos] {
-	return &list[*crdt.NodeInfos]{
-		typeName: "nodes",
+/*
+func newElement(chat *crdt.Chat) *elementOld {
+	return &elementOld{
+		chat: chat,
 	}
 }
+*/
 
-func newElement[T value](v T) *element[T] {
-	return &element[T]{
-		v:    v,
-		next: nil,
-	}
-}
-
-func (l *list[T]) Len() int {
+func (l *listOld) Len() int {
 	return l.length
 }
 
-func (l *list[T]) Display() {
-	fmt.Printf("%d %s\n", l.length, l.typeName)
+func (l *listOld) Display() {
+	fmt.Printf("%d chats\n", l.length)
 
 	tmp := l.head
 	for tmp != nil {
