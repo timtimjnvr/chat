@@ -45,9 +45,20 @@ func NewOperation(typology OperationType, targetedChat string, data Data) *Opera
 	}
 }
 
+// Slot :
+// identifies the TCP connection slot
+//
+// TargetedChat :
+// uuid of the chat, name in case of JoinChatByName operation
+//
+// Typology :
+// Typology of the operation
+//
+// Data :
+// bytes that can be deserialized into a Chat or NodeInfo according to operation typology
 // *------*-------------------*--------------*----------*---------*------*
 // | Slot | lenTargetedChat   | TargetedChat | Typology | lenData | Data |
-// *------*-------*------------*--------------*----------*---------*-----*
+// *------*-------*------------*--------------*----------*---------*----*
 //							 lenTargetedChat				  	  lenData
 //	 1 byte	 	1 byte	  	 	bytes		  1 byte	 1 byte	   bytes
 
@@ -115,6 +126,7 @@ func DecodeOperation(bytes []byte) (*Operation, error) {
 
 	return op, nil
 }
+
 func decodeData(bytes []byte, result any) error {
 	err := json.Unmarshal(bytes, &result)
 	if err != nil {

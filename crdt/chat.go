@@ -30,6 +30,14 @@ func NewChat(name string) *Chat {
 	}
 }
 
+func (c *Chat) GetID() uuid.UUID {
+	return c.Id
+}
+
+func (c *Chat) GetName() string {
+	return c.Name
+}
+
 func (c *Chat) SaveNode(nodeInfo *NodeInfos) {
 	// update if found
 	for i, n := range c.nodesInfos {
@@ -187,14 +195,6 @@ func (c *Chat) ContainsMessage(message *Message) bool {
 		}
 	}
 	return false
-}
-
-func (c *Chat) GetMessageOperationsForPropagation() []*Operation {
-	addMessageOperations := make([]*Operation, 0, 0)
-	for _, m := range c.messages {
-		addMessageOperations = append(addMessageOperations, NewOperation(AddMessage, c.Id.String(), m))
-	}
-	return addMessageOperations
 }
 
 func (c *Chat) containsNode(id uuid.UUID) bool {

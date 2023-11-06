@@ -1,60 +1,81 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github/timtimjnvr/chat/crdt"
 )
 
+type (
+	value interface {
+		GetID() uuid.UUID
+		GetName() string
+
+		*crdt.Chat | *crdt.NodeInfos
+	}
+
+	element[T value] struct {
+		v    T
+		next *element[T]
+	}
+
+	list[T value] struct {
+		typeName string
+		length   int
+		head     *element[T]
+		tail     *element[T]
+	}
+)
+
 var (
-	AlreadyInListWithNameErr = errors.New("already a chat with this name in the list")
-	AlreadyInListWithIDErr   = errors.New("already a chat with this ID in the list")
+	AlreadyInListWithNameErr = errors.New("already a chat with this name in the listOld")
+	AlreadyInListWithIDErr   = errors.New("already a chat with this ID in the listOld")
 	InvalidChatErr           = errors.New("invalid chat")
 	NotFoundErr              = errors.New("not found")
 	InvalidIdentifierErr     = errors.New("invalid identifier")
 )
 
-type (
-	element struct {
-		chat *crdt.Chat
-		next *element
-	}
-
-	list struct {
-		length int
-		head   *element
-		tail   *element
-	}
-)
-
-func NewList() *list {
-	return &list{}
-}
-
-func newElement(chat *crdt.Chat) *element {
-	return &element{
-		chat: chat,
+func NewChatList() *list[*crdt.Chat] {
+	return &list[*crdt.Chat]{
+		typeName: "chats",
 	}
 }
-func (l *list) Len() int {
+
+func NewNodeList() *list[*crdt.NodeInfos] {
+	return &list[*crdt.NodeInfos]{
+		typeName: "nodes",
+	}
+}
+
+func newElement[T value](v T) *element[T] {
+	return &element[T]{
+		v:    v,
+		next: nil,
+	}
+}
+
+func (l *list[T]) Len() int {
 	return l.length
 }
 
-func (l *list) Display() {
-	fmt.Printf("%d chats\n", l.length)
+func (l *list[T]) Display() {
+	fmt.Printf("%d %s\n", l.length, l.typeName)
 
 	tmp := l.head
 	for tmp != nil {
-		fmt.Printf("- %s\n", tmp.chat.Name)
+		fmt.Printf("- %s\n", tmp.v.GetName())
+
 		tmp = tmp.next
 	}
 }
 
-// Add insert chat at the end of the list and return the key of the inserted chat
-func (l *list) Add(chat *crdt.Chat) (uuid.UUID, error) {
-	e := newElement(chat)
-	id, err := uuid.Parse(chat.Id.String())
+// Add insert chat at the end of the listOld and return the key of the inserted chat
+func (l *list[T]) Add(v T) (uuid.UUID, error) {
+	e := newElement(v)
+
+	id, err := uuid.Parse(v.GetID().String())
+
 	if err != nil {
 		return uuid.UUID{}, InvalidIdentifierErr
 	}
@@ -72,12 +93,12 @@ func (l *list) Add(chat *crdt.Chat) (uuid.UUID, error) {
 	)
 
 	for i := 0; i < length; i++ {
-		if ptr.chat.Name == chat.Name {
-			return uuid.UUID{}, AlreadyInListWithNameErr
+		if ptr.v.GetID() == v.GetID() {
+			return uuid.UUID{}, AlreadyInListWithIDErr
 		}
 
-		if ptr.chat.Id == chat.Id {
-			return uuid.UUID{}, AlreadyInListWithIDErr
+		if ptr.v.GetName() == v.GetName() {
+			return uuid.UUID{}, AlreadyInListWithNameErr
 		}
 
 		if ptr.next == nil {
@@ -92,29 +113,29 @@ func (l *list) Add(chat *crdt.Chat) (uuid.UUID, error) {
 	return id, nil
 }
 
-func (l *list) Contains(id uuid.UUID) bool {
+func (l *list[T]) Contains(id uuid.UUID) bool {
 	if l.length == 0 {
 		return false
 	}
 
 	tmp := l.head
-	for tmp.next != nil && tmp.chat.Id != id {
+	for tmp.next != nil && tmp.v.GetID() != id {
 		tmp = tmp.next
 	}
 
-	if tmp.chat.Id == id {
+	if tmp.v.GetID() == id {
 		return true
 	}
 
 	return false
 }
 
-func (l *list) Update(chat *crdt.Chat) error {
-	if chat == nil {
+func (l *list[T]) Update(v T) error {
+	if v == nil {
 		return InvalidChatErr
 	}
 
-	id, err := uuid.Parse(chat.Id.String())
+	id, err := uuid.Parse(v.GetID().String())
 	if err != nil {
 		return InvalidIdentifierErr
 	}
@@ -124,19 +145,19 @@ func (l *list) Update(chat *crdt.Chat) error {
 	}
 
 	tmp := l.head
-	for tmp.next != nil && tmp.chat.Id != id {
+	for tmp.next != nil && tmp.v.GetID() != id {
 		tmp = tmp.next
 	}
 
-	if tmp.chat.Id == id {
-		tmp.chat = chat
+	if tmp.v.GetID() == id {
+		tmp.v = v
 		return nil
 	}
 
 	return NotFoundErr
 }
 
-func (l *list) GetByIndex(index int) (*crdt.Chat, error) {
+func (l *list[T]) GetByIndex(index int) (T, error) {
 	if index >= l.Len() {
 		return nil, NotFoundErr
 	}
@@ -149,50 +170,50 @@ func (l *list) GetByIndex(index int) (*crdt.Chat, error) {
 		i++
 	}
 
-	return tmp.chat, nil
+	return tmp.v, nil
 }
 
-func (l *list) GetById(id uuid.UUID) (*crdt.Chat, error) {
+func (l *list[T]) GetById(id uuid.UUID) (T, error) {
 	if l.length == 0 {
 		return nil, NotFoundErr
 	}
 
-	first := l.head
-	for first.next != nil && first.chat.Id != id {
-		first = first.next
+	tmp := l.head
+	for tmp.next != nil && tmp.v.GetID() != id {
+		tmp = tmp.next
 	}
 
-	if first.chat.Id == id {
-		return first.chat, nil
+	if tmp.v.GetID() == id {
+		return tmp.v, nil
 	}
 
 	return nil, NotFoundErr
 }
 
-func (l *list) Delete(id uuid.UUID) {
+func (l *list[T]) Delete(id uuid.UUID) {
 	if l.length == 0 {
 		return
 	}
 
-	var previous, tmp *element
+	var previous, tmp *element[T]
 
-	// remove first element
-	if l.head.chat.Id == id {
+	// remove first elementOld
+	if l.head.v.GetID() == id {
 		l.head = l.head.next
 		l.length--
 		return
 	}
 
-	// iterate until element found or end of list
+	// iterate until elementOld found or end of listOld
 	previous = l.head
 	tmp = l.head.next
-	for tmp != nil && tmp.next != nil && tmp.chat.Id != id {
+	for tmp != nil && tmp.next != nil && tmp.v.GetID() != id {
 		previous = tmp
 		tmp = tmp.next
 	}
 
-	// element found or end of list
-	if tmp != nil && tmp.chat.Id == id {
+	// elementOld found or end of listOld
+	if tmp != nil && tmp.v.GetID() == id {
 		previous.next = tmp.next
 		l.length--
 	}

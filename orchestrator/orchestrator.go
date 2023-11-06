@@ -112,16 +112,22 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				continue
 			}
 
-			// there is no c specified in operation in this case we need to remove node identified by newNodeSlot from all chats
+			// there is no chat specified in operation in this case we need to remove node identified by newNodeSlot from all chats
 			if op.Typology == crdt.RemoveNode {
 				o.storage.RemoveNodeSlotFromStorage(op.Slot)
 				continue
 			}
 
-			// for other operation we need to get a c from storage
-			c, err := o.storage.GetChat(op.TargetedChat, op.Typology == crdt.JoinChatByName)
+			// for other operation we need to get a chat from storage
+			chatID, err := uuid.Parse(op.TargetedChat)
 			if err != nil {
 				fmt.Printf(logErrFrmt, err)
+				continue
+			}
+
+			exists := o.storage.Exist(chatID)
+			if !exists {
+				fmt.Printf(logErrFrmt, "unknown chat")
 				continue
 			}
 
@@ -135,38 +141,32 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				newNodeSlot := op.Slot
 
-				// create c
-				createChatOperation := crdt.NewOperation(crdt.AddChat, op.TargetedChat, c)
+				// create chat
+				createChatOperation := crdt.NewOperation(crdt.AddChat, op.TargetedChat, &crdt.Chat{Id: chatID, Name: op.TargetedChat})
 				createChatOperation.Slot = newNodeSlot
 				toSend <- createChatOperation
 
 				// add me
-				addMeOperation := crdt.NewOperation(crdt.SaveNode, c.Id.String(), o.myInfos)
+				addMeOperation := crdt.NewOperation(crdt.SaveNode, chatID.String(), o.myInfos)
 				addMeOperation.Slot = newNodeSlot
 				toSend <- addMeOperation
 
 				// add other nodes
-				slots, _ := o.storage.GetSlots(c.Id)
+				slots, _ := o.storage.GetSlots(chatID)
 				for _, s := range slots {
-					nodeInfo, err := c.GetNodeBySlot(s)
+					nodeInfo, err := o.storage.GetNodeFromChatBySlot(chatID, s)
 					if err != nil {
-						log.Println(err)
+						fmt.Printf(logErrFrmt, err)
 					}
-					addNodeOperation := crdt.NewOperation(crdt.AddNode, c.Id.String(), nodeInfo)
+
+					addNodeOperation := crdt.NewOperation(crdt.AddNode, chatID.String(), nodeInfo)
 					addNodeOperation.Slot = newNodeSlot
 					toSend <- addNodeOperation
 				}
 
-				// sending c history
-				addMessageOperations := c.GetMessageOperationsForPropagation()
-				for _, addMessageOperation := range addMessageOperations {
-					addMessageOperation.Slot = newNodeSlot
-					toSend <- addMessageOperation
-				}
-
 				// add new node
 				newNodeInfos.Slot = op.Slot
-				err = o.storage.AddNodeToChat(newNodeInfos, c.Id)
+				err = o.storage.AddNodeToChat(newNodeInfos, chatID)
 
 				fmt.Printf("%s joined c\n", newNodeInfos.Name)
 				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
@@ -180,8 +180,11 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 				newNodeInfos.Slot = op.Slot
-				c.SaveNode(newNodeInfos)
-				o.storage.AddNodeToChat(newNodeInfos, c.Id)
+				err = o.storage.AddNodeToChat(newNodeInfos, chatID)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+					continue
+				}
 
 				log.Println(fmt.Sprintf("connection established with %s", newNodeInfos.Name))
 
@@ -192,7 +195,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					break
 				}
 
-				err = o.storage.AddMessageToChat(newMessage, c.Id)
+				err = o.storage.AddMessageToChat(newMessage, chatID)
 				if err != nil {
 					fmt.Printf(logErrFrmt, err)
 					continue
@@ -200,7 +203,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				fmt.Printf("%s (%s): %s", newMessage.Sender, newMessage.Date, newMessage.Content)
 
-				slots, err := o.storage.GetSlots(c.Id)
+				slots, err := o.storage.GetSlots(chatID)
 				if err != nil {
 					fmt.Printf(logErrFrmt, err)
 					continue
@@ -218,14 +221,14 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					continue
 				}
 
-				chatNodeSlots, err := o.storage.GetSlots(c.Id)
+				chatNodeSlots, err := o.storage.GetSlots(chatID)
 				if err != nil {
 					fmt.Printf(logFrmt, err)
 				}
 
 				toDelete := make(map[uint8]bool)
 				for _, slot := range chatNodeSlots {
-					leaveOperation := crdt.NewOperation(crdt.RemoveNode, op.TargetedChat, nil)
+					leaveOperation := crdt.NewOperation(crdt.RemoveNode, chatID.String(), nil)
 					leaveOperation.Slot = slot
 					toSend <- leaveOperation
 				}
@@ -236,7 +239,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				// Verify that slots are not used by any other chats
 				for s, _ := range toDelete {
-					if o.storage.IsSlotUsedByOtherChats(s, o.myInfos.Id, c.Id) {
+					if o.storage.IsSlotUsedByOtherChats(s, o.myInfos.Id, chatID) {
 						toDelete[s] = false
 					}
 				}
@@ -251,8 +254,11 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 				// Removing c from storage and getting new current
-				fmt.Printf("Leaving c %s\n", c.Name)
-				o.storage.RemoveChat(c.Id)
+				chatName, _ := o.storage.GetChatName(chatID)
+				fmt.Printf("Leaving c %s\n", chatName)
+				o.storage.RemoveChat(chatID)
+
+				// Getting new current chat
 				newID, _ := o.storage.GetNewCurrentChatID()
 				o.updateCurrentChat(newID)
 				newCurrentName, _ := o.storage.GetChatName(newID)
