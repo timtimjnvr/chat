@@ -30,6 +30,14 @@ func NewChat(name string) *Chat {
 	}
 }
 
+func (c *Chat) GetID() uuid.UUID {
+	return c.Id
+}
+
+func (c *Chat) GetName() string {
+	return c.Name
+}
+
 func (c *Chat) SaveNode(nodeInfo *NodeInfos) {
 	// update if found
 	for i, n := range c.nodesInfos {

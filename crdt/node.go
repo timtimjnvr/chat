@@ -27,6 +27,14 @@ func NewNodeInfos(addr string, port, name string) *NodeInfos {
 	}
 }
 
+func (i *NodeInfos) GetID() uuid.UUID {
+	return i.Id
+}
+
+func (i *NodeInfos) GetName() string {
+	return i.Name
+}
+
 func (i *NodeInfos) ToBytes() []byte {
 	bytesMessage, _ := json.Marshal(i)
 	return bytesMessage

@@ -9,14 +9,15 @@ import (
 
 type (
 	Storage struct {
-		chats *listOld
-		nodes *listOld
+		chats *list[*crdt.Chat]
+		nodes *list[*crdt.NodeInfos]
 	}
 )
 
 func NewStorage() *Storage {
 	return &Storage{
-		chats: NewList(),
+		chats: NewChatList(),
+		nodes: NewNodeList(),
 	}
 }
 

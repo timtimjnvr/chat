@@ -11,13 +11,13 @@ import (
 
 func TestList_Len(t *testing.T) {
 	ass := assert.New(t)
-	l := NewList()
+	l := NewChatList()
 	ass.True(l.Len() == 0, "failed on computing listOld length")
 }
 
 func TestList_Add(t *testing.T) {
 	ass := assert.New(t)
-	l := NewList()
+	l := NewChatList()
 
 	id, err := l.Add(crdt.NewChat("1"))
 	assert.Nil(t, err)
@@ -44,7 +44,7 @@ func TestList_Add(t *testing.T) {
 }
 
 func TestList_Contains(t *testing.T) {
-	l := NewList()
+	l := NewChatList()
 	// test on empty listOld
 	inExistingID, _ := uuid.NewUUID()
 	contains := l.Contains(inExistingID)
@@ -64,7 +64,7 @@ func TestList_Contains(t *testing.T) {
 }
 
 func TestList_Update(t *testing.T) {
-	l := NewList()
+	l := NewChatList()
 	// Try to update chat in empty listOld
 	err := l.Update(crdt.NewChat("non existing"))
 	assert.True(t, errors.Is(err, NotFoundErr))
@@ -91,7 +91,7 @@ func TestList_Update(t *testing.T) {
 func TestList_Delete(t *testing.T) {
 	var (
 		ass       = assert.New(t)
-		l         = NewList()
+		l         = NewChatList()
 		first, _  = l.Add(crdt.NewChat("1"))
 		second, _ = l.Add(crdt.NewChat("2"))
 		third, _  = l.Add(crdt.NewChat("3"))
@@ -172,14 +172,14 @@ func TestList_Delete(t *testing.T) {
 	ass.Equal(c.Id, third)
 
 	// try to delete an elementOld in an empty listOld
-	l = NewList()
+	l = NewChatList()
 	l.Delete(second)
 }
 
 func TestList_GetById(t *testing.T) {
 	var (
 		ass       = assert.New(t)
-		l         = NewList()
+		l         = NewChatList()
 		values    = []int{1, 2, 3, 4}
 		valuesIds = make(map[int]uuid.UUID)
 	)
@@ -207,14 +207,14 @@ func TestList_GetById(t *testing.T) {
 	assert.Nil(t, res)
 
 	// try to get in existing elementOld in an empty listOld
-	l = NewList()
+	l = NewChatList()
 	res, err = l.GetById(unExistingID)
 	assert.True(t, errors.Is(err, NotFoundErr))
 	assert.Nil(t, res)
 }
 
 func TestList_GetByIndex(t *testing.T) {
-	l := NewList()
+	l := NewChatList()
 
 	// Try to get more than length
 	e, err := l.GetByIndex(2)
