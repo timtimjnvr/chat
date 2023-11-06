@@ -1,13 +1,15 @@
-BINARY_NAME=chat
-
 build:
-	go build -o "${BINARY_NAME}" .
+	go build  .
 
-init:
-	redis-server > /dev/null &
-
-run:
-	test -f "${BINARY_NAME}" && ./${BINARY_NAME} || go run .
+help:
+	go run . -help
 
 test:
-	go test ./... -race -timeosut 5m
+	go test ./... -v -race -timeout 30s
+
+coverage:
+	go test ./... -race -timeout 30s -coverprofile cover.out
+	go tool cover -html=cover.out
+
+run:
+	go run .
