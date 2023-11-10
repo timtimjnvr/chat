@@ -20,7 +20,7 @@ type (
 		next *element[T]
 	}
 
-	list[T value] struct {
+	List[T value] struct {
 		typeName string
 		length   int
 		head     *element[T]
@@ -36,14 +36,14 @@ var (
 	InvalidIdentifierErr     = errors.New("invalid identifier")
 )
 
-func NewChatList() *list[*crdt.Chat] {
-	return &list[*crdt.Chat]{
+func NewChatList() *List[*crdt.Chat] {
+	return &List[*crdt.Chat]{
 		typeName: "chats",
 	}
 }
 
-func NewNodeList() *list[*crdt.NodeInfos] {
-	return &list[*crdt.NodeInfos]{
+func NewNodeList() *List[*crdt.NodeInfos] {
+	return &List[*crdt.NodeInfos]{
 		typeName: "nodes",
 	}
 }
@@ -55,11 +55,11 @@ func newElement[T value](v T) *element[T] {
 	}
 }
 
-func (l *list[T]) Len() int {
+func (l *List[T]) Len() int {
 	return l.length
 }
 
-func (l *list[T]) Display() {
+func (l *List[T]) Display() {
 	fmt.Printf("%d %s\n", l.length, l.typeName)
 
 	tmp := l.head
@@ -71,7 +71,7 @@ func (l *list[T]) Display() {
 }
 
 // Add insert chat at the end of the listOld and return the key of the inserted chat
-func (l *list[T]) Add(v T) (uuid.UUID, error) {
+func (l *List[T]) Add(v T) (uuid.UUID, error) {
 	e := newElement(v)
 
 	id, err := uuid.Parse(v.GetID().String())
@@ -113,7 +113,7 @@ func (l *list[T]) Add(v T) (uuid.UUID, error) {
 	return id, nil
 }
 
-func (l *list[T]) Contains(id uuid.UUID) bool {
+func (l *List[T]) Contains(id uuid.UUID) bool {
 	if l.length == 0 {
 		return false
 	}
@@ -130,7 +130,7 @@ func (l *list[T]) Contains(id uuid.UUID) bool {
 	return false
 }
 
-func (l *list[T]) Update(v T) error {
+func (l *List[T]) Update(v T) error {
 	if v == nil {
 		return InvalidChatErr
 	}
@@ -157,7 +157,7 @@ func (l *list[T]) Update(v T) error {
 	return NotFoundErr
 }
 
-func (l *list[T]) GetByIndex(index int) (T, error) {
+func (l *List[T]) GetByIndex(index int) (T, error) {
 	if index >= l.Len() {
 		return nil, NotFoundErr
 	}
@@ -173,7 +173,7 @@ func (l *list[T]) GetByIndex(index int) (T, error) {
 	return tmp.v, nil
 }
 
-func (l *list[T]) GetById(id uuid.UUID) (T, error) {
+func (l *List[T]) GetById(id uuid.UUID) (T, error) {
 	if l.length == 0 {
 		return nil, NotFoundErr
 	}
@@ -190,7 +190,7 @@ func (l *list[T]) GetById(id uuid.UUID) (T, error) {
 	return nil, NotFoundErr
 }
 
-func (l *list[T]) Delete(id uuid.UUID) {
+func (l *List[T]) Delete(id uuid.UUID) {
 	if l.length == 0 {
 		return
 	}

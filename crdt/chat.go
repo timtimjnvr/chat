@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"log"
 	"time"
 )
 
@@ -12,7 +11,7 @@ type (
 	Chat struct {
 		Id         uuid.UUID `json:"id"`
 		Name       string    `json:"name"`
-		nodesInfos []*NodeInfos
+		nodesSlots []uint8
 		messages   []*Message // ordered by date : 0 being the oldest message, 1 coming after 0 etc ...
 	}
 )
@@ -25,7 +24,7 @@ func NewChat(name string) *Chat {
 	return &Chat{
 		Id:         uuid.New(),
 		Name:       name,
-		nodesInfos: make([]*NodeInfos, 0, maxNumberOfNodes),
+		nodesSlots: make([]uint8, 0, maxNumberOfNodes),
 		messages:   make([]*Message, 0, maxNumberOfMessages),
 	}
 }
@@ -38,70 +37,67 @@ func (c *Chat) GetName() string {
 	return c.Name
 }
 
-func (c *Chat) SaveNode(nodeInfo *NodeInfos) {
-	// update if found
-	for i, n := range c.nodesInfos {
-		if n.Id == nodeInfo.Id {
-			c.nodesInfos[i] = nodeInfo
+func (c *Chat) SaveNode(nodeSlot uint8) {
+
+	// check if present
+	for _, s := range c.nodesSlots {
+		if s == nodeSlot {
 			return
 		}
 	}
 
 	// append if not found
-	c.nodesInfos = append(c.nodesInfos, nodeInfo)
+	c.nodesSlots = append(c.nodesSlots, nodeSlot)
 }
 
-func (c *Chat) RemoveNodeBySlot(slot uint8) (string, error) {
+func (c *Chat) RemoveNodeSlot(slot uint8) error {
 	// get index
 	var (
 		index int
 		found bool
-		n     *NodeInfos
+		s     uint8
 	)
-	for index, n = range c.nodesInfos {
-		if n.Slot == slot {
+
+	for index, s = range c.nodesSlots {
+		if s == slot {
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		return "", NotFoundErr
+		return NotFoundErr
 	}
 
-	nodeName := c.nodesInfos[index].Name
-
-	if index == 0 && len(c.nodesInfos) == 1 {
-		c.nodesInfos = make([]*NodeInfos, 0, 0)
-		return nodeName, nil
+	if index == 0 && len(c.nodesSlots) == 1 {
+		c.nodesSlots = make([]uint8, 0, 0)
+		return nil
 	}
 
-	if index == 0 && len(c.nodesInfos) > 1 {
-		c.nodesInfos = c.nodesInfos[index+1:]
-		return nodeName, nil
+	if index == 0 && len(c.nodesSlots) > 1 {
+		c.nodesSlots = c.nodesSlots[index+1:]
+		return nil
 	}
 
-	if index == len(c.nodesInfos)-1 {
-		c.nodesInfos = c.nodesInfos[:len(c.nodesInfos)-1]
-		return nodeName, nil
-
+	if index == len(c.nodesSlots)-1 {
+		c.nodesSlots = c.nodesSlots[:len(c.nodesSlots)-1]
+		return nil
 	}
 	var (
-		newNodeInfos = make([]*NodeInfos, len(c.nodesInfos)-1)
-		j            int
+		newNodesSlots = make([]uint8, len(c.nodesSlots)-1)
+		j             int
 	)
-	for i := 0; i <= len(c.nodesInfos)-1; i++ {
+	for i := 0; i <= len(c.nodesSlots)-1; i++ {
 		if i == index {
 			continue
 		}
 
-		newNodeInfos[j] = c.nodesInfos[i]
+		newNodesSlots[j] = c.nodesSlots[i]
 		j++
 	}
 
-	c.nodesInfos = newNodeInfos
-	return nodeName, nil
-
+	c.nodesSlots = newNodesSlots
+	return nil
 }
 
 func (c *Chat) SaveMessage(message *Message) {
@@ -154,40 +150,42 @@ func (c *Chat) ToBytes() []byte {
 // GetSlots returns all the slots identifying active TCP connections between nodes.
 func (c *Chat) GetSlots() []uint8 {
 	length := 0
-	if len(c.nodesInfos) > 0 {
-		length = len(c.nodesInfos) - 1
+	if len(c.nodesSlots) > 0 {
+		length = len(c.nodesSlots) - 1
 	}
 
 	slots := make([]uint8, 0, length)
-	for _, i := range c.nodesInfos {
+	for _, s := range c.nodesSlots {
 		// My own slot
-		if i.Slot == 0 {
+		if s == 0 {
 			continue
 		}
 
-		slots = append(slots, i.Slot)
+		slots = append(slots, s)
 	}
 
 	return slots
 }
 
-func (c *Chat) GetNodeBySlot(slot uint8) (*NodeInfos, error) {
-	for _, i := range c.nodesInfos {
-		if i.Slot == slot {
-			return i, nil
+/*
+	func (c *Chat) GetNodeBySlot(slot uint8) (*NodeInfos, error) {
+		for _, s := range c.nodesSlots {
+			if s == slot {
+				return s, nil
+			}
 		}
+
+		return &NodeInfos{}, NotFoundErr
 	}
-
-	return &NodeInfos{}, NotFoundErr
-}
-
+*/
+/*
 func (c *Chat) DisplayUsers() {
 	log.Printf("chat name : %s\n", c.Name)
-	for _, n := range c.nodesInfos {
+	for _, n := range c.nodesSlots {
 		log.Printf("- %s (Address: %s, Port: %s, Slot: %d)\n", n.Name, n.Address, n.Port, n.Slot)
 	}
 }
-
+*/
 func (c *Chat) ContainsMessage(message *Message) bool {
 	for _, m := range c.messages {
 		if m.Id == message.Id {
@@ -197,8 +195,9 @@ func (c *Chat) ContainsMessage(message *Message) bool {
 	return false
 }
 
-func (c *Chat) containsNode(id uuid.UUID) bool {
-	for _, n := range c.nodesInfos {
+/*
+func (c *Chat) containsNode(s uuid.UUID) bool {
+	for _, n := range c.nodesSlots {
 		if n.Id == id {
 			return true
 		}
@@ -206,3 +205,4 @@ func (c *Chat) containsNode(id uuid.UUID) bool {
 
 	return false
 }
+*/

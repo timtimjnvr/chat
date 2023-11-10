@@ -70,7 +70,7 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 				name: "delete first node",
 				slot: 0,
 				chat: &Chat{
-					nodesInfos: []*NodeInfos{
+					nodesSlots: []*NodeInfos{
 						{
 							Id:   idToDelete,
 							Slot: 0,
@@ -91,7 +91,7 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 				name: "delete middle one",
 				slot: 1,
 				chat: &Chat{
-					nodesInfos: []*NodeInfos{
+					nodesSlots: []*NodeInfos{
 						{
 							Id:   uuid.New(),
 							Slot: 0,
@@ -112,7 +112,7 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 				name: "delete middle one (4 elements)",
 				slot: 2,
 				chat: &Chat{
-					nodesInfos: []*NodeInfos{
+					nodesSlots: []*NodeInfos{
 						{
 							Id:   uuid.New(),
 							Slot: 0,
@@ -137,7 +137,7 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 				name: "delete last",
 				slot: 2,
 				chat: &Chat{
-					nodesInfos: []*NodeInfos{
+					nodesSlots: []*NodeInfos{
 						{
 							Id:   uuid.New(),
 							Slot: 0,
@@ -159,9 +159,9 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.chat.RemoveNodeBySlot(tt.slot)
+			tt.chat.RemoveNodeSlot(tt.slot)
 			assert.True(t, !tt.chat.containsNode(idToDelete))
-			assert.Equal(t, tt.expectedNumberOfNodes, len(tt.chat.nodesInfos))
+			assert.Equal(t, tt.expectedNumberOfNodes, len(tt.chat.nodesSlots))
 		})
 	}
 }

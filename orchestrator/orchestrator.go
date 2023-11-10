@@ -154,7 +154,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				// add other nodes
 				slots, _ := o.storage.GetSlots(chatID)
 				for _, s := range slots {
-					nodeInfo, err := o.storage.GetNodeFromChatBySlot(chatID, s)
+					nodeInfo, err := o.storage.GetNodeBySlot(s)
 					if err != nil {
 						fmt.Printf(logErrFrmt, err)
 					}
@@ -166,7 +166,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				// add new node
 				newNodeInfos.Slot = op.Slot
-				err = o.storage.AddNodeToChat(newNodeInfos, chatID)
+				err = o.storage.AddNodeToChat(newNodeInfos.Slot, chatID)
 
 				fmt.Printf("%s joined c\n", newNodeInfos.Name)
 				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
