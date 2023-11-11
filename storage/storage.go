@@ -106,6 +106,18 @@ func (s *Storage) AddChat(chat *crdt.Chat) error {
 }
 
 func (s *Storage) RemoveChat(chatID uuid.UUID) {
+	slots, err := s.GetSlots(chatID)
+	if err != nil {
+		return
+	}
+
+	for _, slot := range slots {
+		if !s.IsSlotUsedByOtherChats(slot, chatID) {
+			n, _ := s.GetNodeBySlot(slot)
+			s.nodes.Delete(n.Id)
+		}
+	}
+
 	s.chats.Delete(chatID)
 }
 
