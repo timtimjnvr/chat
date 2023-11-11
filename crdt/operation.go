@@ -36,6 +36,22 @@ const (
 	Quit
 )
 
+var operationNames = map[OperationType]string{
+	CreateChat:     "create chat",
+	JoinChatByName: "join chat by name",
+	SaveNode:       "save node",
+	KillNode:       "kill node",
+	AddNode:        "add node",
+	RemoveNode:     "remove node",
+	AddChat:        "add chat",
+	LeaveChat:      "leave chat",
+	SwitchChat:     "switch chat",
+	AddMessage:     "add message",
+	ListUsers:      "list users",
+	ListChats:      "list chats",
+	Quit:           "quit",
+}
+
 func NewOperation(typology OperationType, targetedChat string, data Data) *Operation {
 	return &Operation{
 		Slot:         0,
@@ -143,4 +159,8 @@ func getField(offset int, source []byte) (int, []byte) {
 		lenField := int(source[offset])
 		return offset + lenField + 1, source[offset+1 : offset+lenField+1]
 	}
+}
+
+func GetOperationName(typology OperationType) string {
+	return operationNames[typology]
 }

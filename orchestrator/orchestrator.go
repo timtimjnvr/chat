@@ -29,10 +29,11 @@ func (o *Orchestrator) updateCurrentChat(currenChatID uuid.UUID) {
 }
 
 const (
-	MaxMessagesStdin = 100
-	logErrFrmt       = "[ERROR] %s\n"
-	logFrmt          = "[INFO] %s\n"
-	typeCommand      = "type a Command :"
+	MaxMessagesStdin       = 100
+	logErrFormat           = "[ERROR] %s\n"
+	logFormat              = "[INFO] %s\n"
+	logOpperationErrFormat = "[ERROR] [%s] %s\n"
+	typeCommand            = "type a Command :"
 )
 
 func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
@@ -68,9 +69,10 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			case crdt.JoinChatByName:
 				chatID, err := o.storage.GetChatID(op.TargetedChat)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
+
 				newNodeInfos, ok := op.Data.(*crdt.NodeInfos)
 				if !ok {
 					log.Println("[ERROR] can't parse op data to NodeInfos")
@@ -94,7 +96,8 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				for _, s := range slots {
 					nodeInfo, err := o.storage.GetNodeBySlot(s)
 					if err != nil {
-						fmt.Printf(logErrFrmt, err)
+						fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+						continue
 					}
 
 					addNodeOperation := crdt.NewOperation(crdt.AddNode, chatID.String(), nodeInfo)
@@ -108,16 +111,17 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				fmt.Printf("%s joined c\n", newNodeInfos.Name)
 				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
+
 			case crdt.CreateChat:
 				id, err := o.storage.AddNewChat(op.TargetedChat)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
-				// don't care about error since we just added the given c
+				// don't care about error since we just added the given chat
 				_ = o.storage.AddNodeToChat(o.myInfos, id)
-				continue
+
 			case crdt.AddChat:
 				newChatInfos, ok := op.Data.(*crdt.Chat)
 				if !ok {
@@ -127,32 +131,35 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				err := o.storage.AddChat(newChatInfos)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
 				id := newChatInfos.Id
 				err = o.storage.AddNodeToChat(o.myInfos, id)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
 				o.updateCurrentChat(id)
 
-				fmt.Printf("you joined a new c : %s\n", newChatInfos.Name)
-				continue
+				fmt.Printf("you joined a new chat : %s\n", newChatInfos.Name)
+
 			case crdt.ListChats:
 				o.storage.DisplayChats()
+
 			case crdt.ListUsers:
 				err := o.storage.DisplayChatUsers(o.currenChatID)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					continue
 				}
+
 			case crdt.AddNode, crdt.SaveNode:
 				chatID, err := uuid.Parse(op.TargetedChat)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
@@ -165,15 +172,16 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				newNodeInfos.Slot = op.Slot
 				err = o.storage.AddNodeToChat(newNodeInfos, chatID)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
 				log.Println(fmt.Sprintf("connection established with %s", newNodeInfos.Name))
+
 			case crdt.AddMessage:
 				chatID, err := uuid.Parse(op.TargetedChat)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
@@ -185,7 +193,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				err = o.storage.AddMessageToChat(newMessage, chatID)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
@@ -193,7 +201,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				slots, err := o.storage.GetSlots(chatID)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
@@ -201,12 +209,14 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					op.Slot = s
 					toSend <- op
 				}
+
 			case crdt.RemoveNode:
 				o.storage.RemoveNodeSlotFromStorage(op.Slot)
+
 			case crdt.LeaveChat:
 				chatID, err := uuid.Parse(op.TargetedChat)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
@@ -218,7 +228,8 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				chatNodeSlots, err := o.storage.GetSlots(chatID)
 				if err != nil {
-					fmt.Printf(logFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					continue
 				}
 
 				toDelete := make(map[uint8]bool)
@@ -249,8 +260,13 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 				// Removing c from storage and getting new current
-				chatName, _ := o.storage.GetChatName(chatID)
-				fmt.Printf("Leaving c %s\n", chatName)
+				chatName, err := o.storage.GetChatName(chatID)
+				if err != nil {
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					continue
+				}
+
+				fmt.Printf("Leaving %s\n", chatName)
 				o.storage.RemoveChat(chatID)
 
 				// Getting new current chat
@@ -258,10 +274,12 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				o.updateCurrentChat(newID)
 				newCurrentName, _ := o.storage.GetChatName(newID)
 				fmt.Printf("Switched to c %s\n", newCurrentName)
+
 			case crdt.Quit:
 				process, err := os.FindProcess(os.Getpid())
 				if err != nil {
-					log.Fatal(err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					os.Exit(1)
 				}
 
 				// signal main to stop
@@ -291,7 +309,7 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 	go reader.Read(os.Stdin, stdin, reader.Separator, stopReading, isDone)
 
 	for {
-		fmt.Printf(logFrmt, typeCommand)
+		fmt.Printf(logFormat, typeCommand)
 
 		select {
 		case <-shutdown:
@@ -300,7 +318,7 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 		case line := <-stdin:
 			cmd, err := parsestdin.NewCommand(string(line))
 			if err != nil {
-				fmt.Printf(logErrFrmt, err)
+				fmt.Printf(logErrFormat, err)
 				continue
 			}
 
@@ -308,7 +326,7 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			switch cmd.GetTypology() {
 			case crdt.JoinChatByName:
 				if args[parsestdin.PortArg] == o.myInfos.Port && sameAddress(o.myInfos.Address, args[parsestdin.AddrArg]) {
-					fmt.Printf(logErrFrmt, "You are trying to connect to yourself")
+					fmt.Printf(logErrFormat, "You are trying to connect to yourself")
 					continue
 				}
 
@@ -323,12 +341,12 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					chatName := args[parsestdin.ChatRoomArg]
 					id, err := o.storage.GetChatID(chatName)
 					if err != nil {
-						fmt.Printf(logErrFrmt, err)
+						fmt.Printf(logErrFormat, err)
 					}
 
 					o.updateCurrentChat(id)
 
-					fmt.Printf(logFrmt, fmt.Sprintf("Switched to chat %s", chatName))
+					fmt.Printf(logFormat, fmt.Sprintf("Switched to chat %s", chatName))
 
 				case crdt.AddMessage:
 					/* Add the messageBytes to discussion & sync with other nodes */
