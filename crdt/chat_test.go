@@ -68,43 +68,17 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 		}{
 			{
 				name: "delete first node",
-				slot: 0,
+				slot: 1,
 				chat: &Chat{
-					nodesInfos: []*NodeInfos{
-						{
-							Id:   idToDelete,
-							Slot: 0,
-						},
-						{
-							Id:   uuid.New(),
-							Slot: 1,
-						},
-						{
-							Id:   uuid.New(),
-							Slot: 2,
-						},
-					},
+					nodesSlots: []uint8{1, 2, 3},
 				},
 				expectedNumberOfNodes: 2,
 			},
 			{
 				name: "delete middle one",
-				slot: 1,
+				slot: 2,
 				chat: &Chat{
-					nodesInfos: []*NodeInfos{
-						{
-							Id:   uuid.New(),
-							Slot: 0,
-						},
-						{
-							Id:   idToDelete,
-							Slot: 1,
-						},
-						{
-							Id:   uuid.New(),
-							Slot: 2,
-						},
-					},
+					nodesSlots: []uint8{1, 2, 3},
 				},
 				expectedNumberOfNodes: 2,
 			},
@@ -112,45 +86,15 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 				name: "delete middle one (4 elements)",
 				slot: 2,
 				chat: &Chat{
-					nodesInfos: []*NodeInfos{
-						{
-							Id:   uuid.New(),
-							Slot: 0,
-						},
-						{
-							Id:   uuid.New(),
-							Slot: 1,
-						},
-						{
-							Id:   idToDelete,
-							Slot: 2,
-						},
-						{
-							Id:   uuid.New(),
-							Slot: 3,
-						},
-					},
+					nodesSlots: []uint8{1, 2, 3, 4},
 				},
 				expectedNumberOfNodes: 3,
 			},
 			{
 				name: "delete last",
-				slot: 2,
+				slot: 3,
 				chat: &Chat{
-					nodesInfos: []*NodeInfos{
-						{
-							Id:   uuid.New(),
-							Slot: 0,
-						},
-						{
-							Id:   uuid.New(),
-							Slot: 1,
-						},
-						{
-							Id:   idToDelete,
-							Slot: 2,
-						},
-					},
+					nodesSlots: []uint8{1, 2, 3},
 				},
 				expectedNumberOfNodes: 2,
 			},
@@ -159,9 +103,9 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.chat.RemoveNodeBySlot(tt.slot)
-			assert.True(t, !tt.chat.containsNode(idToDelete))
-			assert.Equal(t, tt.expectedNumberOfNodes, len(tt.chat.nodesInfos))
+			tt.chat.RemoveNodeSlot(tt.slot)
+			assert.NotContains(t, idToDelete, tt.chat.nodesSlots)
+			assert.Equal(t, tt.expectedNumberOfNodes, len(tt.chat.nodesSlots))
 		})
 	}
 }

@@ -104,11 +104,8 @@ func Test_storage_AddNodeToChat(t *testing.T) {
 	c, err := s.getChat(id.String(), false)
 	assert.Nil(t, err)
 
-	addr := "127.0.0.1"
-	port := "8080"
-	nodeName := "toto"
 	slot := uint8(1)
-	node := crdt.NewNodeInfos(addr, port, nodeName)
+	node := crdt.NewNodeInfos("127.0.0.1", "8080", "toto")
 	node.Slot = slot
 
 	numberOfSlots := c.GetSlots()
@@ -121,16 +118,7 @@ func Test_storage_AddNodeToChat(t *testing.T) {
 	assert.Equal(t, 1, len(numberOfSlots))
 
 	// Verify node
-	n, err := c.GetNodeBySlot(slot)
-	assert.Nil(t, err)
-	assert.Equal(t, n.Name, nodeName)
-	assert.Equal(t, n.Port, port)
-	assert.Equal(t, n.Address, addr)
-	assert.Equal(t, n.Slot, slot)
-
-	// Try to get un existent node
-	n, err = c.GetNodeBySlot(uint8(10))
-	assert.Equal(t, err.Error(), NotFoundErr.Error())
+	assert.True(t, contains(slot, c.GetSlots()))
 }
 
 func Test_storage_RemoveNodeFromChat(t *testing.T) {
@@ -142,9 +130,10 @@ func Test_storage_RemoveNodeFromChat(t *testing.T) {
 	c, err := s.getChat(id.String(), false)
 	assert.Nil(t, err)
 
-	node := crdt.NewNodeInfos("127.0.0.1", "8080", "toto")
 	// Setting slot to identify active TCP connection
-	node.Slot = 1
+	nodeSlot := uint8(1)
+	node := crdt.NewNodeInfos("127.0.0.1", "8080", "toto")
+	node.Slot = nodeSlot
 	err = s.AddNodeToChat(node, id)
 	assert.Nil(t, err)
 
@@ -153,11 +142,11 @@ func Test_storage_RemoveNodeFromChat(t *testing.T) {
 
 	chatId, err := uuid.Parse(c.Id.String())
 	assert.Nil(t, err)
-	err = s.RemoveNodeFromChat(node.Slot, chatId)
+	err = s.RemoveNodeFromChat(nodeSlot, chatId)
 	assert.Nil(t, err)
 
 	// try to remove in existent node slot
-	err = s.RemoveNodeFromChat(node.Slot, chatId)
+	err = s.RemoveNodeFromChat(nodeSlot, chatId)
 	assert.NotNil(t, err)
 }
 
@@ -174,14 +163,17 @@ func TestStorage_RemoveNodeSlotFromStorage(t *testing.T) {
 
 	first, err := s.AddNewChat("first")
 	assert.Nil(t, err)
+
 	second, err := s.AddNewChat("second")
 	assert.Nil(t, err)
 
-	firstNode := crdt.NewNodeInfos("", "", "first")
-	firstNode.Slot = uint8(1)
+	firstNode := crdt.NewNodeInfos("127.0.0.1", "8080", "toto")
+	firstNodeSlot := uint8(1)
+	firstNode.Slot = firstNodeSlot
 
-	secondNode := crdt.NewNodeInfos("", "", "second")
-	secondNode.Slot = uint8(2)
+	secondNode := crdt.NewNodeInfos("127.0.0.1", "8080", "toto")
+	secondNodeSlot := uint8(2)
+	secondNode.Slot = secondNodeSlot
 
 	err = s.AddNodeToChat(firstNode, first)
 	assert.Nil(t, err)
@@ -191,15 +183,10 @@ func TestStorage_RemoveNodeSlotFromStorage(t *testing.T) {
 	c1, err := s.getChat(first.String(), false)
 	assert.Nil(t, err)
 
-	_, err = c1.GetNodeBySlot(uint8(1))
-	assert.Nil(t, err)
-
-	_, err = c1.GetNodeBySlot(uint8(2))
-	assert.Nil(t, err)
+	assert.True(t, contains(uint8(1), c1.GetSlots()))
 
 	s.RemoveNodeSlotFromStorage(2)
-	_, err = c1.GetNodeBySlot(uint8(2))
-	assert.Equal(t, err.Error(), NotFoundErr.Error())
+	assert.True(t, !contains(uint8(2), c1.GetSlots()))
 
 	err = s.AddNodeToChat(secondNode, first)
 	assert.Nil(t, err)
@@ -214,4 +201,17 @@ func TestStorage_RemoveNodeSlotFromStorage(t *testing.T) {
 	s.RemoveNodeSlotFromStorage(2)
 	assert.Equal(t, 1, len(c1.GetSlots()))
 	assert.Equal(t, 0, len(c2.GetSlots()))
+}
+
+func contains(element uint8, elements []uint8) bool {
+	if len(elements) == 0 {
+		return false
+	}
+
+	for _, e := range elements {
+		if e == element {
+			return true
+		}
+	}
+	return false
 }

@@ -112,12 +112,6 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				continue
 			}
 
-			// there is no chat specified in operation in this case we need to remove node identified by newNodeSlot from all chats
-			if op.Typology == crdt.RemoveNode {
-				o.storage.RemoveNodeSlotFromStorage(op.Slot)
-				continue
-			}
-
 			// for other operation we need to get a chat from storage
 			chatID, err := uuid.Parse(op.TargetedChat)
 			if err != nil {
@@ -125,7 +119,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				continue
 			}
 
-			exists := o.storage.Exist(chatID)
+			exists := o.storage.ChatExist(chatID)
 			if !exists {
 				fmt.Printf(logErrFrmt, "unknown chat")
 				continue
@@ -154,7 +148,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				// add other nodes
 				slots, _ := o.storage.GetSlots(chatID)
 				for _, s := range slots {
-					nodeInfo, err := o.storage.GetNodeFromChatBySlot(chatID, s)
+					nodeInfo, err := o.storage.GetNodeBySlot(s)
 					if err != nil {
 						fmt.Printf(logErrFrmt, err)
 					}
@@ -239,7 +233,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				// Verify that slots are not used by any other chats
 				for s, _ := range toDelete {
-					if o.storage.IsSlotUsedByOtherChats(s, o.myInfos.Id, chatID) {
+					if o.storage.IsSlotUsedByOtherChats(s, chatID) {
 						toDelete[s] = false
 					}
 				}

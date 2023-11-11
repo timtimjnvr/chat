@@ -129,6 +129,7 @@ func TestList_Delete(t *testing.T) {
 
 	l.Delete(second)
 	ass.Equal(l.Len(), 0, "failed on Deleting remaining elementOld")
+	ass.Nil(l.head)
 
 	first, _ = l.Add(crdt.NewChat("1"))
 	second, _ = l.Add(crdt.NewChat("2"))
