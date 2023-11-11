@@ -36,21 +36,23 @@ const (
 )
 
 func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
-	s := storage.NewStorage()
-	id, _ := s.AddNewChat(myInfos.Name)
+	var (
+		s     = storage.NewStorage()
+		id, _ = s.AddNewChat(myInfos.Name)
+		o     = &Orchestrator{
+			RWMutex: &sync.RWMutex{},
+			myInfos: myInfos,
+			storage: s,
+		}
+	)
 	_ = s.AddNodeToChat(myInfos, id)
-
-	o := &Orchestrator{
-		RWMutex: &sync.RWMutex{},
-		myInfos: myInfos,
-		storage: s,
-	}
-
 	o.updateCurrentChat(id)
+
 	return o
 }
 
-// HandleChats maintains chat infos consistency by executing operation and building operations to send to other nodes if needed
+// HandleChats maintains chat infos consistency by executing and propagating operations received
+// from stdin or TCP connections through the channel toExecute
 func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Operation, toSend chan<- *crdt.Operation, shutdown <-chan struct{}) {
 	defer func() {
 		wg.Done()
@@ -62,83 +64,13 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			return
 
 		case op := <-toExecute:
-			// execute op
-			if op.Typology == crdt.CreateChat {
-				id, err := o.storage.AddNewChat(op.TargetedChat)
-				if err != nil {
-					fmt.Printf(logErrFrmt, err)
-					continue
-				}
-
-				// don't care about error since we just added the given c
-				_ = o.storage.AddNodeToChat(o.myInfos, id)
-				continue
-			}
-
-			if op.Typology == crdt.AddChat {
-				newChatInfos, ok := op.Data.(*crdt.Chat)
-				if !ok {
-					fmt.Println("[ERROR] can't parse op data to Chat")
-					continue
-				}
-
-				err := o.storage.AddChat(newChatInfos)
-				if err != nil {
-					fmt.Printf(logErrFrmt, err)
-					continue
-				}
-
-				id := newChatInfos.Id
-
-				err = o.storage.AddNodeToChat(o.myInfos, id)
-				if err != nil {
-					fmt.Printf(logErrFrmt, err)
-					continue
-				}
-
-				o.updateCurrentChat(id)
-
-				fmt.Printf("you joined a new c : %s\n", newChatInfos.Name)
-				continue
-			}
-
-			if op.Typology == crdt.ListChats {
-				o.storage.DisplayChats()
-				continue
-			}
-
-			if op.Typology == crdt.ListUsers {
-				o.storage.DisplayChatUsers(o.currenChatID)
-				continue
-			}
-
-			// for other operation we need to get a chat from storage
-			var (
-				chatID uuid.UUID
-				err    error
-			)
-			if op.Typology == crdt.JoinChatByName {
-				chatID, err = o.storage.GetChatID(op.TargetedChat)
-				if err != nil {
-					fmt.Printf(logErrFrmt, err)
-					continue
-				}
-			} else {
-				chatID, err = uuid.Parse(op.TargetedChat)
-				if err != nil {
-					fmt.Printf(logErrFrmt, err)
-					continue
-				}
-
-				exists := o.storage.ChatExist(chatID)
-				if !exists {
-					fmt.Printf(logErrFrmt, "unknown chat")
-					continue
-				}
-			}
-
 			switch op.Typology {
 			case crdt.JoinChatByName:
+				chatID, err := o.storage.GetChatID(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+					continue
+				}
 				newNodeInfos, ok := op.Data.(*crdt.NodeInfos)
 				if !ok {
 					log.Println("[ERROR] can't parse op data to NodeInfos")
@@ -176,9 +108,54 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				fmt.Printf("%s joined c\n", newNodeInfos.Name)
 				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
+			case crdt.CreateChat:
+				id, err := o.storage.AddNewChat(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+					continue
+				}
 
-			// connection just established
+				// don't care about error since we just added the given c
+				_ = o.storage.AddNodeToChat(o.myInfos, id)
+				continue
+			case crdt.AddChat:
+				newChatInfos, ok := op.Data.(*crdt.Chat)
+				if !ok {
+					fmt.Println("[ERROR] can't parse op data to Chat")
+					continue
+				}
+
+				err := o.storage.AddChat(newChatInfos)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+					continue
+				}
+
+				id := newChatInfos.Id
+				err = o.storage.AddNodeToChat(o.myInfos, id)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+					continue
+				}
+
+				o.updateCurrentChat(id)
+
+				fmt.Printf("you joined a new c : %s\n", newChatInfos.Name)
+				continue
+			case crdt.ListChats:
+				o.storage.DisplayChats()
+			case crdt.ListUsers:
+				err := o.storage.DisplayChatUsers(o.currenChatID)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+				}
 			case crdt.AddNode, crdt.SaveNode:
+				chatID, err := uuid.Parse(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+					continue
+				}
+
 				newNodeInfos, ok := op.Data.(*crdt.NodeInfos)
 				if !ok {
 					log.Println("[ERROR] can't parse op data to NodeInfos")
@@ -193,8 +170,13 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 				log.Println(fmt.Sprintf("connection established with %s", newNodeInfos.Name))
-
 			case crdt.AddMessage:
+				chatID, err := uuid.Parse(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+					continue
+				}
+
 				newMessage, ok := op.Data.(*crdt.Message)
 				if !ok {
 					log.Println("[ERROR] can't parse op data to Message")
@@ -219,8 +201,15 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					op.Slot = s
 					toSend <- op
 				}
-
+			case crdt.RemoveNode:
+				o.storage.RemoveNodeSlotFromStorage(op.Slot)
 			case crdt.LeaveChat:
+				chatID, err := uuid.Parse(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+					continue
+				}
+
 				// Only one chat in storage
 				if o.storage.GetNumberOfChats() <= 1 {
 					fmt.Printf("[ERROR] You can't leave the current c\n")
@@ -269,10 +258,6 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				o.updateCurrentChat(newID)
 				newCurrentName, _ := o.storage.GetChatName(newID)
 				fmt.Printf("Switched to c %s\n", newCurrentName)
-
-			case crdt.RemoveNode:
-				o.storage.RemoveNodeSlotFromStorage(op.Slot)
-
 			case crdt.Quit:
 				process, err := os.FindProcess(os.Getpid())
 				if err != nil {
@@ -280,7 +265,10 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 				// signal main to stop
-				process.Signal(os.Interrupt)
+				err = process.Signal(os.Interrupt)
+				if err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}
