@@ -50,7 +50,7 @@ func (c *Chat) SaveNode(nodeSlot uint8) {
 	c.nodesSlots = append(c.nodesSlots, nodeSlot)
 }
 
-func (c *Chat) RemoveNodeSlot(slot uint8) error {
+func (c *Chat) RemoveNode(slot uint8) error {
 	// get index
 	var (
 		index int
@@ -167,25 +167,6 @@ func (c *Chat) GetSlots() []uint8 {
 	return slots
 }
 
-/*
-	func (c *Chat) GetNodeBySlot(slot uint8) (*NodeInfos, error) {
-		for _, s := range c.nodesSlots {
-			if s == slot {
-				return s, nil
-			}
-		}
-
-		return &NodeInfos{}, NotFoundErr
-	}
-*/
-/*
-func (c *Chat) DisplayUsers() {
-	log.Printf("chat name : %s\n", c.Name)
-	for _, n := range c.nodesSlots {
-		log.Printf("- %s (Address: %s, Port: %s, Slot: %d)\n", n.Name, n.Address, n.Port, n.Slot)
-	}
-}
-*/
 func (c *Chat) ContainsMessage(message *Message) bool {
 	for _, m := range c.messages {
 		if m.Id == message.Id {
@@ -194,15 +175,3 @@ func (c *Chat) ContainsMessage(message *Message) bool {
 	}
 	return false
 }
-
-/*
-func (c *Chat) containsNode(s uuid.UUID) bool {
-	for _, n := range c.nodesSlots {
-		if n.Id == id {
-			return true
-		}
-	}
-
-	return false
-}
-*/

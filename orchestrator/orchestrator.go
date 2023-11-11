@@ -113,16 +113,28 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			}
 
 			// for other operation we need to get a chat from storage
-			chatID, err := uuid.Parse(op.TargetedChat)
-			if err != nil {
-				fmt.Printf(logErrFrmt, err)
-				continue
-			}
+			var (
+				chatID uuid.UUID
+				err    error
+			)
+			if op.Typology == crdt.JoinChatByName {
+				chatID, err = o.storage.GetChatID(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+					continue
+				}
+			} else {
+				chatID, err = uuid.Parse(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logErrFrmt, err)
+					continue
+				}
 
-			exists := o.storage.ChatExist(chatID)
-			if !exists {
-				fmt.Printf(logErrFrmt, "unknown chat")
-				continue
+				exists := o.storage.ChatExist(chatID)
+				if !exists {
+					fmt.Printf(logErrFrmt, "unknown chat")
+					continue
+				}
 			}
 
 			switch op.Typology {
