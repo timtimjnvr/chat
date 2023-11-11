@@ -163,12 +163,14 @@ func TestStorage_RemoveNodeSlotFromStorage(t *testing.T) {
 
 	first, err := s.AddNewChat("first")
 	assert.Nil(t, err)
+
 	second, err := s.AddNewChat("second")
 	assert.Nil(t, err)
 
 	firstNode := crdt.NewNodeInfos("127.0.0.1", "8080", "toto")
 	firstNodeSlot := uint8(1)
 	firstNode.Slot = firstNodeSlot
+
 	secondNode := crdt.NewNodeInfos("127.0.0.1", "8080", "toto")
 	secondNodeSlot := uint8(2)
 	secondNode.Slot = secondNodeSlot

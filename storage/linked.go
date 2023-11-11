@@ -24,7 +24,6 @@ type (
 		typeName string
 		length   int
 		head     *element[T]
-		tail     *element[T]
 	}
 )
 
@@ -82,7 +81,6 @@ func (l *List[T]) Add(v T) (uuid.UUID, error) {
 
 	if l.length == 0 {
 		l.head = e
-		l.tail = e
 		l.length++
 		return id, nil
 	}
@@ -103,7 +101,6 @@ func (l *List[T]) Add(v T) (uuid.UUID, error) {
 
 		if ptr.next == nil {
 			ptr.next = e
-			l.tail = e
 			l.length++
 		}
 
