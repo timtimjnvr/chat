@@ -10,7 +10,7 @@ Decentralized P2P chat built in golang.
   - basic text message exchanges.
   - list current users in discussion.
   - close a chat discussion.
-  - order messages and handle new users with operation based CRDTs.
+  - order messages and handle new users with operation based CRDTs. 
 
 ## Commands
 

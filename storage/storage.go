@@ -93,6 +93,9 @@ func (s *Storage) RemoveNodeFromChat(nodeSlot uint8, chatID uuid.UUID) error {
 	}
 
 	err = c.RemoveNode(nodeSlot)
+	if err != nil {
+		return err
+	}
 	n, err := s.GetNodeBySlot(nodeSlot)
 	if err != nil {
 		return err
