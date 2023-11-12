@@ -4,14 +4,6 @@
 
 Decentralized P2P chat built in golang.
 
-## Initial dev -> v1.0.0
-- client - client connections (2 nodes) :
-  - open a new discussion given an ip address and a port and the discussion name.
-  - basic text message exchanges.
-  - list current users in discussion.
-  - close a chat discussion.
-  - order messages and handle new users with operation based CRDTs. 
-
 ## Commands
 
 ```
@@ -24,6 +16,9 @@ Decentralized P2P chat built in golang.
 /list_users :                     display all connected users.
 /quit :                           kills the program
 ```
+
+## Next -> v2.0.0
+- Multi user rooms feature (for now only two users in a room)
 
 ## Doc
 - Node management : [CRDTs choices](doc/crdt.md)
