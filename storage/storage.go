@@ -22,6 +22,103 @@ func NewStorage() *Storage {
 	}
 }
 
+func (s *Storage) GetNumberOfChats() int {
+	return s.chats.Len()
+}
+
+func (s *Storage) GetChatID(chatName string) (uuid.UUID, error) {
+	c, err := s.getChat(chatName, true)
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+
+	return c.Id, nil
+}
+
+func (s *Storage) GetChatName(id uuid.UUID) (string, error) {
+	c, err := s.getChat(id.String(), false)
+	if err != nil {
+		return "", err
+	}
+
+	return c.Name, nil
+}
+
+func (s *Storage) GetNewCurrentChatID() (uuid.UUID, error) {
+	if s.chats.Len() == 0 {
+		return uuid.UUID{}, errors.New("no chats in storage")
+	}
+
+	c, err := s.chats.GetByIndex(0)
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+
+	return c.Id, nil
+}
+
+func (s *Storage) AddNewChat(chatName string) (uuid.UUID, error) {
+	newChat := crdt.NewChat(chatName)
+	return s.chats.Add(newChat)
+}
+
+func (s *Storage) AddChat(chat *crdt.Chat) error {
+	_, err := s.chats.Add(chat)
+	return err
+}
+
+func (s *Storage) RemoveChat(chatID uuid.UUID) {
+	s.chats.Delete(chatID)
+}
+
+// AddNodeToChat add a node to a given chat identified by id. The node slot need to be set
+func (s *Storage) AddNodeToChat(node *crdt.NodeInfos, chatID uuid.UUID) error {
+	if !s.nodes.Contains(node.Id) {
+		_, _ = s.nodes.Add(node)
+	}
+
+	c, err := s.getChat(chatID.String(), false)
+	if err != nil {
+		return err
+	}
+
+	c.SaveNode(node.Slot)
+	return nil
+}
+
+func (s *Storage) RemoveNodeFromChat(nodeSlot uint8, chatID uuid.UUID) error {
+	c, err := s.getChat(chatID.String(), false)
+	if err != nil {
+		return err
+	}
+
+	err = c.RemoveNode(nodeSlot)
+	if err != nil {
+		return err
+	}
+	n, err := s.GetNodeBySlot(nodeSlot)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s leaved chat\n", n.Name)
+	return nil
+}
+
+func (s *Storage) AddMessageToChat(message *crdt.Message, chatID uuid.UUID) error {
+	c, err := s.getChat(chatID.String(), true)
+	if err != nil {
+		return err
+	}
+
+	if c.ContainsMessage(message) {
+		return errors.New("message already saved")
+	}
+
+	c.SaveMessage(message)
+	return nil
+}
+
 func (s *Storage) GetNodeBySlot(slot uint8) (*crdt.NodeInfos, error) {
 	var (
 		numberOfNodes = s.nodes.Len()
@@ -46,107 +143,15 @@ func (s *Storage) GetNodeBySlot(slot uint8) (*crdt.NodeInfos, error) {
 	return n, nil
 }
 
-func (s *Storage) GetChatName(id uuid.UUID) (string, error) {
-	c, err := s.getChat(id.String(), false)
-	if err != nil {
-		return "", err
-	}
-
-	return c.Name, nil
-}
-
-func (s *Storage) ChatExist(chatID uuid.UUID) bool {
-	return s.chats.Contains(chatID)
-}
-
-func (s *Storage) GetChatID(chatName string) (uuid.UUID, error) {
-	c, err := s.getChat(chatName, true)
-	if err != nil {
-		return uuid.UUID{}, err
-	}
-
-	return c.Id, nil
-}
-
-func (s *Storage) GetNewCurrentChatID() (uuid.UUID, error) {
-	if s.chats.Len() == 0 {
-		return uuid.UUID{}, errors.New("no chats in storage")
-	}
-
-	c, err := s.chats.GetByIndex(0)
-	if err != nil {
-		return uuid.UUID{}, err
-	}
-
-	return c.Id, nil
-}
-
-func (s *Storage) AddMessageToChat(message *crdt.Message, chatID uuid.UUID) error {
-	c, err := s.getChat(chatID.String(), true)
-	if err != nil {
-		return err
-	}
-
-	if c.ContainsMessage(message) {
-		return errors.New("message already saved")
-	}
-
-	c.SaveMessage(message)
-	return nil
-}
-
-func (s *Storage) AddNewChat(chatName string) (uuid.UUID, error) {
-	newChat := crdt.NewChat(chatName)
-	return s.chats.Add(newChat)
-}
-
-func (s *Storage) AddChat(chat *crdt.Chat) error {
-	_, err := s.chats.Add(chat)
-	return err
-}
-
-func (s *Storage) RemoveChat(chatID uuid.UUID) {
-	slots, err := s.GetSlots(chatID)
-	if err != nil {
-		return
-	}
-
-	for _, slot := range slots {
-		if !s.IsSlotUsedByOtherChats(slot, chatID) {
-			n, _ := s.GetNodeBySlot(slot)
-			s.nodes.Delete(n.Id)
-		}
-	}
-
-	s.chats.Delete(chatID)
-}
-
-// AddNodeToChat add a node to a given chat identified by id. The node slot need to be set
-func (s *Storage) AddNodeToChat(node *crdt.NodeInfos, chatID uuid.UUID) error {
-	if !s.nodes.Contains(node.Id) {
-		_, _ = s.nodes.Add(node)
-	}
-
-	c, err := s.getChat(chatID.String(), false)
-	if err != nil {
-		return err
-	}
-
-	c.SaveNode(node.Slot)
-	return nil
-}
-
 func (s *Storage) IsSlotUsedByOtherChats(slotToFind uint8, excludeChatForSearch uuid.UUID) bool {
 	var (
-		index         = 0
 		numberOfChats = s.GetNumberOfChats()
 		err           error
 	)
 
-	for index < numberOfChats && err == nil {
-		tmpChat, _ := s.GetChatByIndex(index)
+	for index := 0; index < numberOfChats && err == nil; index++ {
+		tmpChat, _ := s.chats.GetByIndex(index)
 		if tmpChat.Id == excludeChatForSearch {
-			index++
 			continue
 		}
 
@@ -160,54 +165,6 @@ func (s *Storage) IsSlotUsedByOtherChats(slotToFind uint8, excludeChatForSearch 
 	}
 
 	return false
-}
-
-func (s *Storage) RemoveNodeFromChat(nodeSlot uint8, chatID uuid.UUID) error {
-	c, err := s.getChat(chatID.String(), false)
-	if err != nil {
-		return err
-	}
-
-	err = c.RemoveNodeSlot(nodeSlot)
-	n, err := s.GetNodeBySlot(nodeSlot)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("%s leaved chat\n", n.Name)
-
-	if !s.IsSlotUsedByOtherChats(n.Slot, c.Id) {
-		s.nodes.Delete(n.Id)
-	}
-
-	return nil
-}
-
-func (s *Storage) GetChatByIndex(index int) (*crdt.Chat, error) {
-	return s.chats.GetByIndex(index)
-}
-
-func (s *Storage) DisplayChats() {
-	s.chats.Display()
-}
-
-func (s *Storage) DisplayChatUsers(chatID uuid.UUID) error {
-	c, err := s.chats.GetById(chatID)
-	if err != nil {
-		return err
-	}
-
-	log.Printf("chat name : %s\n", c.Name)
-	for slot := range c.GetSlots() {
-		n, _ := s.nodes.GetByIndex(slot)
-		log.Printf("- %s (Address: %s, Port: %s, Slot: %d)\n", n.Name, n.Address, n.Port, n.Slot)
-	}
-
-	return nil
-}
-
-func (s *Storage) GetNumberOfChats() int {
-	return s.chats.Len()
 }
 
 func (s *Storage) RemoveNodeSlotFromStorage(slot uint8) {
@@ -224,19 +181,40 @@ func (s *Storage) RemoveNodeSlotFromStorage(slot uint8) {
 	}
 
 	for index < numberOfChats && err == nil {
-		c, err = s.GetChatByIndex(index)
-		if err != nil {
-			index++
-			continue
-		}
+		c, _ = s.chats.GetByIndex(index)
 
-		err2 := c.RemoveNodeSlot(slot)
-		if err2 == nil {
+		err = c.RemoveNode(slot)
+		if err == nil {
 			fmt.Printf("%s leaved chat %s\n", node.Name, c.Name)
 		}
 
 		index++
 	}
+
+	s.nodes.Delete(node.Id)
+}
+
+func (s *Storage) DisplayChats() {
+	s.chats.Display()
+}
+
+func (s *Storage) DisplayNodes() {
+	s.nodes.Display()
+}
+
+func (s *Storage) DisplayChatUsers(chatID uuid.UUID) error {
+	c, err := s.chats.GetById(chatID)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("chat name : %s\n", c.Name)
+	for slot := range c.GetSlots() {
+		n, _ := s.nodes.GetByIndex(slot)
+		log.Printf("- %s (Address: %s, Port: %s, Slot: %d)\n", n.Name, n.Address, n.Port, n.Slot)
+	}
+
+	return nil
 }
 
 func (s *Storage) GetSlots(chatID uuid.UUID) ([]uint8, error) {

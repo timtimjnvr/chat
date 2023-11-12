@@ -11,6 +11,7 @@ type (
 	value interface {
 		GetID() uuid.UUID
 		GetName() string
+		Display()
 
 		*crdt.Chat | *crdt.NodeInfos
 	}
@@ -63,8 +64,7 @@ func (l *List[T]) Display() {
 
 	tmp := l.head
 	for tmp != nil {
-		fmt.Printf("- %s\n", tmp.v.GetName())
-
+		tmp.v.Display()
 		tmp = tmp.next
 	}
 }

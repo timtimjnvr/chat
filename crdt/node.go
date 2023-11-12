@@ -2,6 +2,7 @@ package crdt
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
 )
 
@@ -38,4 +39,7 @@ func (i *NodeInfos) GetName() string {
 func (i *NodeInfos) ToBytes() []byte {
 	bytesMessage, _ := json.Marshal(i)
 	return bytesMessage
+}
+func (i *NodeInfos) Display() {
+	fmt.Printf("- %s (Address: %s, Port: %s, Slot: %d)\n", i.Name, i.Address, i.Port, i.Slot)
 }

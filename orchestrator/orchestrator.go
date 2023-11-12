@@ -29,28 +29,31 @@ func (o *Orchestrator) updateCurrentChat(currenChatID uuid.UUID) {
 }
 
 const (
-	MaxMessagesStdin = 100
-	logErrFrmt       = "[ERROR] %s\n"
-	logFrmt          = "[INFO] %s\n"
-	typeCommand      = "type a Command :"
+	MaxMessagesStdin       = 100
+	logErrFormat           = "[ERROR] %s\n"
+	logFormat              = "[INFO] %s\n"
+	logOpperationErrFormat = "[ERROR] [%s] %s\n"
+	typeCommand            = "type a Command :"
 )
 
 func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
-	s := storage.NewStorage()
-	id, _ := s.AddNewChat(myInfos.Name)
-	_ = s.AddNodeToChat(myInfos, id)
-
-	o := &Orchestrator{
-		RWMutex: &sync.RWMutex{},
-		myInfos: myInfos,
-		storage: s,
-	}
+	var (
+		s     = storage.NewStorage()
+		id, _ = s.AddNewChat(myInfos.Name)
+		o     = &Orchestrator{
+			RWMutex: &sync.RWMutex{},
+			myInfos: myInfos,
+			storage: s,
+		}
+	)
 
 	o.updateCurrentChat(id)
+
 	return o
 }
 
-// HandleChats maintains chat infos consistency by executing operation and building operations to send to other nodes if needed
+// HandleChats maintains chat infos consistency by executing and propagating operations received
+// from stdin or TCP connections through the channel toExecute
 func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Operation, toSend chan<- *crdt.Operation, shutdown <-chan struct{}) {
 	defer func() {
 		wg.Done()
@@ -62,71 +65,14 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			return
 
 		case op := <-toExecute:
-			// execute op
-			if op.Typology == crdt.CreateChat {
-				id, err := o.storage.AddNewChat(op.TargetedChat)
-				if err != nil {
-					fmt.Printf(logErrFrmt, err)
-					continue
-				}
-
-				// don't care about error since we just added the given c
-				_ = o.storage.AddNodeToChat(o.myInfos, id)
-				continue
-			}
-
-			if op.Typology == crdt.AddChat {
-				newChatInfos, ok := op.Data.(*crdt.Chat)
-				if !ok {
-					fmt.Println("[ERROR] can't parse op data to Chat")
-					continue
-				}
-
-				err := o.storage.AddChat(newChatInfos)
-				if err != nil {
-					fmt.Printf(logErrFrmt, err)
-					continue
-				}
-
-				id := newChatInfos.Id
-
-				err = o.storage.AddNodeToChat(o.myInfos, id)
-				if err != nil {
-					fmt.Printf(logErrFrmt, err)
-					continue
-				}
-
-				o.updateCurrentChat(id)
-
-				fmt.Printf("you joined a new c : %s\n", newChatInfos.Name)
-				continue
-			}
-
-			if op.Typology == crdt.ListChats {
-				o.storage.DisplayChats()
-				continue
-			}
-
-			if op.Typology == crdt.ListUsers {
-				o.storage.DisplayChatUsers(o.currenChatID)
-				continue
-			}
-
-			// for other operation we need to get a chat from storage
-			chatID, err := uuid.Parse(op.TargetedChat)
-			if err != nil {
-				fmt.Printf(logErrFrmt, err)
-				continue
-			}
-
-			exists := o.storage.ChatExist(chatID)
-			if !exists {
-				fmt.Printf(logErrFrmt, "unknown chat")
-				continue
-			}
-
 			switch op.Typology {
 			case crdt.JoinChatByName:
+				chatID, err := o.storage.GetChatID(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					continue
+				}
+
 				newNodeInfos, ok := op.Data.(*crdt.NodeInfos)
 				if !ok {
 					log.Println("[ERROR] can't parse op data to NodeInfos")
@@ -150,7 +96,8 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				for _, s := range slots {
 					nodeInfo, err := o.storage.GetNodeBySlot(s)
 					if err != nil {
-						fmt.Printf(logErrFrmt, err)
+						fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+						continue
 					}
 
 					addNodeOperation := crdt.NewOperation(crdt.AddNode, chatID.String(), nodeInfo)
@@ -162,11 +109,41 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				newNodeInfos.Slot = op.Slot
 				err = o.storage.AddNodeToChat(newNodeInfos, chatID)
 
-				fmt.Printf("%s joined c\n", newNodeInfos.Name)
-				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
+				fmt.Printf(logFormat, fmt.Sprintf("%s joined chat", newNodeInfos.Name))
 
-			// connection just established
+			case crdt.CreateChat:
+				id, err := o.storage.AddNewChat(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					continue
+				}
+
+				// don't care about error since we just added the given chat
+				_ = o.storage.AddNodeToChat(o.myInfos, id)
+
+			case crdt.AddChat:
+				newChatInfos, ok := op.Data.(*crdt.Chat)
+				if !ok {
+					fmt.Println("[ERROR] can't parse op data to Chat")
+					continue
+				}
+
+				err := o.storage.AddChat(newChatInfos)
+				if err != nil {
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					continue
+				}
+
+				o.updateCurrentChat(newChatInfos.Id)
+				fmt.Printf(logFormat, fmt.Sprintf("you joined a new chat : %s", newChatInfos.Name))
+
 			case crdt.AddNode, crdt.SaveNode:
+				chatID, err := uuid.Parse(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					continue
+				}
+
 				newNodeInfos, ok := op.Data.(*crdt.NodeInfos)
 				if !ok {
 					log.Println("[ERROR] can't parse op data to NodeInfos")
@@ -176,13 +153,17 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				newNodeInfos.Slot = op.Slot
 				err = o.storage.AddNodeToChat(newNodeInfos, chatID)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
-				log.Println(fmt.Sprintf("connection established with %s", newNodeInfos.Name))
-
 			case crdt.AddMessage:
+				chatID, err := uuid.Parse(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					continue
+				}
+
 				newMessage, ok := op.Data.(*crdt.Message)
 				if !ok {
 					log.Println("[ERROR] can't parse op data to Message")
@@ -191,7 +172,6 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				err = o.storage.AddMessageToChat(newMessage, chatID)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
 					continue
 				}
 
@@ -199,7 +179,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				slots, err := o.storage.GetSlots(chatID)
 				if err != nil {
-					fmt.Printf(logErrFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
@@ -208,67 +188,81 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					toSend <- op
 				}
 
-			case crdt.LeaveChat:
+			case crdt.RemoveNode:
+				chatID, err := uuid.Parse(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					continue
+				}
+
+				err = o.storage.RemoveNodeFromChat(op.Slot, chatID)
+				if err != nil {
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+				}
+
+			case crdt.KillNode:
+				o.storage.RemoveNodeSlotFromStorage(op.Slot)
+
+			case crdt.RemoveChat:
 				// Only one chat in storage
 				if o.storage.GetNumberOfChats() <= 1 {
 					fmt.Printf("[ERROR] You can't leave the current c\n")
 					continue
 				}
 
+				chatID, err := uuid.Parse(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					continue
+				}
+
 				chatNodeSlots, err := o.storage.GetSlots(chatID)
 				if err != nil {
-					fmt.Printf(logFrmt, err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					continue
 				}
 
-				toDelete := make(map[uint8]bool)
-				for _, slot := range chatNodeSlots {
-					leaveOperation := crdt.NewOperation(crdt.RemoveNode, chatID.String(), nil)
-					leaveOperation.Slot = slot
-					toSend <- leaveOperation
-				}
-
-				for _, slot := range chatNodeSlots {
-					toDelete[slot] = true
-				}
-
-				// Verify that slots are not used by any other chats
-				for s, _ := range toDelete {
+				// Killing needed connections and removing node from chat
+				for _, s := range chatNodeSlots {
 					if o.storage.IsSlotUsedByOtherChats(s, chatID) {
-						toDelete[s] = false
-					}
-				}
-
-				// Operation used by node handler to kill connections if it is not used anymore
-				for s, killConnection := range toDelete {
-					if killConnection {
+						leaveOperation := crdt.NewOperation(crdt.RemoveNode, chatID.String(), nil)
+						leaveOperation.Slot = s
+						toSend <- leaveOperation
+					} else {
 						removeNode := crdt.NewOperation(crdt.KillNode, "", nil)
 						removeNode.Slot = s
 						toSend <- removeNode
 					}
 				}
 
-				// Removing c from storage and getting new current
-				chatName, _ := o.storage.GetChatName(chatID)
-				fmt.Printf("Leaving c %s\n", chatName)
+				chatName, err := o.storage.GetChatName(chatID)
+				if err != nil {
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					continue
+				}
+
+				//Removing chat from storage
 				o.storage.RemoveChat(chatID)
+				fmt.Printf(logFormat, fmt.Sprintf("Leaving %s", chatName))
 
 				// Getting new current chat
 				newID, _ := o.storage.GetNewCurrentChatID()
 				o.updateCurrentChat(newID)
 				newCurrentName, _ := o.storage.GetChatName(newID)
-				fmt.Printf("Switched to c %s\n", newCurrentName)
-
-			case crdt.RemoveNode:
-				o.storage.RemoveNodeSlotFromStorage(op.Slot)
+				fmt.Printf("Switched to chat %s\n", newCurrentName)
 
 			case crdt.Quit:
 				process, err := os.FindProcess(os.Getpid())
 				if err != nil {
-					log.Fatal(err)
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+					os.Exit(1)
 				}
 
 				// signal main to stop
-				process.Signal(os.Interrupt)
+				err = process.Signal(os.Interrupt)
+				if err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}
@@ -291,7 +285,7 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 	go reader.Read(os.Stdin, stdin, reader.Separator, stopReading, isDone)
 
 	for {
-		fmt.Printf(logFrmt, typeCommand)
+		fmt.Printf(logFormat, typeCommand)
 
 		select {
 		case <-shutdown:
@@ -300,7 +294,7 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 		case line := <-stdin:
 			cmd, err := parsestdin.NewCommand(string(line))
 			if err != nil {
-				fmt.Printf(logErrFrmt, err)
+				fmt.Printf(logErrFormat, err)
 				continue
 			}
 
@@ -308,7 +302,7 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			switch cmd.GetTypology() {
 			case crdt.JoinChatByName:
 				if args[parsestdin.PortArg] == o.myInfos.Port && sameAddress(o.myInfos.Address, args[parsestdin.AddrArg]) {
-					fmt.Printf(logErrFrmt, "You are trying to connect to yourself")
+					fmt.Printf(logErrFormat, "You are trying to connect to yourself")
 					continue
 				}
 
@@ -323,12 +317,12 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					chatName := args[parsestdin.ChatRoomArg]
 					id, err := o.storage.GetChatID(chatName)
 					if err != nil {
-						fmt.Printf(logErrFrmt, err)
+						fmt.Printf(logErrFormat, err)
 					}
 
 					o.updateCurrentChat(id)
 
-					fmt.Printf(logFrmt, fmt.Sprintf("Switched to chat %s", chatName))
+					fmt.Printf(logFormat, fmt.Sprintf("Switched to chat %s", chatName))
 
 				case crdt.AddMessage:
 					/* Add the messageBytes to discussion & sync with other nodes */
@@ -337,13 +331,16 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 						crdt.NewMessage(o.myInfos.Name, args[parsestdin.MessageArg]))
 
 				case crdt.ListChats:
-					toExecute <- crdt.NewOperation(crdt.ListChats, "", nil)
+					o.storage.DisplayChats()
 
 				case crdt.ListUsers:
-					toExecute <- crdt.NewOperation(crdt.ListUsers, "", nil)
+					o.storage.DisplayNodes()
 
-				case crdt.LeaveChat:
-					toExecute <- crdt.NewOperation(crdt.LeaveChat, o.currenChatID.String(), o.myInfos)
+				case crdt.ListChatUsers:
+					o.storage.DisplayChatUsers(o.currenChatID)
+
+				case crdt.RemoveChat:
+					toExecute <- crdt.NewOperation(crdt.RemoveChat, o.currenChatID.String(), o.myInfos)
 
 				case crdt.Quit:
 					process, err := os.FindProcess(os.Getpid())

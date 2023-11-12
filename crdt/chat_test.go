@@ -103,7 +103,7 @@ func TestChat_RemoveNodeBySlot(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.chat.RemoveNodeSlot(tt.slot)
+			tt.chat.RemoveNode(tt.slot)
 			assert.NotContains(t, idToDelete, tt.chat.nodesSlots)
 			assert.Equal(t, tt.expectedNumberOfNodes, len(tt.chat.nodesSlots))
 		})

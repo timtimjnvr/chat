@@ -28,13 +28,31 @@ const (
 	AddNode
 	RemoveNode
 	AddChat
-	LeaveChat
+	RemoveChat
 	SwitchChat
 	AddMessage
+	ListChatUsers
 	ListUsers
 	ListChats
 	Quit
 )
+
+var operationNames = map[OperationType]string{
+	CreateChat:     "create chat",
+	JoinChatByName: "join chat by name",
+	SaveNode:       "save node",
+	KillNode:       "kill node",
+	AddNode:        "add node",
+	RemoveNode:     "remove node",
+	AddChat:        "add chat",
+	RemoveChat:     "leave chat",
+	SwitchChat:     "switch chat",
+	AddMessage:     "add message",
+	ListChatUsers:  "list chat users",
+	ListUsers:      "list users",
+	ListChats:      "list chats",
+	Quit:           "quit",
+}
 
 func NewOperation(typology OperationType, targetedChat string, data Data) *Operation {
 	return &Operation{
@@ -96,7 +114,7 @@ func DecodeOperation(bytes []byte) (*Operation, error) {
 
 	// decode data into concrete type when needed
 	switch typology {
-	case AddNode, SaveNode, LeaveChat, JoinChatByName:
+	case AddNode, SaveNode, RemoveChat, JoinChatByName:
 		var result NodeInfos
 		err := decodeData(dataBytes, &result)
 		if err != nil {
@@ -143,4 +161,8 @@ func getField(offset int, source []byte) (int, []byte) {
 		lenField := int(source[offset])
 		return offset + lenField + 1, source[offset+1 : offset+lenField+1]
 	}
+}
+
+func GetOperationName(typology OperationType) string {
+	return operationNames[typology]
 }

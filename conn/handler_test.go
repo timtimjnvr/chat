@@ -105,7 +105,7 @@ func TestNodeHandler_StartStopNodesAndSendQuit(t *testing.T) {
 	// killing conn1 by closing conn2
 	conn2.Close()
 
-	expectedQuitOperation := crdt.NewOperation(crdt.RemoveNode, "", nil)
+	expectedQuitOperation := crdt.NewOperation(crdt.KillNode, "", nil)
 	expectedQuitOperation.Slot = 1
 	expectedBytes := expectedQuitOperation.ToBytes()
 

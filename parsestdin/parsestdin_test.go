@@ -34,12 +34,12 @@ func TestParseCommandType(t *testing.T) {
 		},
 		{
 			line:             "/close ***********!\n\n",
-			expectedTypology: crdt.LeaveChat,
+			expectedTypology: crdt.RemoveChat,
 			expectedErr:      nil,
 		},
 		{
 			line:             "/list ***********!\n\n",
-			expectedTypology: crdt.ListUsers,
+			expectedTypology: crdt.ListChatUsers,
 			expectedErr:      nil,
 		},
 		{
@@ -115,7 +115,7 @@ func TestGetArgs(t *testing.T) {
 		},
 		{
 			text:         "/close\n",
-			typology:     crdt.LeaveChat,
+			typology:     crdt.RemoveChat,
 			expectedArgs: make(map[string]string),
 			expectedErr:  nil,
 		},

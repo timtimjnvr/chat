@@ -21,7 +21,7 @@ func Test_storage_AddNewChat(t *testing.T) {
 	assert.Equal(t, name, c.Name)
 
 	// try to get by index
-	c, err = s.GetChatByIndex(0)
+	c, err = s.chats.GetByIndex(0)
 	assert.Nil(t, err)
 	assert.Equal(t, name, c.Name)
 
@@ -46,7 +46,7 @@ func Test_storage_AddChat(t *testing.T) {
 	assert.Equal(t, name, c.Name)
 
 	// try to get by index
-	c, err = s.GetChatByIndex(0)
+	c, err = s.chats.GetByIndex(0)
 	assert.Nil(t, err)
 	assert.Equal(t, name, c.Name)
 

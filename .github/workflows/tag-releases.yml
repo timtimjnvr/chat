@@ -59,7 +59,7 @@ jobs:
           NEW_MINOR=0
           NEW_PATCH=0
 
-          if [[ "${{ github.event.head_commit.message }}" == *"breaking(:"* ]]; then
+          if [[ "${{ github.event.head_commit.message }}" == *"breaking("* ]]; then
             NEW_MAJOR=$((MAJOR+1))
           fi
 
