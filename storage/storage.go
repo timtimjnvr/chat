@@ -21,12 +21,9 @@ func NewStorage() *Storage {
 		nodes: NewNodeList(),
 	}
 }
+
 func (s *Storage) GetNumberOfChats() int {
 	return s.chats.Len()
-}
-
-func (s *Storage) ChatExist(chatID uuid.UUID) bool {
-	return s.chats.Contains(chatID)
 }
 
 func (s *Storage) GetChatID(chatName string) (uuid.UUID, error) {
@@ -71,18 +68,6 @@ func (s *Storage) AddChat(chat *crdt.Chat) error {
 }
 
 func (s *Storage) RemoveChat(chatID uuid.UUID) {
-	slots, err := s.GetSlots(chatID)
-	if err != nil {
-		return
-	}
-
-	for _, slot := range slots {
-		if !s.IsSlotUsedByOtherChats(slot, chatID) {
-			n, _ := s.GetNodeBySlot(slot)
-			s.nodes.Delete(n.Id)
-		}
-	}
-
 	s.chats.Delete(chatID)
 }
 
@@ -114,11 +99,6 @@ func (s *Storage) RemoveNodeFromChat(nodeSlot uint8, chatID uuid.UUID) error {
 	}
 
 	fmt.Printf("%s leaved chat\n", n.Name)
-
-	if !s.IsSlotUsedByOtherChats(n.Slot, c.Id) {
-		s.nodes.Delete(n.Id)
-	}
-
 	return nil
 }
 
@@ -162,15 +142,13 @@ func (s *Storage) GetNodeBySlot(slot uint8) (*crdt.NodeInfos, error) {
 
 func (s *Storage) IsSlotUsedByOtherChats(slotToFind uint8, excludeChatForSearch uuid.UUID) bool {
 	var (
-		index         = 0
 		numberOfChats = s.GetNumberOfChats()
 		err           error
 	)
 
-	for index < numberOfChats && err == nil {
+	for index := 0; index < numberOfChats && err == nil; index++ {
 		tmpChat, _ := s.chats.GetByIndex(index)
 		if tmpChat.Id == excludeChatForSearch {
-			index++
 			continue
 		}
 
@@ -200,23 +178,25 @@ func (s *Storage) RemoveNodeSlotFromStorage(slot uint8) {
 	}
 
 	for index < numberOfChats && err == nil {
-		c, err = s.chats.GetByIndex(index)
-		if err != nil {
-			index++
-			continue
-		}
+		c, _ = s.chats.GetByIndex(index)
 
-		err2 := c.RemoveNode(slot)
-		if err2 == nil {
+		err = c.RemoveNode(slot)
+		if err == nil {
 			fmt.Printf("%s leaved chat %s\n", node.Name, c.Name)
 		}
 
 		index++
 	}
+
+	s.nodes.Delete(node.Id)
 }
 
 func (s *Storage) DisplayChats() {
 	s.chats.Display()
+}
+
+func (s *Storage) DisplayNodes() {
+	s.nodes.Display()
 }
 
 func (s *Storage) DisplayChatUsers(chatID uuid.UUID) error {

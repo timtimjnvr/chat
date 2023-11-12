@@ -46,7 +46,7 @@ func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
 			storage: s,
 		}
 	)
-	_ = s.AddNodeToChat(myInfos, id)
+
 	o.updateCurrentChat(id)
 
 	return o
@@ -109,8 +109,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				newNodeInfos.Slot = op.Slot
 				err = o.storage.AddNodeToChat(newNodeInfos, chatID)
 
-				fmt.Printf("%s joined c\n", newNodeInfos.Name)
-				fmt.Printf("connection established with %s\n", newNodeInfos.Name)
+				fmt.Printf(logFormat, fmt.Sprintf("%s joined chat", newNodeInfos.Name))
 
 			case crdt.CreateChat:
 				id, err := o.storage.AddNewChat(op.TargetedChat)
@@ -135,26 +134,8 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					continue
 				}
 
-				id := newChatInfos.Id
-				err = o.storage.AddNodeToChat(o.myInfos, id)
-				if err != nil {
-					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
-					continue
-				}
-
-				o.updateCurrentChat(id)
-
-				fmt.Printf("you joined a new chat : %s\n", newChatInfos.Name)
-
-			case crdt.ListChats:
-				o.storage.DisplayChats()
-
-			case crdt.ListUsers:
-				err := o.storage.DisplayChatUsers(o.currenChatID)
-				if err != nil {
-					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
-					continue
-				}
+				o.updateCurrentChat(newChatInfos.Id)
+				fmt.Printf(logFormat, fmt.Sprintf("you joined a new chat : %s", newChatInfos.Name))
 
 			case crdt.AddNode, crdt.SaveNode:
 				chatID, err := uuid.Parse(op.TargetedChat)
@@ -176,8 +157,6 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					continue
 				}
 
-				log.Println(fmt.Sprintf("connection established with %s", newNodeInfos.Name))
-
 			case crdt.AddMessage:
 				chatID, err := uuid.Parse(op.TargetedChat)
 				if err != nil {
@@ -193,7 +172,6 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 				err = o.storage.AddMessageToChat(newMessage, chatID)
 				if err != nil {
-					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
@@ -211,18 +189,30 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 			case crdt.RemoveNode:
-				o.storage.RemoveNodeSlotFromStorage(op.Slot)
-
-			case crdt.LeaveChat:
 				chatID, err := uuid.Parse(op.TargetedChat)
 				if err != nil {
 					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
+				err = o.storage.RemoveNodeFromChat(op.Slot, chatID)
+				if err != nil {
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
+				}
+
+			case crdt.KillNode:
+				o.storage.RemoveNodeSlotFromStorage(op.Slot)
+
+			case crdt.RemoveChat:
 				// Only one chat in storage
 				if o.storage.GetNumberOfChats() <= 1 {
 					fmt.Printf("[ERROR] You can't leave the current c\n")
+					continue
+				}
+
+				chatID, err := uuid.Parse(op.TargetedChat)
+				if err != nil {
+					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
@@ -232,48 +222,34 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					continue
 				}
 
-				toDelete := make(map[uint8]bool)
-				for _, slot := range chatNodeSlots {
-					leaveOperation := crdt.NewOperation(crdt.RemoveNode, chatID.String(), nil)
-					leaveOperation.Slot = slot
-					toSend <- leaveOperation
-				}
-
-				for _, slot := range chatNodeSlots {
-					toDelete[slot] = true
-				}
-
-				// Verify that slots are not used by any other chats
-				for s, _ := range toDelete {
+				// Killing needed connections and removing node from chat
+				for _, s := range chatNodeSlots {
 					if o.storage.IsSlotUsedByOtherChats(s, chatID) {
-						toDelete[s] = false
-					}
-				}
-
-				// Operation used by node handler to kill connections if it is not used anymore
-				for s, killConnection := range toDelete {
-					if killConnection {
+						leaveOperation := crdt.NewOperation(crdt.RemoveNode, chatID.String(), nil)
+						leaveOperation.Slot = s
+						toSend <- leaveOperation
+					} else {
 						removeNode := crdt.NewOperation(crdt.KillNode, "", nil)
 						removeNode.Slot = s
 						toSend <- removeNode
 					}
 				}
 
-				// Removing c from storage and getting new current
 				chatName, err := o.storage.GetChatName(chatID)
 				if err != nil {
 					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
 
-				fmt.Printf("Leaving %s\n", chatName)
+				//Removing chat from storage
 				o.storage.RemoveChat(chatID)
+				fmt.Printf(logFormat, fmt.Sprintf("Leaving %s", chatName))
 
 				// Getting new current chat
 				newID, _ := o.storage.GetNewCurrentChatID()
 				o.updateCurrentChat(newID)
 				newCurrentName, _ := o.storage.GetChatName(newID)
-				fmt.Printf("Switched to c %s\n", newCurrentName)
+				fmt.Printf("Switched to chat %s\n", newCurrentName)
 
 			case crdt.Quit:
 				process, err := os.FindProcess(os.Getpid())
@@ -355,13 +331,16 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 						crdt.NewMessage(o.myInfos.Name, args[parsestdin.MessageArg]))
 
 				case crdt.ListChats:
-					toExecute <- crdt.NewOperation(crdt.ListChats, "", nil)
+					o.storage.DisplayChats()
 
 				case crdt.ListUsers:
-					toExecute <- crdt.NewOperation(crdt.ListUsers, "", nil)
+					o.storage.DisplayNodes()
 
-				case crdt.LeaveChat:
-					toExecute <- crdt.NewOperation(crdt.LeaveChat, o.currenChatID.String(), o.myInfos)
+				case crdt.ListChatUsers:
+					o.storage.DisplayChatUsers(o.currenChatID)
+
+				case crdt.RemoveChat:
+					toExecute <- crdt.NewOperation(crdt.RemoveChat, o.currenChatID.String(), o.myInfos)
 
 				case crdt.Quit:
 					process, err := os.FindProcess(os.Getpid())

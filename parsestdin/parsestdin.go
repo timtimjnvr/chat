@@ -15,14 +15,15 @@ type (
 )
 
 const (
-	newChatCommand   = "/chat"
-	msgCommand       = "/msg"
-	joinChatCommand  = "/join"
-	switchCommand    = "/switch"
-	leaveChatCommand = "/close"
-	listUsersCommand = "/list"
-	listChatsCommand = "/list_chats"
-	quitCommand      = "/quit"
+	newChatCommand       = "/chat"
+	msgCommand           = "/msg"
+	joinChatCommand      = "/join"
+	switchCommand        = "/switch"
+	leaveChatCommand     = "/close"
+	listChatUsersCommand = "/list"
+	listChatsCommand     = "/list_chats"
+	listAllUsersCommand  = "/list_users"
+	quitCommand          = "/quit"
 
 	MessageArg  = "messageArgument"
 	PortArg     = "portArgument"
@@ -36,14 +37,15 @@ const (
 
 var (
 	commandToOperation = map[string]crdt.OperationType{
-		newChatCommand:   crdt.CreateChat,
-		msgCommand:       crdt.AddMessage,
-		joinChatCommand:  crdt.JoinChatByName,
-		switchCommand:    crdt.SwitchChat,
-		leaveChatCommand: crdt.LeaveChat,
-		listUsersCommand: crdt.ListUsers,
-		listChatsCommand: crdt.ListChats,
-		quitCommand:      crdt.Quit,
+		newChatCommand:       crdt.CreateChat,
+		msgCommand:           crdt.AddMessage,
+		joinChatCommand:      crdt.JoinChatByName,
+		switchCommand:        crdt.SwitchChat,
+		leaveChatCommand:     crdt.RemoveChat,
+		listChatUsersCommand: crdt.ListChatUsers,
+		listAllUsersCommand:  crdt.ListUsers,
+		listChatsCommand:     crdt.ListChats,
+		quitCommand:          crdt.Quit,
 	}
 
 	/* PACKAGE ERRORS */

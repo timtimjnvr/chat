@@ -2,6 +2,7 @@ package crdt
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"time"
@@ -174,4 +175,8 @@ func (c *Chat) ContainsMessage(message *Message) bool {
 		}
 	}
 	return false
+}
+
+func (c *Chat) Display() {
+	fmt.Printf("- %s : %d users, %d messages\n", c.Name, len(c.nodesSlots)+1, len(c.messages))
 }

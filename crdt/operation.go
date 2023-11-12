@@ -28,9 +28,10 @@ const (
 	AddNode
 	RemoveNode
 	AddChat
-	LeaveChat
+	RemoveChat
 	SwitchChat
 	AddMessage
+	ListChatUsers
 	ListUsers
 	ListChats
 	Quit
@@ -44,9 +45,10 @@ var operationNames = map[OperationType]string{
 	AddNode:        "add node",
 	RemoveNode:     "remove node",
 	AddChat:        "add chat",
-	LeaveChat:      "leave chat",
+	RemoveChat:     "leave chat",
 	SwitchChat:     "switch chat",
 	AddMessage:     "add message",
+	ListChatUsers:  "list chat users",
 	ListUsers:      "list users",
 	ListChats:      "list chats",
 	Quit:           "quit",
@@ -112,7 +114,7 @@ func DecodeOperation(bytes []byte) (*Operation, error) {
 
 	// decode data into concrete type when needed
 	switch typology {
-	case AddNode, SaveNode, LeaveChat, JoinChatByName:
+	case AddNode, SaveNode, RemoveChat, JoinChatByName:
 		var result NodeInfos
 		err := decodeData(dataBytes, &result)
 		if err != nil {
