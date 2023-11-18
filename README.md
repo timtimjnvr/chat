@@ -18,9 +18,11 @@ Decentralized P2P chat built in golang.
 ```
 
 ## Next -> v2.0.0
-- Multi user rooms feature (for now only two users in a room)
+- Multi-user rooms feature (for now only two users in a room)
 
 ## Doc
 - Node management : [CRDTs choices](doc/crdt.md)
 - Architecture
 ![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/architecture.png?raw=true)
+- Joining a chat
+![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/joining_sequence.png?raw=true)

@@ -156,6 +156,12 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
+				// in case of node we just added we need to ask the remote node to save us
+				if op.Typology == crdt.AddNode {
+					addMe := crdt.NewOperation(crdt.SaveNode, chatID.String(), o.myInfos)
+					addMe.Slot = op.Slot
+					toSend <- addMe
+				}
 
 			case crdt.AddMessage:
 				chatID, err := uuid.Parse(op.TargetedChat)

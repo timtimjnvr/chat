@@ -123,7 +123,6 @@ func NewNodeHandler(shutdown chan struct{}) *NodeHandler {
 }
 
 func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.Operation, toExecute chan<- *crdt.Operation) {
-
 	var (
 		done        = make(chan slot)
 		outputNodes = make(chan []byte)
