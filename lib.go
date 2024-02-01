@@ -7,15 +7,12 @@ import (
 	"github/timtimjnvr/chat/orchestrator"
 	"net"
 	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 )
 
-func start(addr string, port string, name string, stdin *os.File) {
+func start(addr string, port string, name string, stdin *os.File, sigc chan os.Signal) {
 	var (
 		myInfos            = crdt.NewNodeInfos(addr, port, name)
-		sigc               = make(chan os.Signal, 1)
 		shutdown           = make(chan struct{})
 		connectionRequests = make(chan conn.ConnectionRequest)
 		newConnections     = make(chan net.Conn)
@@ -39,12 +36,6 @@ func start(addr string, port string, name string, stdin *os.File) {
 		nodeHandler.Wg.Wait()
 		fmt.Println("[INFO] program shutdown")
 	}()
-
-	signal.Notify(sigc,
-		syscall.SIGHUP,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT)
 
 	// create connections : tcp connect & listen for incoming connections
 	wgListen.Add(1)
