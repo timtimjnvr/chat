@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
@@ -14,12 +15,6 @@ import (
 )
 
 func TestTwoUsers(t *testing.T) {
-	_, err := os.OpenFile("debug.txt", os.O_CREATE|os.O_WRONLY, os.ModePerm)
-	if err != nil {
-		assert.Fail(t, "failed to create writer (OpenFile) ", err.Error())
-		return
-	}
-
 	// keep backup of the real stdout
 	oldStdout := os.Stdout
 	rStdout, wStdout, _ := os.Pipe()
@@ -32,23 +27,36 @@ func TestTwoUsers(t *testing.T) {
 		wg   = &sync.WaitGroup{}
 	)
 
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
+		defer close(outC)
 		for {
 			select {
 			case <-stop:
 				return
 
 			default:
-				var buf bytes.Buffer
-				_, _ = io.Copy(&buf, rStdout)
+				var buf = bytes.Buffer{}
+				_, err := io.Copy(&buf, rStdout)
+				if err != nil {
+					return
+				}
 				outC <- buf.String()
 			}
 		}
 	}()
 
-	// TODO define list of expected display messages
+	var expectedMessages = []string{
+		"[INFO] type a Command :",
+		"[INFO] type a Command :",
+		"[INFO] type a Command :",
+		"[INFO] user2 joined chat",
+		"[INFO] you joined a new chat : user1",
+		"[INFO] type a Command :",
+		"user2 (2024-05-19T16:45:02+02:00): hey man",
+		"user2 (2024-05-19T16:45:02+02:00): hey man",
+		"[INFO] program shutdown",
+		"[INFO] program shutdown",
+	}
 
 	// Set up test resources and start test scenarios
 	rand.Seed(time.Now().UnixNano())
@@ -74,6 +82,7 @@ func TestTwoUsers(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
 		start("", fmt.Sprintf("%d", port1), "user1", stdinUser1, sigC1)
 	}()
 
@@ -83,12 +92,21 @@ func TestTwoUsers(t *testing.T) {
 		start("", fmt.Sprintf("%d", port2), "user2", stdinUser2, sigC2)
 	}()
 
-	// TODO send the commands to simulated clients
 	_, err = w2.Write([]byte(fmt.Sprintf("/join localhost %d user1\n", port1)))
 	if err != nil {
 		t.Fatal("w2.Write err : failed to write on user2 stdin", err)
 		return
 	}
+
+	<-time.Tick(1 * time.Second)
+
+	_, err = w2.Write([]byte("/msg hey man"))
+	if err != nil {
+		t.Fatal("w2.Write err : failed to write on user2 stdin", err)
+		return
+	}
+
+	<-time.Tick(5 * time.Second)
 
 	// stop simulation
 	sigC1 <- syscall.SIGINT
@@ -102,10 +120,15 @@ func TestTwoUsers(t *testing.T) {
 	// restoring stdout for printing test results
 	wStdout.Close()
 	os.Stdout = oldStdout
+
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+		index := 0
 		for m := range outC {
-			// TODO compare with expected
-			fmt.Println(m)
+			messages := strings.Split(m, "\n")
+			assert.Equal(t, expectedMessages[index], messages[index])
 		}
 	}()
+	wg.Wait()
 }
