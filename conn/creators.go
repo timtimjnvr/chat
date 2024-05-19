@@ -43,10 +43,14 @@ func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.Nod
 	go Connect(&wgInitNodeConnections, myInfos, incomingConnectionRequests, newConnections, shutdown)
 
 	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Recovered from panic:", r)
+		}
+
+		wgInitNodeConnections.Wait()
 		close(newConnections)
 		isReady.Signal()
 		wgClosure.Wait()
-		wgInitNodeConnections.Wait()
 		wg.Done()
 	}()
 
@@ -63,10 +67,9 @@ func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.Nod
 		// extracts the first connection on the listener queue
 		c, err = ln.Accept()
 		if err != nil {
+			fmt.Println("[ERROR] ", err.Error())
 			return
 
-			fmt.Println("[ERROR] ", err.Error())
-			continue
 		}
 
 		newConnections <- c
@@ -75,6 +78,9 @@ func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.Nod
 
 func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, incomingConnectionRequest <-chan ConnectionRequest, newConnections chan<- net.Conn, shutdown <-chan struct{}) {
 	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("[ERROR] ", r)
+		}
 		wg.Done()
 	}()
 
@@ -99,7 +105,6 @@ func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, incomingConnectionRequ
 			var c net.Conn
 			c, err = openConnection(addr, connectionRequest.targetedPort)
 			if err != nil {
-				panic(err)
 				fmt.Println("[ERROR] ", err)
 				break
 			}
