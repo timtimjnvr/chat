@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"fmt"
 	"net"
 	"os"
 )
@@ -11,7 +12,12 @@ type conn struct {
 }
 
 func newConn(c net.Conn) (*conn, error) {
-	file, err := c.(*net.TCPConn).File()
+	f, ok := c.(*net.TCPConn)
+	if !ok {
+		return nil, fmt.Errorf("conn can't be converted to *net.TCPConn")
+	}
+
+	file, err := f.File()
 	if err != nil {
 		return nil, err
 	}

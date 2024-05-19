@@ -2,7 +2,6 @@ package conn
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"github/timtimjnvr/chat/crdt"
 	"log"
 	"net"
@@ -44,10 +43,14 @@ func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.Nod
 	go Connect(&wgInitNodeConnections, myInfos, incomingConnectionRequests, newConnections, shutdown)
 
 	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Recovered from panic:", r)
+		}
+
+		wgInitNodeConnections.Wait()
 		close(newConnections)
 		isReady.Signal()
 		wgClosure.Wait()
-		wgInitNodeConnections.Wait()
 		wg.Done()
 	}()
 
@@ -63,12 +66,10 @@ func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.Nod
 	for {
 		// extracts the first connection on the listener queue
 		c, err = ln.Accept()
-		if errors.Is(err, net.ErrClosed) {
-			return
-		}
-
 		if err != nil {
-			log.Fatal("[ERROR]", err)
+			fmt.Println("[ERROR] ", err.Error())
+			return
+
 		}
 
 		newConnections <- c
@@ -77,6 +78,9 @@ func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.Nod
 
 func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, incomingConnectionRequest <-chan ConnectionRequest, newConnections chan<- net.Conn, shutdown <-chan struct{}) {
 	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("[ERROR] ", r)
+		}
 		wg.Done()
 	}()
 
@@ -86,7 +90,6 @@ func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, incomingConnectionRequ
 			return
 
 		case connectionRequest := <-incomingConnectionRequest:
-			//args := connectionRequest.GetArgs()
 			var (
 				addr     = connectionRequest.targetedAddress
 				chatRoom = connectionRequest.chatRoom

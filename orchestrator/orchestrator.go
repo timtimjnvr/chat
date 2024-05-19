@@ -274,10 +274,10 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 	}
 }
 
-func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Operation, outgoingConnectionRequests chan<- conn.ConnectionRequest, shutdown chan struct{}) {
+func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, osStdin *os.File, toExecute chan *crdt.Operation, outgoingConnectionRequests chan<- conn.ConnectionRequest, shutdown chan struct{}) {
 	var (
 		wgReadStdin = sync.WaitGroup{}
-		stdin       = make(chan []byte, MaxMessagesStdin)
+		stdinChann  = make(chan []byte, MaxMessagesStdin)
 		stopReading = make(chan struct{}, 0)
 	)
 
@@ -288,7 +288,7 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 	}()
 
 	isDone := make(chan struct{})
-	go reader.Read(os.Stdin, stdin, reader.Separator, stopReading, isDone)
+	go reader.Read(osStdin, stdinChann, reader.Separator, stopReading, isDone)
 
 	for {
 		fmt.Printf(logFormat, typeCommand)
@@ -297,7 +297,7 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 		case <-shutdown:
 			return
 
-		case line := <-stdin:
+		case line := <-stdinChann:
 			cmd, err := parsestdin.NewCommand(string(line))
 			if err != nil {
 				fmt.Printf(logErrFormat, err)
