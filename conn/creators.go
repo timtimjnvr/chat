@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"errors"
 	"fmt"
 	"github/timtimjnvr/chat/crdt"
 	"log"
@@ -66,10 +67,11 @@ func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.Nod
 	for {
 		// extracts the first connection on the listener queue
 		c, err = ln.Accept()
-		if err != nil {
+		if errors.Is(err, net.ErrClosed) {
+			return
+		} else if err != nil {
 			fmt.Println("[ERROR] ", err.Error())
 			return
-
 		}
 
 		newConnections <- c

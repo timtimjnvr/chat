@@ -190,8 +190,9 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				}
 
 				for _, s := range slots {
-					op.Slot = s
-					toSend <- op
+					copied := op.Copy()
+					copied.Slot = s
+					toSend <- copied
 				}
 
 			case crdt.RemoveNode:
@@ -343,7 +344,10 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, osStdin *os.File, toExecu
 					o.storage.DisplayNodes()
 
 				case crdt.ListChatUsers:
-					o.storage.DisplayChatUsers(o.currenChatID)
+					err = o.storage.DisplayChatUsers(o.currenChatID)
+					if err != nil {
+						fmt.Printf(logErrFormat, err)
+					}
 
 				case crdt.RemoveChat:
 					toExecute <- crdt.NewOperation(crdt.RemoveChat, o.currenChatID.String(), o.myInfos)

@@ -210,7 +210,10 @@ func (s *Storage) DisplayChatUsers(chatID uuid.UUID) error {
 
 	log.Printf("chat name : %s\n", c.Name)
 	for slot := range c.GetSlots() {
-		n, _ := s.nodes.GetByIndex(slot)
+		n, err := s.nodes.GetByIndex(slot)
+		if err != nil {
+			return err
+		}
 		log.Printf("- %s (Address: %s, Port: %s, Slot: %d)\n", n.Name, n.Address, n.Port, n.Slot)
 	}
 
