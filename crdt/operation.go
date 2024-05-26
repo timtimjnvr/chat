@@ -166,3 +166,12 @@ func getField(offset int, source []byte) (int, []byte) {
 func GetOperationName(typology OperationType) string {
 	return operationNames[typology]
 }
+
+func (o *Operation) Copy() *Operation {
+	newOp := &Operation{}
+	newOp.Slot = o.Slot
+	newOp.Typology = o.Typology
+	newOp.TargetedChat = o.TargetedChat
+	newOp.Data = o.Data
+	return newOp
+}

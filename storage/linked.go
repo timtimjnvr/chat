@@ -29,8 +29,8 @@ type (
 )
 
 var (
-	AlreadyInListWithNameErr = errors.New("already a chat with this name in the listOld")
-	AlreadyInListWithIDErr   = errors.New("already a chat with this ID in the listOld")
+	AlreadyInListWithNameErr = errors.New("already a chat with this name in the list")
+	AlreadyInListWithIDErr   = errors.New("already a chat with this ID in the list")
 	InvalidChatErr           = errors.New("invalid chat")
 	NotFoundErr              = errors.New("not found")
 	InvalidIdentifierErr     = errors.New("invalid identifier")
