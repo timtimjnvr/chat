@@ -26,7 +26,8 @@ type (
 	}
 
 	NodeHandler struct {
-		nodes map[slot]*node
+		debugMode bool
+		nodes     map[slot]*node
 
 		Wg       *sync.WaitGroup
 		Shutdown chan struct{}
@@ -122,6 +123,10 @@ func NewNodeHandler(shutdown chan struct{}) *NodeHandler {
 	}
 }
 
+func (d *NodeHandler) SetDebugMode() {
+	d.debugMode = true
+}
+
 func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.Operation, toExecute chan<- *crdt.Operation) {
 	var (
 		done        = make(chan slot)
@@ -143,6 +148,10 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 
 		case c := <-newConnections:
 			s := d.getNextSlot()
+			if d.debugMode {
+				fmt.Println("[DEBUG] ", "New connection", s)
+			}
+
 			n, err := newNode(c, d.getNextSlot(), outputNodes)
 			if err != nil {
 				log.Println("[ERROR] ", err)
@@ -154,12 +163,20 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			d.nodes[s] = n
 
 		case s := <-done:
+			if d.debugMode {
+				fmt.Println("[DEBUG] node Handler", "Node done", s)
+			}
+
 			quitOperation := crdt.NewOperation(crdt.KillNode, "", nil)
 			quitOperation.Slot = uint8(s)
 			toExecute <- quitOperation
 			d.nodes[s] = nil
 
 		case operation := <-toSend:
+			if d.debugMode {
+				fmt.Println("[DEBUG] node Handler", crdt.GetOperationName(operation.Typology), "operation to send")
+			}
+
 			// Set slot
 			s := slot(operation.Slot)
 			if n, exist := d.nodes[s]; exist {
@@ -174,6 +191,10 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			if err != nil {
 				log.Println("[ERROR] ", err)
 				continue
+			}
+
+			if d.debugMode {
+				fmt.Println("[DEBUG] node Handler", crdt.GetOperationName(operation.Typology), "operation received")
 			}
 
 			// need to create connection and set slot in operation
