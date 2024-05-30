@@ -16,6 +16,7 @@ import (
 type (
 	Orchestrator struct {
 		*sync.RWMutex
+		debugMode    bool
 		myInfos      *crdt.NodeInfos
 		currenChatID uuid.UUID
 		storage      *storage.Storage
@@ -52,6 +53,10 @@ func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
 	return o
 }
 
+func (o *Orchestrator) SetDebugMode() {
+	o.debugMode = true
+}
+
 // HandleChats maintains chat infos consistency by executing and propagating operations received
 // from stdin or TCP connections through the channel toExecute
 func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Operation, toSend chan<- *crdt.Operation, shutdown <-chan struct{}) {
@@ -62,9 +67,16 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 	for {
 		select {
 		case <-shutdown:
+			if o.debugMode {
+				fmt.Println("[DEBUG] orch", "shutting down")
+			}
 			return
 
 		case op := <-toExecute:
+			if o.debugMode {
+				fmt.Println("[DEBUG] orch", crdt.GetOperationName(op.Typology), "operation to execute")
+			}
+
 			switch op.Typology {
 			case crdt.JoinChatByName:
 				chatID, err := o.storage.GetChatID(op.TargetedChat)
@@ -181,6 +193,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					continue
 				}
 
+				// No error so we effectively got a new message
 				fmt.Printf("%s (%s): %s", newMessage.Sender, newMessage.Date, newMessage.Content)
 
 				slots, err := o.storage.GetSlots(chatID)
@@ -188,11 +201,13 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 					fmt.Printf(logOpperationErrFormat, crdt.GetOperationName(op.Typology), err)
 					continue
 				}
-
 				for _, s := range slots {
-					copied := op.Copy()
-					copied.Slot = s
-					toSend <- copied
+					// Send message to all slots except the sender
+					if op.Slot != s {
+						copied := op.Copy()
+						copied.Slot = s
+						toSend <- copied
+					}
 				}
 
 			case crdt.RemoveNode:
@@ -283,6 +298,9 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, osStdin *os.File, toExecu
 	)
 
 	defer func() {
+		if o.debugMode {
+			fmt.Println("[DEBUG] orch : defering HandleStdin")
+		}
 		close(stopReading)
 		wgReadStdin.Wait()
 		wg.Done()
@@ -296,9 +314,21 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, osStdin *os.File, toExecu
 
 		select {
 		case <-shutdown:
+			if o.debugMode {
+				fmt.Println("[DEBUG] orch : shuting down HandleStdin")
+			}
+			return
+
+		case <-isDone:
+			if o.debugMode {
+				fmt.Println("[DEBUG] orch : stding reader is done")
+			}
 			return
 
 		case line := <-stdinChann:
+			if o.debugMode {
+				fmt.Println("[DEBUG] orch : got new line from stdin")
+			}
 			cmd, err := parsestdin.NewCommand(string(line))
 			if err != nil {
 				fmt.Printf(logErrFormat, err)
