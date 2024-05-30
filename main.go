@@ -9,9 +9,10 @@ import (
 
 func main() {
 	var (
-		myPortPtr = flag.String("p", "8080", "port number used to accept connections")
-		myAddrPtr = flag.String("a", "", "address used to accept connections")
-		myNamePtr = flag.String("u", "tim", "nickname used in all chat")
+		myPortPtr    = flag.String("p", "8080", "port number used to accept connections")
+		myAddrPtr    = flag.String("a", "", "address used to accept connections")
+		myNamePtr    = flag.String("u", "tim", "nickname used in all chat")
+		debugModePtr = flag.Bool("d", false, "Enable debub mode")
 
 		sigc = make(chan os.Signal, 1)
 	)
@@ -25,5 +26,5 @@ func main() {
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 
-	start(*myAddrPtr, *myPortPtr, *myNamePtr, os.Stdin, sigc)
+	start(*myAddrPtr, *myPortPtr, *myNamePtr, os.Stdin, sigc, *debugModePtr)
 }

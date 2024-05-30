@@ -83,13 +83,13 @@ func TestTwoUsers(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		start("", fmt.Sprintf("%d", port1), "user1", stdinUser1, sigC1)
+		start("", fmt.Sprintf("%d", port1), "user1", stdinUser1, sigC1, false)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		start("", fmt.Sprintf("%d", port2), "user2", stdinUser2, sigC2)
+		start("", fmt.Sprintf("%d", port2), "user2", stdinUser2, sigC2, false)
 	}()
 
 	_, err = w2.Write([]byte(fmt.Sprintf("/join localhost %d user1\n", port1)))

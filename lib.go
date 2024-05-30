@@ -10,7 +10,7 @@ import (
 	"sync"
 )
 
-func start(addr string, port string, name string, stdin *os.File, sigc chan os.Signal) {
+func start(addr string, port string, name string, stdin *os.File, sigc chan os.Signal, debugModePtr bool) {
 	var (
 		myInfos            = crdt.NewNodeInfos(addr, port, name)
 		shutdown           = make(chan struct{})
@@ -28,6 +28,11 @@ func start(addr string, port string, name string, stdin *os.File, sigc chan os.S
 		orch        = orchestrator.NewOrchestrator(myInfos)
 		nodeHandler = conn.NewNodeHandler(shutdown)
 	)
+
+	if debugModePtr {
+		orch.SetDebugMode()
+		nodeHandler.SetDebugMode()
+	}
 
 	defer func() {
 		wgHandleStdin.Wait()

@@ -164,7 +164,7 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 
 		case s := <-done:
 			if d.debugMode {
-				fmt.Println("[DEBUG] ", "Node done", s)
+				fmt.Println("[DEBUG] node Handler", "Node done", s)
 			}
 
 			quitOperation := crdt.NewOperation(crdt.KillNode, "", nil)
@@ -174,7 +174,7 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 
 		case operation := <-toSend:
 			if d.debugMode {
-				fmt.Println("[DEBUG] ", "Send Operation", string(operation.ToBytes()))
+				fmt.Println("[DEBUG] node Handler", crdt.GetOperationName(operation.Typology), "operation to send")
 			}
 
 			// Set slot
@@ -187,14 +187,14 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			}
 
 		case operationBytes := <-outputNodes:
-			if d.debugMode {
-				fmt.Println("[DEBUG] ", "Received Operation", string(operationBytes))
-			}
-
 			operation, err := crdt.DecodeOperation(operationBytes)
 			if err != nil {
 				log.Println("[ERROR] ", err)
 				continue
+			}
+
+			if d.debugMode {
+				fmt.Println("[DEBUG] node Handler", crdt.GetOperationName(operation.Typology), "operation received")
 			}
 
 			// need to create connection and set slot in operation
