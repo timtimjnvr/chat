@@ -129,6 +129,7 @@ func (d *NodeHandler) SetDebugMode() {
 
 func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.Operation, toExecute chan<- *crdt.Operation) {
 	var (
+		nodeAccess  = &sync.Mutex{}
 		done        = make(chan slot)
 		outputNodes = make(chan []byte)
 	)
@@ -141,15 +142,47 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 		d.Wg.Done()
 	}()
 
+	d.Wg.Add(1)
+	go func() {
+		defer d.Wg.Done()
+
+		for {
+			select {
+			case <-d.Shutdown:
+				return
+
+			case operation := <-toSend:
+				if d.debugMode {
+					fmt.Println("[DEBUG] node Handler", crdt.GetOperationName(operation.Typology), "operation to send")
+				}
+
+				// Set slot
+				s := slot(operation.Slot)
+				nodeAccess.Lock()
+				if n, exist := d.nodes[s]; exist && n != nil {
+					n.Input <- operation.ToBytes()
+					if operation.Typology == crdt.KillNode {
+						n.stop()
+					}
+				}
+				nodeAccess.Unlock()
+			}
+		}
+	}()
+
 	for {
 		select {
 		case <-d.Shutdown:
+			if d.debugMode {
+				fmt.Println("[DEBUG] node Handler shuting down")
+			}
+
 			return
 
 		case c := <-newConnections:
 			s := d.getNextSlot()
 			if d.debugMode {
-				fmt.Println("[DEBUG] ", "New connection", s)
+				fmt.Println("[DEBUG] node Handler", "New connection", s)
 			}
 
 			n, err := newNode(c, d.getNextSlot(), outputNodes)
@@ -160,7 +193,9 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 
 			n.Wg.Add(1)
 			go n.start(done)
+			nodeAccess.Lock()
 			d.nodes[s] = n
+			nodeAccess.Unlock()
 
 		case s := <-done:
 			if d.debugMode {
@@ -170,23 +205,15 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			quitOperation := crdt.NewOperation(crdt.KillNode, "", nil)
 			quitOperation.Slot = uint8(s)
 			toExecute <- quitOperation
+			nodeAccess.Lock()
 			d.nodes[s] = nil
-
-		case operation := <-toSend:
-			if d.debugMode {
-				fmt.Println("[DEBUG] node Handler", crdt.GetOperationName(operation.Typology), "operation to send")
-			}
-
-			// Set slot
-			s := slot(operation.Slot)
-			if n, exist := d.nodes[s]; exist {
-				n.Input <- operation.ToBytes()
-				if operation.Typology == crdt.KillNode {
-					n.stop()
-				}
-			}
+			nodeAccess.Unlock()
 
 		case operationBytes := <-outputNodes:
+			if d.debugMode {
+				fmt.Println("[DEBUG] node Handler received operationBytes")
+			}
+
 			operation, err := crdt.DecodeOperation(operationBytes)
 			if err != nil {
 				log.Println("[ERROR] ", err)
@@ -207,10 +234,18 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 
 				// establish connection and set slot
 				var c net.Conn
+				if d.debugMode {
+					fmt.Println("[DEBUG] node Handler establishing connection")
+				}
+
 				c, err = openConnection(newNodeInfos.Address, newNodeInfos.Port)
 				if err != nil {
 					log.Println("[ERROR] ", err)
 					break
+				}
+
+				if d.debugMode {
+					fmt.Println("[DEBUG] node Handler connection established")
 				}
 
 				s := d.getNextSlot()
@@ -222,7 +257,9 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 
 				n.Wg.Add(1)
 				go n.start(done)
+				nodeAccess.Lock()
 				d.nodes[s] = n
+				nodeAccess.Unlock()
 
 				operation.Slot = uint8(s)
 			}
