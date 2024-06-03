@@ -93,7 +93,7 @@ func TestConnect(t *testing.T) {
 	isListening.Wait()
 
 	wgConnect.Add(1)
-	go Connect(&wgConnect, joinerInfos, connectionRequests, newConnectionsInitConn, shutdown)
+	go InitJoinChatProcess(&wgConnect, joinerInfos, connectionRequests, newConnectionsInitConn, shutdown)
 
 	connRequest := NewConnectionRequest(listenerInfos.Port, listenerInfos.Address, listenerInfos.Name)
 

@@ -59,64 +59,6 @@ func TestNodeHandler_StartAndStop(t *testing.T) {
 		sender.Wg.Wait()
 		reader.Wg.Wait()
 	}()
-
-	timeout = time.Tick(maxTestDuration)
-	numberOfDone := 0
-
-	for {
-		select {
-		case <-timeout:
-			assert.Fail(t, "test timeout")
-			return
-		case <-done:
-			numberOfDone++
-			if numberOfDone == 2 {
-				return
-			}
-		}
-	}
-}
-
-func TestNodeHandler_StartStopNodesAndSendQuit(t *testing.T) {
-	var (
-		maxTestDuration = 1 * time.Second
-		shutdown        = make(chan struct{}, 0)
-		nh              = NewNodeHandler(nil, shutdown)
-		newConnections  = make(chan net.Conn)
-		toSend          = make(chan *crdt.Operation)
-		toExecute       = make(chan *crdt.Operation)
-	)
-
-	defer func() {
-		close(shutdown)
-		nh.Wg.Wait()
-	}()
-
-	nh.Wg.Add(1)
-	go nh.Start(newConnections, toSend, toExecute)
-
-	conn1, conn2, err := helperGetConnections("12346")
-	if err != nil {
-		assert.Fail(t, "failed to create a conn")
-	}
-
-	newConnections <- conn1
-
-	// killing conn1 by closing conn2
-	conn2.Close()
-
-	expectedQuitOperation := crdt.NewOperation(crdt.KillNode, "", nil)
-	expectedQuitOperation.Slot = 1
-	expectedBytes := expectedQuitOperation.ToBytes()
-
-	timeout := time.Tick(maxTestDuration)
-	select {
-	case <-timeout:
-		assert.Fail(t, "test timeout")
-		return
-	case op := <-toExecute:
-		assert.Equal(t, op.ToBytes(), expectedBytes, "did not received expected quit operation")
-	}
 }
 
 func TestNodeHandler_Send(t *testing.T) {

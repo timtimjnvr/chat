@@ -41,7 +41,7 @@ func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.Nod
 	)
 
 	wgInitNodeConnections.Add(1)
-	go Connect(&wgInitNodeConnections, myInfos, incomingConnectionRequests, newConnections, shutdown)
+	go InitJoinChatProcess(&wgInitNodeConnections, myInfos, incomingConnectionRequests, newConnections, shutdown)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -78,7 +78,7 @@ func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.Nod
 	}
 }
 
-func Connect(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, incomingConnectionRequest <-chan ConnectionRequest, newConnections chan<- net.Conn, shutdown <-chan struct{}) {
+func InitJoinChatProcess(wg *sync.WaitGroup, myInfos *crdt.NodeInfos, incomingConnectionRequest <-chan ConnectionRequest, newConnections chan<- net.Conn, shutdown <-chan struct{}) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("[ERROR] ", r)
