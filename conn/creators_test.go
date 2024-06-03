@@ -2,7 +2,6 @@ package conn
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/reader"
 	"net"
@@ -11,6 +10,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestListenAndServe(t *testing.T) {
@@ -170,12 +171,10 @@ func TestReadConn(t *testing.T) {
 		return
 	}
 
-	isDone := make(chan struct{})
-	go reader.Read(c, messages, reader.Separator, shutdown, isDone)
+	go reader.Read(c, messages, reader.Separator, shutdown)
 
 	defer func() {
 		close(shutdown)
-		<-isDone
 	}()
 
 	var (

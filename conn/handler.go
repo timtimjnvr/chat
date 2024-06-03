@@ -58,14 +58,10 @@ func (n *node) start(done chan<- slot) {
 		done <- n.slot
 	}()
 
-	isDone := make(chan struct{})
-	go reader.Read(n.conn, outputConnection, reader.Separator, n.Shutdown, isDone)
+	go reader.Read(n.conn, outputConnection, reader.Separator, n.Shutdown)
 
 	for {
 		select {
-		case <-isDone:
-			return
-
 		case <-n.Shutdown:
 			return
 

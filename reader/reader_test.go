@@ -60,8 +60,7 @@ func TestRead(t *testing.T) {
 		return
 	}
 
-	isDone := make(chan struct{})
-	go Read(r, messages, Separator, shutdown, isDone)
+	go Read(r, messages, Separator, shutdown)
 
 	var (
 		timeout = time.Tick(maxTestDuration)
@@ -141,8 +140,7 @@ func TestRead_SOMAXCONN(t *testing.T) {
 			return
 		}
 
-		isDone := make(chan struct{})
-		go Read(r, messages, Separator, shutdown, isDone)
+		go Read(r, messages, Separator, shutdown)
 		testsWg[i] = &wg
 	}
 
