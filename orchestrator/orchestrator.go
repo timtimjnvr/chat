@@ -306,8 +306,7 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, osStdin *os.File, toExecu
 		wg.Done()
 	}()
 
-	isDone := make(chan struct{})
-	go reader.Read(osStdin, stdinChann, reader.Separator, stopReading, isDone)
+	go reader.Read(osStdin, stdinChann, reader.Separator, stopReading)
 
 	for {
 		fmt.Printf(logFormat, typeCommand)
@@ -316,12 +315,6 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, osStdin *os.File, toExecu
 		case <-shutdown:
 			if o.debugMode {
 				fmt.Println("[DEBUG] orch : shuting down HandleStdin")
-			}
-			return
-
-		case <-isDone:
-			if o.debugMode {
-				fmt.Println("[DEBUG] orch : stding reader is done")
 			}
 			return
 

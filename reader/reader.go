@@ -16,14 +16,13 @@ var Separator = []byte("\n")
 
 const MaxMessageSize = 1000
 
-func Read(reader Reader, output chan<- []byte, separator []byte, shutdown, isDone chan struct{}) {
+func Read(reader Reader, output chan<- []byte, separator []byte, shutdown chan struct{}) {
 	done := make(chan struct{})
 
 	defer func() {
 		reader.Close()
 		close(done)
 		close(output)
-		close(isDone)
 	}()
 
 	// writeClose is closed in order to signal to stop reading output
