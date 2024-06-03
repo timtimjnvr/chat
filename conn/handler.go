@@ -58,9 +58,7 @@ func newNode(conn net.Conn, slot slot, output chan<- []byte) (*node, error) {
 func (n *node) start(done chan<- slot) {
 	outputConnection := make(chan []byte)
 
-	defer func() {
-		n.Wg.Done()
-	}()
+	defer n.Wg.Done()
 
 	go reader.Read(n.conn, outputConnection, reader.Separator, n.Shutdown)
 
@@ -82,9 +80,18 @@ func (n *node) start(done chan<- slot) {
 
 		case message, ok := <-outputConnection:
 			if !ok {
-				// TCP connection closed and need to be re established
-				done <- n.slot
-				return
+				select {
+				case <-n.Shutdown:
+					fmt.Println("pass in shutdown")
+					// simple closure due to stop call
+					return
+
+				default:
+					fmt.Println("pass in default")
+					//TCP connection closed and need to be re established
+					done <- n.slot
+					return
+				}
 			}
 
 			// Set node slot for chat NodeHandler
@@ -103,7 +110,6 @@ func (n *node) stop() {
 	if n == nil {
 		return
 	}
-
 	close(n.Shutdown)
 	n.Wg.Wait()
 }
@@ -160,13 +166,25 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 				if d.debugMode {
 					fmt.Println("[DEBUG] node Handler", crdt.GetOperationName(operation.Typology), "operation to send")
 				}
-
 				// Set slot
 				s := slot(operation.Slot)
+
 				nodeAccess.Lock()
-				if n, exist := d.nodes[s]; exist && n != nil {
-					n.Input <- operation.ToBytes()
+				// Broadcast
+				if s == 0 {
+					for _, n := range d.nodes {
+						if n != nil {
+							n.Input <- operation.ToBytes()
+							// TODO find a way to wait node
+						}
+					}
+				} else {
+					if n, exist := d.nodes[s]; exist && n != nil {
+						n.Input <- operation.ToBytes()
+						// TODO find a way to wait node
+					}
 				}
+
 				nodeAccess.Unlock()
 			}
 		}
@@ -199,7 +217,7 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			d.nodes[s] = n
 			nodeAccess.Unlock()
 
-			// TCP connection closed unexpectedly
+			// TCP connection closed
 		case s := <-done:
 			if d.debugMode {
 				fmt.Println("[DEBUG] node Handler", "Node done", s)
@@ -290,6 +308,7 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 				if operation.Slot == 0 {
 					for _, n := range d.nodes {
 						if n != nil {
+							fmt.Println("closing connection")
 							n.stop()
 							n = nil
 						}
