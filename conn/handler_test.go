@@ -81,7 +81,7 @@ func TestNodeHandler_StartStopNodesAndSendQuit(t *testing.T) {
 	var (
 		maxTestDuration = 1 * time.Second
 		shutdown        = make(chan struct{}, 0)
-		nh              = NewNodeHandler(shutdown)
+		nh              = NewNodeHandler(nil, shutdown)
 		newConnections  = make(chan net.Conn)
 		toSend          = make(chan *crdt.Operation)
 		toExecute       = make(chan *crdt.Operation)
@@ -143,7 +143,7 @@ func TestNodeHandler_Send(t *testing.T) {
 	var (
 		maxTestDuration = 1 * time.Second
 		shutdown        = make(chan struct{}, 0)
-		nh              = NewNodeHandler(shutdown)
+		nh              = NewNodeHandler(nil, shutdown)
 		newConnections  = make(chan net.Conn)
 		toSend          = make(chan *crdt.Operation)
 		toExecute       = make(chan *crdt.Operation)

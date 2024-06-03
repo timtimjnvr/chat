@@ -26,11 +26,16 @@ type (
 	}
 
 	NodeHandler struct {
-		debugMode bool
-		nodes     map[slot]*node
+		debugMode   bool
+		nodeStorage NodeStorage
+		nodes       map[slot]*node
 
 		Wg       *sync.WaitGroup
 		Shutdown chan struct{}
+	}
+
+	NodeStorage interface {
+		GetNodeBySlot(slot uint8) (*crdt.NodeInfos, error)
 	}
 )
 
@@ -111,11 +116,12 @@ func (d *NodeHandler) getNextSlot() slot {
 	return slot(length + 1)
 }
 
-func NewNodeHandler(shutdown chan struct{}) *NodeHandler {
+func NewNodeHandler(nodeStorage NodeStorage, shutdown chan struct{}) *NodeHandler {
 	return &NodeHandler{
-		nodes:    make(map[slot]*node),
-		Wg:       &sync.WaitGroup{},
-		Shutdown: shutdown,
+		nodeStorage: nodeStorage,
+		nodes:       make(map[slot]*node),
+		Wg:          &sync.WaitGroup{},
+		Shutdown:    shutdown,
 	}
 }
 
@@ -157,9 +163,6 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 				nodeAccess.Lock()
 				if n, exist := d.nodes[s]; exist && n != nil {
 					n.Input <- operation.ToBytes()
-					if operation.Typology == crdt.KillNode {
-						n.stop()
-					}
 				}
 				nodeAccess.Unlock()
 			}

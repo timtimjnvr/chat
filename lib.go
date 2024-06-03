@@ -5,6 +5,7 @@ import (
 	"github/timtimjnvr/chat/conn"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/orchestrator"
+	"github/timtimjnvr/chat/storage"
 	"net"
 	"os"
 	"sync"
@@ -24,9 +25,9 @@ func start(addr string, port string, name string, stdin *os.File, sigc chan os.S
 		wgHandleStdin = sync.WaitGroup{}
 		lock          = sync.Mutex{}
 		isReady       = sync.NewCond(&lock)
-
-		orch        = orchestrator.NewOrchestrator(myInfos)
-		nodeHandler = conn.NewNodeHandler(shutdown)
+		storage       = storage.NewStorage()
+		orch          = orchestrator.NewOrchestrator(storage, myInfos)
+		nodeHandler   = conn.NewNodeHandler(storage, shutdown)
 	)
 
 	if debugModePtr {

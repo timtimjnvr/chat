@@ -37,9 +37,9 @@ const (
 	typeCommand            = "type a Command :"
 )
 
-func NewOrchestrator(myInfos *crdt.NodeInfos) *Orchestrator {
+func NewOrchestrator(storage *storage.Storage, myInfos *crdt.NodeInfos) *Orchestrator {
 	var (
-		s     = storage.NewStorage()
+		s     = storage
 		id, _ = s.AddNewChat(myInfos.Name)
 		o     = &Orchestrator{
 			RWMutex: &sync.RWMutex{},
