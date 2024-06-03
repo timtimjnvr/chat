@@ -225,10 +225,6 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 			case crdt.KillNode:
 				o.storage.RemoveNodeSlotFromStorage(op.Slot)
-				if op.Slot == 0 {
-					// Node handler need to close all TCP connections
-					toSend <- op
-				}
 
 			case crdt.RemoveChat:
 				// Only one chat in storage
@@ -277,6 +273,10 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 				o.updateCurrentChat(newID)
 				newCurrentName, _ := o.storage.GetChatName(newID)
 				fmt.Printf("Switched to chat %s\n", newCurrentName)
+
+			case crdt.Quit:
+				// Node handler need to close all TCP connections (node slot 0)
+				toSend <- crdt.NewOperation(crdt.KillNode, "", nil)
 			}
 		}
 	}
@@ -368,8 +368,7 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, osStdin *os.File, toExecu
 					toExecute <- crdt.NewOperation(crdt.RemoveChat, o.currenChatID.String(), o.myInfos)
 
 				case crdt.Quit:
-					// Send kill operation to all connection (node slot 0)
-					toExecute <- crdt.NewOperation(crdt.KillNode, "", nil)
+					toExecute <- crdt.NewOperation(crdt.Quit, "", nil)
 
 					// TODO cleaner synchronisation
 					<-time.Tick(1 * time.Second)
