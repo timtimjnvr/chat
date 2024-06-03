@@ -2,7 +2,7 @@
 ![example workflow](https://github.com/timtimjnvr/chat/actions/workflows/build.yml/badge.svg)
 ![example workflow](https://github.com/timtimjnvr/chat/actions/workflows/tag-releases.yml/badge.svg)
 
-Decentralized P2P chat built in golang.
+Decentralized P2P in terminal chat built in golang.
 
 ## Commands
 
@@ -21,8 +21,8 @@ Decentralized P2P chat built in golang.
 - Multi-user rooms feature (for now only two users in a room)
 
 ## Doc
-- Node management : [CRDTs choices](doc/crdt.md)
 - Architecture
-![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/architecture.png?raw=true)
-- Joining a chat
-![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/joining_sequence.png?raw=true)
+  ![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/architecture.png?raw=true)
+- data exchanges : [CRDTs choices](doc/crdt.md)
+- protocol to join & leave :
+![alt text](https://github.com/timtimjnvr/chat/blob/main/doc/sequence.png?raw=true)
