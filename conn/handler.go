@@ -60,7 +60,6 @@ func (n *node) start(done chan<- slot) {
 
 	defer func() {
 		n.Wg.Done()
-		done <- n.slot
 	}()
 
 	go reader.Read(n.conn, outputConnection, reader.Separator, n.Shutdown)
@@ -71,20 +70,24 @@ func (n *node) start(done chan<- slot) {
 			return
 
 		case message := <-n.Input:
-			// hide own slot to remote client
+			// Hide own slot to remote client
 			message = resetSlot(message)
-			n, err := n.conn.Write(message)
+			_, err := n.conn.Write(message)
 			if err != nil {
-				fmt.Printf("Write %d, %s\n", n, err)
+				fmt.Printf("Write: %s\n", err)
+				// TCP connection need to be re established
+				done <- n.slot
+				return
 			}
 
 		case message, ok := <-outputConnection:
 			if !ok {
-				// conn closed by the remote client
+				// TCP connection closed and need to be re established
+				done <- n.slot
 				return
 			}
 
-			// set node slot for chat NodeHandler
+			// Set node slot for chat NodeHandler
 			n.setSlot(message)
 			n.Output <- message
 		}
@@ -196,16 +199,32 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			d.nodes[s] = n
 			nodeAccess.Unlock()
 
+			// TCP connection closed unexpectedly
 		case s := <-done:
 			if d.debugMode {
 				fmt.Println("[DEBUG] node Handler", "Node done", s)
 			}
 
-			quitOperation := crdt.NewOperation(crdt.KillNode, "", nil)
-			quitOperation.Slot = uint8(s)
-			toExecute <- quitOperation
+			nodeInfos, err := d.nodeStorage.GetNodeBySlot(uint8(s))
+			if err != nil {
+				log.Println("[ERROR] ", err)
+				continue
+			}
+
+			c, err := openConnection(nodeInfos.Address, nodeInfos.Port)
+			if err != nil {
+				log.Println("[ERROR] ", err)
+				continue
+			}
+
+			resetNode, err := newNode(c, s, outputNodes)
+			if err != nil {
+				log.Println("[ERROR] ", err)
+				continue
+			}
+
 			nodeAccess.Lock()
-			d.nodes[s] = nil
+			d.nodes[s] = resetNode
 			nodeAccess.Unlock()
 
 		case operationBytes := <-outputNodes:
@@ -223,7 +242,7 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 				fmt.Println("[DEBUG] node Handler", crdt.GetOperationName(operation.Typology), "operation received")
 			}
 
-			// need to create connection and set slot in operation
+			// Open TCP connection
 			if operation.Typology == crdt.AddNode {
 				newNodeInfos, ok := operation.Data.(*crdt.NodeInfos)
 				if !ok {
@@ -263,6 +282,28 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 				operation.Slot = uint8(s)
 			}
 
+			// Close TCP connection
+			if operation.Typology == crdt.KillNode {
+				nodeAccess.Lock()
+
+				// Kill all TCP connections
+				if operation.Slot == 0 {
+					for _, n := range d.nodes {
+						if n != nil {
+							n.stop()
+							n = nil
+						}
+					}
+				} else {
+					// Kill specific TCP connection
+					if n, exists := d.nodes[slot(operation.Slot)]; exists && n != nil {
+						n.stop()
+						n = nil
+					}
+				}
+
+				nodeAccess.Unlock()
+			}
 			toExecute <- operation
 		}
 	}
