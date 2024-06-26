@@ -2,7 +2,6 @@ package orchestrator
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"github/timtimjnvr/chat/conn"
 	"github/timtimjnvr/chat/crdt"
 	"github/timtimjnvr/chat/parsestdin"
@@ -11,7 +10,8 @@ import (
 	"log"
 	"os"
 	"sync"
-	"time"
+
+	"github.com/google/uuid"
 )
 
 type (
@@ -60,20 +60,23 @@ func (o *Orchestrator) SetDebugMode() {
 
 // HandleChats maintains chat infos consistency by executing and propagating operations received
 // from stdin or TCP connections through the channel toExecute
-func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Operation, toSend chan<- *crdt.Operation, shutdown <-chan struct{}) {
+func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Operation, toSend chan<- *crdt.Operation) {
 	defer func() {
+		close(toSend)
 		wg.Done()
 	}()
 
 	for {
 		select {
-		case <-shutdown:
-			if o.debugMode {
-				fmt.Println("[DEBUG] orch", "shutting down")
-			}
-			return
+		case op, noMore := <-toExecute:
+			if noMore {
+				if o.debugMode {
+					fmt.Println("[DEBUG] orch handle chats shutting down")
+				}
 
-		case op := <-toExecute:
+				return
+			}
+
 			if o.debugMode {
 				fmt.Println("[DEBUG] orch", crdt.GetOperationName(op.Typology), "operation to execute")
 			}
@@ -277,12 +280,24 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			case crdt.Quit:
 				// Node handler need to close all TCP connections (node slot 0)
 				toSend <- crdt.NewOperation(crdt.KillNode, "", nil)
+
+				// Actual program closure
+				process, err := os.FindProcess(os.Getpid())
+				if err != nil {
+					os.Exit(1)
+				}
+
+				// signal main to stop
+				err = process.Signal(os.Interrupt)
+				if err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}
 }
 
-func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, osStdin *os.File, toExecute chan *crdt.Operation, outgoingConnectionRequests chan<- conn.ConnectionRequest, shutdown chan struct{}) {
+func (o *Orchestrator) HandleStdin(osStdin *os.File, toExecute chan *crdt.Operation, outgoingConnectionRequests chan<- conn.ConnectionRequest, shutdown chan struct{}, sigC chan os.Signal) {
 	var (
 		wgReadStdin = sync.WaitGroup{}
 		stdinChann  = make(chan []byte, MaxMessagesStdin)
@@ -295,7 +310,6 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, osStdin *os.File, toExecu
 		}
 		close(stopReading)
 		wgReadStdin.Wait()
-		wg.Done()
 	}()
 
 	go reader.Read(osStdin, stdinChann, reader.Separator, stopReading)
@@ -304,10 +318,8 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, osStdin *os.File, toExecu
 		fmt.Printf(logFormat, typeCommand)
 
 		select {
-		case <-shutdown:
-			if o.debugMode {
-				fmt.Println("[DEBUG] orch : shuting down HandleStdin")
-			}
+		case <-sigC:
+			quit(toExecute, shutdown)
 			return
 
 		case line := <-stdinChann:
@@ -368,22 +380,17 @@ func (o *Orchestrator) HandleStdin(wg *sync.WaitGroup, osStdin *os.File, toExecu
 					toExecute <- crdt.NewOperation(crdt.RemoveChat, o.currenChatID.String(), o.myInfos)
 
 				case crdt.Quit:
-					toExecute <- crdt.NewOperation(crdt.Quit, "", nil)
-
-					// TODO cleaner synchronisation
-					<-time.Tick(1 * time.Second)
-
-					process, err := os.FindProcess(os.Getpid())
-					if err != nil {
-						log.Fatal(err)
-					}
-
-					// signal main to stop
-					process.Signal(os.Interrupt)
+					quit(toExecute, shutdown)
+					return
 				}
 			}
 		}
 	}
+}
+
+func quit(toExecute chan *crdt.Operation, shutdown chan struct{}) {
+	toExecute <- crdt.NewOperation(crdt.Quit, "", nil)
+	close(shutdown)
 }
 
 func sameAddress(addr1, addr2 string) bool {
