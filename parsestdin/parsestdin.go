@@ -2,9 +2,10 @@ package parsestdin
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"github/timtimjnvr/chat/crdt"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 type (
