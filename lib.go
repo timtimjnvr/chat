@@ -18,12 +18,11 @@ func start(addr string, port string, name string, stdin *os.File, sigc chan os.S
 		connectionRequests = make(chan conn.ConnectionRequest)
 		newConnections     = make(chan net.Conn)
 		toSend             = make(chan *crdt.Operation)
-		// 2 senders
+		// 2 senders : node handler & orchestrator (operations from stdin)
 		toExecute = make(chan *crdt.Operation, 2)
 
 		wgListen      = sync.WaitGroup{}
 		wgHandleChats = sync.WaitGroup{}
-		wgHandleStdin = sync.WaitGroup{}
 		lock          = sync.Mutex{}
 		isReady       = sync.NewCond(&lock)
 		storage       = storage.NewStorage()
@@ -35,14 +34,6 @@ func start(addr string, port string, name string, stdin *os.File, sigc chan os.S
 		orch.SetDebugMode()
 		nodeHandler.SetDebugMode()
 	}
-
-	defer func() {
-		wgHandleStdin.Wait()
-		wgHandleChats.Wait()
-		wgListen.Wait()
-		nodeHandler.Wg.Wait()
-		fmt.Println("[INFO] program shutdown")
-	}()
 
 	// create connections : tcp connect & listen for incoming connections
 	wgListen.Add(1)
@@ -61,4 +52,10 @@ func start(addr string, port string, name string, stdin *os.File, sigc chan os.S
 
 	// create operations from stdin input
 	orch.HandleStdin(stdin, toExecute, connectionRequests, shutDown, sigc)
+
+	wgHandleChats.Wait()
+	wgListen.Wait()
+	nodeHandler.Wg.Wait()
+	fmt.Println("[INFO] program shutdown")
+
 }

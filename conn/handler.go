@@ -76,8 +76,8 @@ func (n *node) start(done chan<- slot) {
 				return
 			}
 
-		case message, ok := <-outputConnection:
-			if !ok {
+		case message, more := <-outputConnection:
+			if !more {
 				select {
 				case <-n.Shutdown:
 					// simple closure
@@ -103,9 +103,6 @@ func (n *node) setSlot(message []byte) []byte {
 }
 
 func (n *node) stop() {
-	if n == nil {
-		return
-	}
 	close(n.Shutdown)
 	n.Wg.Wait()
 }
@@ -143,11 +140,15 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 	)
 
 	defer func() {
+		nodeAccess.Lock()
 		for _, n := range d.nodes {
 			n.stop()
+			n = nil
 		}
+		nodeAccess.Unlock()
 
 		TCPHandling.Done()
+		close(toExecute)
 		d.Wg.Done()
 	}()
 
@@ -160,6 +161,7 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			case operation, more := <-toSend:
 				// Received shutdown
 				if !more {
+					fmt.Println("no more operations to send")
 					close(stopTCPConnectionsHandling)
 					TCPHandling.Wait()
 					return
@@ -168,6 +170,7 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 				if d.debugMode {
 					fmt.Println("[DEBUG] node Handler", crdt.GetOperationName(operation.Typology), "operation to send")
 				}
+
 				// Set slot
 				s := slot(operation.Slot)
 
@@ -202,7 +205,14 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 
 			return
 
-		case c := <-newConnections:
+		case c, more := <-newConnections:
+			if !more {
+				if d.debugMode {
+					fmt.Println("[DEBUG] node Handler", "no new connections anymore")
+				}
+				continue
+			}
+
 			s := d.getNextSlot()
 			if d.debugMode {
 				fmt.Println("[DEBUG] node Handler", "New connection", s)
