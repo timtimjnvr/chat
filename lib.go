@@ -18,7 +18,8 @@ func start(addr string, port string, name string, stdin *os.File, sigc chan os.S
 		connectionRequests = make(chan conn.ConnectionRequest)
 		newConnections     = make(chan net.Conn)
 		toSend             = make(chan *crdt.Operation)
-		toExecute          = make(chan *crdt.Operation)
+		// 2 senders
+		toExecute = make(chan *crdt.Operation, 2)
 
 		wgListen      = sync.WaitGroup{}
 		wgHandleChats = sync.WaitGroup{}

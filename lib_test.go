@@ -59,7 +59,6 @@ func TestTwoUsers(t *testing.T) {
 	}
 
 	// Set up test resources and start test scenarios
-	rand.Seed(time.Now().UnixNano())
 	var (
 		port1 = rand.Intn(65533-49152) + 49152
 		port2 = port1 + 1
@@ -98,7 +97,7 @@ func TestTwoUsers(t *testing.T) {
 		return
 	}
 
-	<-time.Tick(1 * time.Second)
+	<-time.Tick(5 * time.Second)
 
 	_, err = w2.Write([]byte("/msg hey man"))
 	if err != nil {
@@ -112,10 +111,13 @@ func TestTwoUsers(t *testing.T) {
 	sigC1 <- syscall.SIGINT
 	sigC2 <- syscall.SIGINT
 
+	fmt.Println("pass 1")
 	// stop reading redirected stdout
 	// wait for simulation to be done
 	close(stop)
 	wg.Wait()
+
+	fmt.Println("pass 2")
 
 	// restoring stdout for printing test results
 	wStdout.Close()
