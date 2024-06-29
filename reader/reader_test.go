@@ -2,13 +2,14 @@ package reader
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"strings"
 	"sync"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var separator = []byte("\n")

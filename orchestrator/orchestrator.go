@@ -68,8 +68,8 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 
 	for {
 		select {
-		case op, noMore := <-toExecute:
-			if noMore {
+		case op, more := <-toExecute:
+			if !more {
 				if o.debugMode {
 					fmt.Println("[DEBUG] orch handle chats shutting down")
 				}
@@ -280,18 +280,7 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 			case crdt.Quit:
 				// Node handler need to close all TCP connections (node slot 0)
 				toSend <- crdt.NewOperation(crdt.KillNode, "", nil)
-
-				// Actual program closure
-				process, err := os.FindProcess(os.Getpid())
-				if err != nil {
-					os.Exit(1)
-				}
-
-				// signal main to stop
-				err = process.Signal(os.Interrupt)
-				if err != nil {
-					log.Fatal(err)
-				}
+				return
 			}
 		}
 	}
