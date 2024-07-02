@@ -1,8 +1,12 @@
 # IDE
 .idea/
+.zed/
 
 # MacOSX
 .DS_Store
 
 # test coverage
 cover.out
+
+# Debugs
+stdout
