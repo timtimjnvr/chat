@@ -54,10 +54,6 @@ func NewOrchestrator(storage *storage.Storage, myInfos *crdt.NodeInfos) *Orchest
 	return o
 }
 
-func (o *Orchestrator) SetDebugMode() {
-	o.debugMode = true
-}
-
 // HandleChats maintains chat infos consistency by executing and propagating operations received
 // from stdin or TCP connections through the channel toExecute
 func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Operation, toSend chan<- *crdt.Operation) {
@@ -70,15 +66,8 @@ func (o *Orchestrator) HandleChats(wg *sync.WaitGroup, toExecute chan *crdt.Oper
 		select {
 		case op, more := <-toExecute:
 			if !more {
-				if o.debugMode {
-					fmt.Println("[DEBUG] orch handle chats shutting down")
-				}
 
 				return
-			}
-
-			if o.debugMode {
-				fmt.Println("[DEBUG] orch", crdt.GetOperationName(op.Typology), "operation to execute")
 			}
 
 			switch op.Typology {
@@ -294,9 +283,7 @@ func (o *Orchestrator) HandleStdin(osStdin *os.File, toExecute chan *crdt.Operat
 	)
 
 	defer func() {
-		if o.debugMode {
-			fmt.Println("[DEBUG] orch : defering HandleStdin")
-		}
+
 		close(stopReading)
 		wgReadStdin.Wait()
 	}()
@@ -312,9 +299,6 @@ func (o *Orchestrator) HandleStdin(osStdin *os.File, toExecute chan *crdt.Operat
 			return
 
 		case line := <-stdinChann:
-			if o.debugMode {
-				fmt.Println("[DEBUG] orch : got new line from stdin")
-			}
 			cmd, err := parsestdin.NewCommand(string(line))
 			if err != nil {
 				fmt.Printf(logErrFormat, err)

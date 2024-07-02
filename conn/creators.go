@@ -49,7 +49,6 @@ func CreateConnections(wg *sync.WaitGroup, isReady *sync.Cond, myInfos *crdt.Nod
 		}
 
 		wgInitNodeConnections.Wait()
-		close(newConnections)
 		isReady.Signal()
 		wgClosure.Wait()
 		wg.Done()

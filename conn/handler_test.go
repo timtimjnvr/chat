@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNodeHandler_StartAndStop(t *testing.T) {
+func TestNode_StartAndStop(t *testing.T) {
 	var (
 		output          = make(chan []byte, maxMessageSize)
 		done            = make(chan slot, 2)
@@ -60,6 +60,18 @@ func TestNodeHandler_StartAndStop(t *testing.T) {
 		sender.Wg.Wait()
 		reader.Wg.Wait()
 	}()
+
+	timeout = time.NewTicker(1 * time.Second).C
+	received := make([]slot, 0, 2)
+	select {
+	case <-timeout:
+		assert.Fail(t, "test timeout")
+	case s := <-done:
+		received = append(received, s)
+		if len(received) == 2 {
+			return
+		}
+	}
 }
 
 func TestNodeHandler_Send(t *testing.T) {
