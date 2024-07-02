@@ -30,11 +30,6 @@ func start(addr string, port string, name string, stdin *os.File, sigc chan os.S
 		nodeHandler   = conn.NewNodeHandler(storage)
 	)
 
-	if debugModePtr {
-		orch.SetDebugMode()
-		nodeHandler.SetDebugMode()
-	}
-
 	// create connections : tcp connect & listen for incoming connections
 	wgListen.Add(1)
 	isReady.L.Lock()

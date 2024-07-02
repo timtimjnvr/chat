@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 type (
@@ -21,12 +23,10 @@ type (
 		Input  chan []byte
 		Output chan<- []byte
 
-		Wg       *sync.WaitGroup
-		Shutdown chan struct{}
+		Wg *sync.WaitGroup
 	}
 
 	NodeHandler struct {
-		debugMode   bool
 		nodeStorage NodeStorage
 		nodes       map[slot]*node
 
@@ -45,27 +45,35 @@ func newNode(conn net.Conn, slot slot, output chan<- []byte) (*node, error) {
 	}
 
 	return &node{
-		slot:     slot,
-		conn:     c,
-		Input:    make(chan []byte),
-		Output:   output,
-		Wg:       &sync.WaitGroup{},
-		Shutdown: make(chan struct{}, 0),
+		slot:   slot,
+		conn:   c,
+		Input:  make(chan []byte),
+		Output: output,
+		Wg:     &sync.WaitGroup{},
 	}, nil
 }
 
 func (n *node) start(done chan<- slot) {
-	outputConnection := make(chan []byte)
-	defer n.Wg.Done()
+	var (
+		outputConnection = make(chan []byte)
+		stopReading      = make(chan struct{})
+		isClosing        = atomic.Bool{}
+	)
+	defer func() {
+		isClosing.Store(true)
+		close(stopReading)
+		n.Wg.Done()
+	}()
 
-	go reader.Read(n.conn, outputConnection, reader.Separator, n.Shutdown)
+	go reader.Read(n.conn, outputConnection, reader.Separator, stopReading)
 
 	for {
 		select {
-		case <-n.Shutdown:
-			return
+		case message, more := <-n.Input:
+			if !more {
+				return
+			}
 
-		case message := <-n.Input:
 			// Hide own slot to remote client
 			message = resetSlot(message)
 			_, err := n.conn.Write(message)
@@ -78,13 +86,8 @@ func (n *node) start(done chan<- slot) {
 
 		case message, more := <-outputConnection:
 			if !more {
-				select {
-				case <-n.Shutdown:
-					// simple closure
-					return
-
-				default:
-					// TCP connection closed and need to be re established
+				// TCP connection closed and need to be re established
+				if !isClosing.Load() {
 					done <- n.slot
 					return
 				}
@@ -103,7 +106,7 @@ func (n *node) setSlot(message []byte) []byte {
 }
 
 func (n *node) stop() {
-	close(n.Shutdown)
+	close(n.Input)
 	n.Wg.Wait()
 }
 
@@ -126,10 +129,6 @@ func NewNodeHandler(nodeStorage NodeStorage) *NodeHandler {
 	}
 }
 
-func (d *NodeHandler) SetDebugMode() {
-	d.debugMode = true
-}
-
 func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.Operation, toExecute chan<- *crdt.Operation) {
 	var (
 		nodeAccess                 = &sync.Mutex{}
@@ -140,15 +139,14 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 	)
 
 	defer func() {
-		nodeAccess.Lock()
-		for _, n := range d.nodes {
-			n.stop()
-			n = nil
-		}
-		nodeAccess.Unlock()
-
 		TCPHandling.Done()
 		close(toExecute)
+		// Hugly but needed
+		// this is the last go routine to exit
+		// when this exits all leaving TCP connections will be closed
+		// we want them to be closed cleanly by the remote nodes
+		// wen the KillNode operation is received
+		<-time.Tick(5 * time.Second)
 		d.Wg.Done()
 	}()
 
@@ -161,14 +159,9 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			case operation, more := <-toSend:
 				// Received shutdown
 				if !more {
-					fmt.Println("no more operations to send")
 					close(stopTCPConnectionsHandling)
 					TCPHandling.Wait()
 					return
-				}
-
-				if d.debugMode {
-					fmt.Println("[DEBUG] node Handler", crdt.GetOperationName(operation.Typology), "operation to send")
 				}
 
 				// Set slot
@@ -199,24 +192,12 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 	for {
 		select {
 		case <-stopTCPConnectionsHandling:
-			if d.debugMode {
-				fmt.Println("[DEBUG] node Handler", "Stopping TCP connections handling")
-			}
 
 			return
 
-		case c, more := <-newConnections:
-			if !more {
-				if d.debugMode {
-					fmt.Println("[DEBUG] node Handler", "no new connections anymore")
-				}
-				continue
-			}
-
+		case c := <-newConnections:
+			fmt.Println("[DEBUG] node Handler", "New connection")
 			s := d.getNextSlot()
-			if d.debugMode {
-				fmt.Println("[DEBUG] node Handler", "New connection", s)
-			}
 
 			n, err := newNode(c, d.getNextSlot(), outputNodes)
 			if err != nil {
@@ -230,11 +211,8 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			d.nodes[s] = n
 			nodeAccess.Unlock()
 
-			// TCP connection closed
+			// TCP connection closed unexpectedly
 		case s := <-done:
-			if d.debugMode {
-				fmt.Println("[DEBUG] node Handler", "Node done", s)
-			}
 
 			nodeInfos, err := d.nodeStorage.GetNodeBySlot(uint8(s))
 			if err != nil {
@@ -259,18 +237,11 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 			nodeAccess.Unlock()
 
 		case operationBytes := <-outputNodes:
-			if d.debugMode {
-				fmt.Println("[DEBUG] node Handler received operationBytes")
-			}
 
 			operation, err := crdt.DecodeOperation(operationBytes)
 			if err != nil {
 				log.Println("[ERROR] ", err)
 				continue
-			}
-
-			if d.debugMode {
-				fmt.Println("[DEBUG] node Handler", crdt.GetOperationName(operation.Typology), "operation received")
 			}
 
 			// Open TCP connection
@@ -283,18 +254,11 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 
 				// establish connection and set slot
 				var c net.Conn
-				if d.debugMode {
-					fmt.Println("[DEBUG] node Handler establishing connection")
-				}
 
 				c, err = openConnection(newNodeInfos.Address, newNodeInfos.Port)
 				if err != nil {
 					log.Println("[ERROR] ", err)
 					break
-				}
-
-				if d.debugMode {
-					fmt.Println("[DEBUG] node Handler connection established")
 				}
 
 				s := d.getNextSlot()
@@ -319,18 +283,18 @@ func (d *NodeHandler) Start(newConnections <-chan net.Conn, toSend <-chan *crdt.
 
 				// Kill all TCP connections
 				if operation.Slot == 0 {
-					for _, n := range d.nodes {
+					for s, n := range d.nodes {
 						if n != nil {
 							fmt.Println("closing connection")
 							n.stop()
-							n = nil
+							d.nodes[s] = nil
 						}
 					}
 				} else {
 					// Kill specific TCP connection
 					if n, exists := d.nodes[slot(operation.Slot)]; exists && n != nil {
 						n.stop()
-						n = nil
+						d.nodes[slot(operation.Slot)] = nil
 					}
 				}
 
